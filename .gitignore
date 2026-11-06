@@ -1,6 +1,11 @@
 # 接続の設定（キーを含む）
+.env
 .env.local
+*.local.env
 workshop.config
+workshop.local.env
+# 設定ファイルを書いている途中の一時ファイル（team.py env）
+.*.tmp
 
 # Python
 .venv/
@@ -8,3 +13,4 @@ __pycache__/
 
 # 作業用
 _work/
+.superpowers/

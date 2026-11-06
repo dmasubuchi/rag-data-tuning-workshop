@@ -6,12 +6,16 @@
   python tools/team.py check-names --team suika   作る前に、名前が使えるかを Azure に聞く（何も作らない）
   python tools/team.py health      --team suika   作ったものの状態を見る（読み取りだけ）
   python tools/team.py env --role member --team suika   接続の設定 .env.local を作る（--role は builder か member）
+  python tools/team.py env --role member --team suika --out member.local.env   メンバーに渡す設定を別の名前で書き出す
 
 --team を省略すると、環境変数 WORKSHOP_TEAM を使う（PowerShell では $env:WORKSHOP_TEAM = "suika"）。
---config は組織の設定ファイル（既定は workshop.config。雛形は config/workshop.example.config）。
+--config は組織の設定ファイル（既定は Repo 直下の workshop.config。どのフォルダーで実行しても同じ。雛形は
+config/workshop.example.config）。
 
-env は az でキーを読み、Repo 直下の .env.local にだけ書く（画面には出さない）。
-  builder（構築する人）は AI Search の管理者キー、member（メンバー）は検索用のキー。
+env は az でキーを読み、設定ファイルに書く（画面には出さない）。書き先は、既定では Repo 直下の .env.local。
+--out PATH を付けると、そこに書く（構築する人が、メンバー用の設定を書き出して渡すとき）。Repo の中に書くなら、
+Git に入らない名前（.env.local、*.local.env）にする。
+  builder（構築する人）は AI Search の管理者キー（人に渡さない）、member（メンバー）は検索用のキー（チームの外に渡さない）。
 
 動かすのは Python の標準ライブラリと az だけ。Azure に何かを作る・変える・消すコマンドは、このファイルに入っていない
 （az に渡せるコマンドは teamlib/az.py の READ_ONLY の一覧に限る）。
@@ -27,7 +31,8 @@ from teamlib.envfile import CHAT_DEPLOYMENT, EMBEDDING_DEPLOYMENT, ENV_FILE, ROL
 from teamlib.names import ConfigError, Names, NameRuleError, check_org, check_team, load_config, make_names
 
 ENV_NAME = "WORKSHOP_TEAM"
-DEFAULT_CONFIG = "workshop.config"
+REPO_DIR = Path(__file__).resolve().parent.parent
+DEFAULT_CONFIG = REPO_DIR / "workshop.config"   # 作業場所でなく Repo 直下
 DEPLOYMENTS = (EMBEDDING_DEPLOYMENT, CHAT_DEPLOYMENT)
 
 
@@ -353,10 +358,13 @@ def build_parser():
                         ("env", "接続の設定 .env.local を作る（キーは画面に出さない）")):
         p = sub.add_parser(name, help=help_)
         p.add_argument("--team", help=f"チームの名前（省略すると環境変数 {ENV_NAME}）")
-        p.add_argument("--config", default=DEFAULT_CONFIG, help=f"組織の設定ファイル（既定 {DEFAULT_CONFIG}）")
+        p.add_argument("--config", default=DEFAULT_CONFIG,
+                       help="組織の設定ファイル（既定は Repo 直下の workshop.config）")
         if name == "env":
             p.add_argument("--role", required=True, choices=sorted(ROLES),
                            help="builder＝構築する人（AI Search の管理者キー）、member＝メンバー（検索用のキー）")
+            p.add_argument("--out", type=Path, metavar="PATH",
+                           help="設定を書き出す場所（既定は Repo 直下の .env.local）。メンバーに渡す設定を別の名前で書くとき")
     return parser
 
 
@@ -385,7 +393,7 @@ def main(argv=None, az=None, env_path=None) -> int:
         if args.command == "check-names":
             text, code = check_names_text(n.team, check_names(az, n))
         elif args.command == "env":
-            text, code = write_env(az, n, args.role, env_path or ENV_FILE), 0
+            text, code = write_env(az, n, args.role, args.out or env_path or ENV_FILE), 0
         else:
             text, code = health_text(n.team, health(az, n))
     except CheckError as error:

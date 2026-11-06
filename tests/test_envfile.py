@@ -8,11 +8,14 @@
 
 import contextlib
 import io
+import os
+import stat
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 REPO_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_DIR / "tools"))
@@ -22,7 +25,7 @@ from teamlib.az import Az, CheckError  # noqa: E402
 from teamlib.envfile import ENV_FILE, env_text, write_env  # noqa: E402
 from teamlib.names import make_names  # noqa: E402
 
-SUB = "sub-for-test"
+SUB = "0123abcd" + "-4567-" + "89ab-cdef-" + "0123456789ab"   # サブスクリプション ID の形（つないで作る）
 TENANT = "tenant-for-test"
 CONFIG_TEXT = (
     f"AZURE_SUBSCRIPTION_ID={SUB}\n"
@@ -126,6 +129,15 @@ class EnvTextTest(unittest.TestCase):
         self.assertTrue(text.endswith("\n"))
         self.assertIn("suika", text.splitlines()[0])
         self.assertTrue(text.startswith("#"))
+
+    def test_header_says_who_may_hold_the_file(self):
+        """構築する人用は「人に渡さない」、メンバー用は「チームの外に渡さない」（メンバーには渡す）。"""
+        builder = env_text(NAMES, "builder", ADMIN, AI).splitlines()[0]
+        member = env_text(NAMES, "member", QUERY, AI).splitlines()[0]
+        self.assertIn("人に渡さない", builder)
+        self.assertIn("チームの外に渡さない", member)
+        self.assertNotIn("人に渡さない", member)
+        self.assertIn("Git に入らない", member)
 
     def test_unknown_role_is_refused(self):
         for role in ("admin", "query", "Member", "", None):
@@ -299,8 +311,15 @@ class WriteEnvTest(TempCase):
         with self.assertRaises(CheckError) as caught:
             write_env(answers(), NAMES, "member", self.dir / "no-such-dir" / ".env.local")
         self.assertIn(".env.local", caught.exception.detail)
+        self.assertIn("前の設定ファイルはそのまま", caught.exception.detail)
         for key in ALL_KEYS:
             self.assertNotIn(key, caught.exception.detail)
+
+    def test_shown_text_tells_who_may_hold_the_file(self):
+        self.assertIn("人に渡しません", write_env(answers(), NAMES, "builder", self.path))
+        shown = write_env(answers(), NAMES, "member", self.path)
+        self.assertIn("チームの外には渡しません", shown)
+        self.assertNotIn("人に渡しません", shown)
 
     def test_written_as_utf8(self):
         write_env(answers(), NAMES, "member", self.path)
@@ -310,10 +329,90 @@ class WriteEnvTest(TempCase):
         self.assertEqual(ENV_FILE, REPO_DIR / ".env.local")
 
 
+# ------------------------------------------------------------------ 安全な書き込み
+
+class SafeWriteTest(TempCase):
+    OLD = "OLD_SETTING=1\n"
+
+    def leftovers(self):
+        return sorted(name for name in os.listdir(self.dir) if name != self.path.name)
+
+    def test_writes_through_a_private_temp_file_in_the_same_folder(self):
+        real_open, calls = os.open, []
+
+        def spy(path, flags, mode=0o777, **kw):
+            calls.append((Path(path), flags, mode))
+            return real_open(path, flags, mode, **kw)
+
+        with mock.patch("teamlib.envfile.os.open", side_effect=spy):
+            write_env(answers(), NAMES, "member", self.path)
+        self.assertEqual(len(calls), 1)
+        tmp, flags, mode = calls[0]
+        self.assertEqual(tmp.parent, self.path.parent)
+        self.assertNotEqual(tmp, self.path)
+        self.assertTrue(flags & os.O_EXCL and flags & os.O_CREAT and flags & os.O_WRONLY)
+        self.assertEqual(mode, 0o600)
+
+    def test_no_temp_file_is_left_after_success(self):
+        write_env(answers(), NAMES, "member", self.path)
+        self.assertEqual(self.leftovers(), [])
+
+    @unittest.skipIf(os.name == "nt", "Windows では権限のビットが使えない")
+    def test_file_is_private_to_the_owner(self):
+        self.path.write_text(self.OLD, encoding="utf-8")
+        self.path.chmod(0o644)
+        write_env(answers(), NAMES, "member", self.path)
+        self.assertEqual(stat.S_IMODE(self.path.stat().st_mode), 0o600)
+
+    def test_text_is_written_with_lf_only(self):
+        write_env(answers(), NAMES, "member", self.path)
+        self.assertNotIn(b"\r", self.path.read_bytes())
+
+    def test_failed_replace_keeps_the_previous_file(self):
+        self.path.write_text(self.OLD, encoding="utf-8")
+        with mock.patch("teamlib.envfile.os.replace", side_effect=OSError("boom")):
+            with self.assertRaises(CheckError) as caught:
+                write_env(answers(), NAMES, "member", self.path)
+        self.assertIn("前の設定ファイルはそのまま", caught.exception.detail)
+        self.assertEqual(self.read(), self.OLD)
+        self.assertEqual(self.leftovers(), [])
+
+    def test_failed_write_keeps_the_previous_file(self):
+        self.path.write_text(self.OLD, encoding="utf-8")
+        with mock.patch("teamlib.envfile.os.write", side_effect=OSError("disk full")):
+            with self.assertRaises(CheckError) as caught:
+                write_env(answers(), NAMES, "member", self.path)
+        self.assertIn("前の設定ファイルはそのまま", caught.exception.detail)
+        for key in ALL_KEYS:
+            self.assertNotIn(key, caught.exception.detail)
+        self.assertEqual(self.read(), self.OLD)
+        self.assertEqual(self.leftovers(), [])
+
+    def test_failed_write_without_a_previous_file_leaves_nothing(self):
+        with mock.patch("teamlib.envfile.os.replace", side_effect=OSError("boom")):
+            with self.assertRaises(CheckError):
+                write_env(answers(), NAMES, "builder", self.path)
+        self.assertEqual(os.listdir(self.dir), [])
+
+
 class GitignoreTest(unittest.TestCase):
+    def ignored(self, name):
+        done = subprocess.run(["git", "check-ignore", "-q", name], cwd=REPO_DIR, capture_output=True)
+        return done.returncode == 0
+
     def test_env_file_is_gitignored(self):
-        done = subprocess.run(["git", "check-ignore", "-q", ".env.local"], cwd=REPO_DIR, capture_output=True)
-        self.assertEqual(done.returncode, 0, ".env.local が .gitignore に入っていない")
+        self.assertTrue(self.ignored(".env.local"), ".env.local が .gitignore に入っていない")
+
+    def test_other_settings_files_are_gitignored(self):
+        for name in (".env", "member.local.env", "workshop.local.env", "workshop.config", ".superpowers/sdd/x.md",
+                     ".env.local.1234.abcd.tmp", ".member.local.env.1234.abcd.tmp"):
+            with self.subTest(name=name):
+                self.assertTrue(self.ignored(name), f"{name} が .gitignore に入っていない")
+
+    def test_examples_are_not_ignored(self):
+        for name in ("config/env.example", "config/workshop.example.config"):
+            with self.subTest(name=name):
+                self.assertFalse(self.ignored(name), f"{name} は Git に入れる")
 
 
 # ------------------------------------------------------------------ team.py env
@@ -353,6 +452,54 @@ class EnvCommandTest(TempCase):
         self.assertEqual(self.items()["AZURE_SEARCH_API_KEY"], ADMIN)
         for key in ALL_KEYS:
             self.assertNotIn(key, out)
+
+    def test_out_writes_member_settings_to_the_given_path(self):
+        out_path = self.dir / "hand-out" / "member.local.env"
+        out_path.parent.mkdir()
+        az = answers()
+        code, out, err = self.run_main("--out", str(out_path), az=az, role="member")
+        self.assertEqual(code, 0, out)
+        self.assertEqual(err, "")
+        text = out_path.read_text(encoding="utf-8")
+        self.assertIn("AZURE_SEARCH_KEY_ROLE=query", text)
+        self.assertIn("チームの外に渡さない", text.splitlines()[0])
+        self.assertNotIn(ADMIN, text)
+        self.assertNotIn(ADMIN_CALL, [call[:3] for call in az.calls])
+        self.assertFalse(self.path.exists(), "--out があるとき、既定の場所には書かない")
+        self.assertIn("member.local.env", out)
+        for key in ALL_KEYS:
+            self.assertNotIn(key, out)
+
+    def test_out_for_builder_keeps_the_builder_note(self):
+        out_path = self.dir / "builder.local.env"
+        code, out, _ = self.run_main("--out", str(out_path), az=answers(), role="builder")
+        self.assertEqual(code, 0, out)
+        self.assertIn("人に渡さない", out_path.read_text(encoding="utf-8").splitlines()[0])
+
+    def test_out_relative_path_is_relative_to_the_current_folder(self):
+        here = os.getcwd()
+        self.addCleanup(os.chdir, here)
+        os.chdir(self.dir)
+        code, out, _ = self.run_main("--out", "member.local.env", az=answers(), role="member")
+        self.assertEqual(code, 0, out)
+        self.assertTrue((self.dir / "member.local.env").exists())
+
+    def test_without_out_the_default_is_the_repo_env_local(self):
+        with mock.patch.object(team, "write_env", return_value="OK    x") as fake:
+            argv = ["env", "--config", str(self.config), "--team", "suika", "--role", "member"]
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(team.main(argv, az=answers()), 0)
+        self.assertEqual(Path(fake.call_args.args[3]), ENV_FILE)
+
+    def test_out_that_cannot_be_written_exits_1_and_keeps_the_previous_file(self):
+        out_path = self.dir / "member.local.env"
+        out_path.write_text("OLD_SETTING=1\n", encoding="utf-8")
+        with mock.patch("teamlib.envfile.os.replace", side_effect=OSError("boom")):
+            code, out, err = self.run_main("--out", str(out_path), az=answers(), role="member")
+        self.assertEqual(code, 1)
+        self.assertIn("前の設定ファイルはそのまま", out)
+        self.assertNotIn("Traceback", out + err)
+        self.assertEqual(out_path.read_text(encoding="utf-8"), "OLD_SETTING=1\n")
 
     def test_role_is_required_and_checked(self):
         for role in (None, "owner", "admin"):
