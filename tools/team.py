@@ -67,6 +67,24 @@ def _why(error: CheckError) -> str:
     return error.detail or "理由が分かりません"
 
 
+UNEXPECTED = "az の答えの形が想定外です"
+
+
+def _answer(value, kind, key=None):
+    """az の答えが想定の型（dict か list か bool）で、key があれば dict にそのキーがあることを確かめて返す。違えば CheckError。
+
+    空の答え（None）や、キーのない dict を、「ない」「使える」と読まないための確認。
+    """
+    if not isinstance(value, kind) or (key is not None and key not in value):
+        raise CheckError("other", UNEXPECTED)
+    return value
+
+
+def _dict(value) -> dict:
+    """入れ子の項目用。dict でなければ空の dict（項目は「分からない」になり、OK とは読まれない）。"""
+    return value if isinstance(value, dict) else {}
+
+
 def _keep_going(error: CheckError) -> None:
     """サインインが切れたときだけは、1行の結果にせず上へ投げる（main が az login の案内を出す）。"""
     if error.kind == "login":
@@ -84,30 +102,43 @@ def _arm(az, provider, action):
     return f"{ARM}/subscriptions/{az.subscription}/providers/{provider}/{action}"
 
 
+def _available(answer, key) -> bool:
+    """名前の空き確認の答え（dict の key が true か false）から、空いているかを取る。
+
+    形が違うとき、名前として受け付けられないとき（reason に Invalid）は CheckError。「ほかで使われている」とは言わない。
+    """
+    answer = _answer(answer, dict, key)
+    free = _answer(answer[key], bool)
+    reason = str(answer.get("reason") or "")
+    if not free and "invalid" in reason.lower():
+        raise CheckError("other", f"名前として受け付けられません（{reason[:40]}）")
+    return free
+
+
 def check_names(az, n: Names):
     """名前ごとに (ラベル, 名前, 状態) を返す。状態は FREE、TAKEN、EXISTS、または「確認できない（理由）」。"""
     def storage(name):
-        return bool((az.run("storage", "account", "check-name", "-n", name) or {}).get("nameAvailable"))
+        return _available(az.run("storage", "account", "check-name", "-n", name), "nameAvailable")
 
     def cosmos(name):
-        return not az.run("cosmosdb", "check-name-exists", "-n", name)
+        return not _answer(az.run("cosmosdb", "check-name-exists", "-n", name), bool)   # true なら、その名前がある
 
     def search(name):
         url = _arm(az, "Microsoft.Search", "checkNameAvailability") + "?api-version=2023-11-01"
-        return bool((az.post(url, {"name": name, "type": "searchServices"}) or {}).get("nameAvailable"))
+        return _available(az.post(url, {"name": name, "type": "searchServices"}), "nameAvailable")
 
     def foundry(name):
         url = _arm(az, "Microsoft.CognitiveServices", "checkDomainAvailability") + "?api-version=2023-05-01"
         body = {"subdomainName": name, "type": "Microsoft.CognitiveServices/accounts", "kind": "AIServices"}
-        return bool((az.post(url, body) or {}).get("isSubdomainAvailable"))
+        return _available(az.post(url, body), "isSubdomainAvailable")
 
     def in_subscription(name):
-        return bool(az.run("resource", "list", "--name", name))
+        return bool(_answer(az.run("resource", "list", "--name", name), list))
 
     rows = []
     group = n.resource_group
     try:
-        rows.append(("リソース グループ", group, EXISTS if az.run("group", "exists", "-n", group) else FREE))
+        rows.append(("リソース グループ", group, EXISTS if _answer(az.run("group", "exists", "-n", group), bool) else FREE))
     except CheckError as error:
         _keep_going(error)
         rows.append(("リソース グループ", group, f"確認できない（{_why(error)}）"))
@@ -165,10 +196,10 @@ def error_row(label: str, error: CheckError) -> Row:
     return Row(NG, label, _why(error))
 
 
-def _found(fn):
-    """fn() を呼ぶ。まだない（notfound）なら None。ほかのエラーはそのまま上げる。"""
+def _found(fn, kind):
+    """fn() を呼んで、kind の型の答えを返す。まだない（notfound）なら None。答えの形が違えば（空の答えも）CheckError。"""
     try:
-        return fn()
+        return _answer(fn(), kind)
     except CheckError as error:
         if error.kind == "notfound":
             return None
@@ -199,18 +230,18 @@ def health(az, n: Names):
 
     # リソースグループ
     try:
-        group = _found(lambda: az.run("group", "show", "-n", rg))
+        group = _found(lambda: az.run("group", "show", "-n", rg), dict)
     except CheckError as error:
         rows.append(error_row(L_RG, error))
     else:
         if group is None:
             later(L_RG, L_ST, L_SR, L_PRICE, L_SEM, L_FD, *L_DEP)
             return rows
-        add(OK, L_RG, (group.get("properties") or {}).get("provisioningState", ""))
+        add(OK, L_RG, _dict(group.get("properties")).get("provisioningState", ""))
 
     # Storage
     def storage_section():
-        st = _found(lambda: az.run("storage", "account", "show", "-n", n.storage, "-g", rg))
+        st = _found(lambda: az.run("storage", "account", "show", "-n", n.storage, "-g", rg), dict)
         if st is None:
             later(L_ST)
             return
@@ -218,20 +249,20 @@ def health(az, n: Names):
         if state != "Succeeded":
             add(MADA, L_ST, state or "状態が分かりません")
             return
-        add(OK, L_ST, f"{(st.get('sku') or {}).get('name')}・{st.get('kind')}")
+        add(OK, L_ST, f"{_dict(st.get('sku')).get('name')}・{st.get('kind')}")
 
     guard(L_ST, storage_section)
 
     # AI Search（価格レベル Basic、セマンティック ランカー Free）
     def search_section():
-        sv = _found(lambda: az.run("search", "service", "show", "-n", n.search, "-g", rg))
+        sv = _found(lambda: az.run("search", "service", "show", "-n", n.search, "-g", rg), dict)
         if sv is None:
             later(L_SR, L_PRICE, L_SEM)
             return
         state = str(sv.get("provisioningState"))
         ready = state.lower() == "succeeded"
         add(OK if ready else MADA, L_SR, sv.get("status") if ready else state)
-        sku = (sv.get("sku") or {}).get("name")
+        sku = _dict(sv.get("sku")).get("name")
         add(OK if sku == "basic" else NG, L_PRICE, "Basic" if sku == "basic" else f"{sku}。Basic のはず")
         semantic = sv.get("semanticSearch")
         if semantic == "free":
@@ -243,25 +274,29 @@ def health(az, n: Names):
 
     # Foundry とデプロイ
     def foundry_section():
-        fd = _found(lambda: az.run("cognitiveservices", "account", "show", "-n", n.foundry, "-g", rg))
+        fd = _found(lambda: az.run("cognitiveservices", "account", "show", "-n", n.foundry, "-g", rg), dict)
         if fd is None:
             later(L_FD, *L_DEP)
             return
-        state = (fd.get("properties") or {}).get("provisioningState")
+        state = _dict(fd.get("properties")).get("provisioningState")
         kind = fd.get("kind")
         if kind != "AIServices":
             add(NG, L_FD, f"種類 {kind}。AIServices のはず")
         else:
             add(OK if state == "Succeeded" else MADA, L_FD, "" if state == "Succeeded" else str(state))
-        listing = _found(lambda: az.run("cognitiveservices", "account", "deployment", "list", "-n", n.foundry, "-g", rg)) or []
-        by_name = {d.get("name"): d for d in listing}
+        try:
+            listing = _found(lambda: az.run("cognitiveservices", "account", "deployment", "list", "-n", n.foundry, "-g", rg), list) or []
+        except CheckError as error:
+            rows.extend(error_row(label, error) for label in L_DEP)   # 一覧を読めなかった。Foundry の行はそのまま
+            return
+        by_name = {d["name"]: d for d in listing if isinstance(d, dict) and isinstance(d.get("name"), str)}
         for name, label in zip(DEPLOYMENTS, L_DEP):
             d = by_name.get(name)
             if d is None:
                 add(MADA, label)
                 continue
-            sku = d.get("sku") or {}
-            dstate = str((d.get("properties") or {}).get("provisioningState"))
+            sku = _dict(d.get("sku"))
+            dstate = str(_dict(d.get("properties")).get("provisioningState"))
             note = f"{sku.get('name')}・容量{sku.get('capacity')}・{dstate}"
             if dstate.lower() in ("failed", "canceled"):
                 add(NG, label, note)

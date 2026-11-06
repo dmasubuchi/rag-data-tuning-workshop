@@ -441,6 +441,135 @@ class HealthTest(MainCase):
         self.assertTrue(az.calls)
 
 
+# ------------------------------------------------------------------ 想定外の答え
+
+BAD = "az の答えの形が想定外です"
+BOOL_BAD = (None, {}, [], "false", 0)   # true か false のはずの答え
+DICT_BAD = (None, {}, [], "yes", 3)     # dict のはずの答え
+
+
+def availability_bad(key):
+    """{key: true/false} のはずの答えとして、ありえない形。"""
+    return (*DICT_BAD, {"available": True}, {key: "true"}, {key: None})
+
+
+class UnexpectedAnswerTest(MainCase):
+    """az の答えの形が違うとき、「使える」「ほかで使われている」「まだ」と言い切らず、画面に traceback も出さない。"""
+
+    def assert_unknown(self, out, line_start):
+        lines = [line for line in out.splitlines() if line.startswith(line_start)]
+        self.assertEqual(len(lines), 1, out)
+        self.assertEqual(lines[0], f"{line_start}：確認できない（{BAD}）", out)
+
+    def test_check_names_unexpected_answer_is_unknown(self):
+        cases = (
+            ("リソース グループ rg-acme-suika", ("group", "exists"), BOOL_BAD),
+            ("Storage stacmesuika", ("storage", "account", "check-name"), availability_bad("nameAvailable")),
+            ("Cosmos DB cosmos-acme-suika", ("cosmosdb", "check-name-exists"), BOOL_BAD),
+            ("AI Search srch-acme-suika", ("rest", "post", "checkNameAvailability"), availability_bad("nameAvailable")),
+            ("Foundry ai-acme-suika", ("rest", "post", "checkDomainAvailability"), availability_bad("isSubdomainAvailable")),
+        )
+        for line_start, prefix, bad_answers in cases:
+            for bad in bad_answers:
+                with self.subTest(row=line_start, answer=bad):
+                    code, out, err = self.run_main("check-names", az=FakeAz(override(names_free(), (prefix, bad))))
+                    self.assertEqual(code, 1, out)
+                    self.assertEqual(err, "")
+                    self.assert_unknown(out, line_start)
+                    self.assertNotIn("すべて使えます", out)
+
+    def test_check_names_unexpected_resource_list_is_unknown(self):
+        for bad in (None, {}, "x", 3):
+            with self.subTest(answer=bad):
+                taken = override(names_free(), (("storage", "account", "check-name"), {"nameAvailable": False}), (("resource", "list"), bad))
+                code, out, _ = self.run_main("check-names", az=FakeAz(taken))
+                self.assertEqual(code, 1)
+                self.assert_unknown(out, "Storage stacmesuika")
+                self.assertNotIn("ほかで使われている", out)
+
+    def test_check_names_invalid_name_is_not_taken(self):
+        cases = (
+            ("Storage stacmesuika", ("storage", "account", "check-name"), {"nameAvailable": False, "reason": "AccountNameInvalid"}),
+            ("AI Search srch-acme-suika", ("rest", "post", "checkNameAvailability"), {"nameAvailable": False, "reason": "Invalid"}),
+            ("Foundry ai-acme-suika", ("rest", "post", "checkDomainAvailability"), {"isSubdomainAvailable": False, "reason": "SubdomainInvalid"}),
+        )
+        for line_start, prefix, answer in cases:
+            with self.subTest(row=line_start):
+                code, out, _ = self.run_main("check-names", az=FakeAz(override(names_free(), (prefix, answer), (("resource", "list"), []))))
+                self.assertEqual(code, 1)
+                row = next(line for line in out.splitlines() if line.startswith(line_start))
+                self.assertIn("確認できない（名前として受け付けられません（", row)
+                self.assertNotIn("ほかで使われている", row)
+
+    def test_check_names_already_exists_reason_is_still_taken(self):
+        taken = override(names_free(),
+                         (("storage", "account", "check-name"), {"nameAvailable": False, "reason": "AlreadyExists"}),
+                         (("rest", "post", "checkNameAvailability"), {"nameAvailable": False, "reason": "AlreadyExists"}),
+                         (("rest", "post", "checkDomainAvailability"), {"isSubdomainAvailable": False, "reason": "SubdomainAlreadyExists"}),
+                         (("resource", "list"), []))
+        code, out, _ = self.run_main("check-names", az=FakeAz(taken))
+        self.assertEqual(code, 1)
+        for line_start in ("Storage stacmesuika", "AI Search srch-acme-suika", "Foundry ai-acme-suika"):
+            self.assertIn(f"{line_start}：ほかで使われている", out)
+
+    def test_health_unexpected_answer_is_ng_not_mada(self):
+        cases = (
+            ("リソース グループ rg-acme-suika", ("group", "show")),
+            ("Storage stacmesuika", ("storage", "account", "show")),
+            ("AI Search srch-acme-suika", ("search", "service", "show")),
+            ("Foundry ai-acme-suika", ("cognitiveservices", "account", "show")),
+        )
+        for label, prefix in cases:
+            for bad in (None, [], "x", 3):
+                with self.subTest(row=label, answer=bad):
+                    code, out, err = self.run_main("health", az=FakeAz(override(healthy(), (prefix, bad))))
+                    self.assertEqual(code, 1, out)
+                    self.assertEqual(err, "")
+                    self.assertIn(f"NG    {label}（{BAD}）", out)
+
+    def test_health_empty_group_answer_does_not_look_like_nothing_built(self):
+        """リソース グループの答えが空でも、「全部まだ・終了コード 0」にしない。"""
+        az = FakeAz([(("group", "show"), None)], default=NOTFOUND)
+        code, out, _ = self.run_main("health", az=az)
+        self.assertEqual(code, 1)
+        self.assertIn(f"NG    リソース グループ rg-acme-suika（{BAD}）", out)
+        self.assertNotIn("OK 0・まだ 8・NG 0", out)
+
+    def test_health_unexpected_deployment_list_is_ng(self):
+        for bad in (None, {}, "x", 3):
+            with self.subTest(answer=bad):
+                code, out, _ = self.run_main("health", az=FakeAz(override(healthy(), (("cognitiveservices", "account", "deployment", "list"), bad))))
+                self.assertEqual(code, 1)
+                self.assertIn("OK    Foundry ai-acme-suika", out)
+                for name in ("text-embedding-3-small", "gpt-5-mini"):
+                    self.assertIn(f"NG    デプロイ {name}（{BAD}）", out)
+
+    def test_health_junk_in_deployment_list_is_ignored(self):
+        junk = [None, "x", 3, {"name": ["a"]}, {"sku": {}}]
+        code, out, _ = self.run_main("health", az=FakeAz(override(healthy(), (("cognitiveservices", "account", "deployment", "list"), junk))))
+        self.assertEqual(code, 0)
+        self.assertIn("まだ  デプロイ text-embedding-3-small", out)
+        self.assertIn("まだ  デプロイ gpt-5-mini", out)
+
+    def test_health_wrong_nested_types_do_not_crash(self):
+        weird = override(
+            healthy(),
+            (("group", "show"), {"properties": "x"}),
+            (("storage", "account", "show"), {"provisioningState": "Succeeded", "sku": "x", "kind": "y"}),
+            (("search", "service", "show"), {"provisioningState": "succeeded", "sku": ["a"], "semanticSearch": "free"}),
+            (("cognitiveservices", "account", "show"), {"kind": "AIServices", "properties": [1]}),
+            (("cognitiveservices", "account", "deployment", "list"),
+             [{"name": "gpt-5-mini", "sku": "x", "properties": "y"}, {"name": "text-embedding-3-small", "sku": [], "properties": None}]),
+        )
+        code, out, err = self.run_main("health", az=FakeAz(weird))
+        self.assertIn(code, (0, 1))
+        self.assertEqual(err, "")
+        self.assertNotIn("Traceback", out)
+        self.assertIn("NG    AI Search 価格レベル（None。Basic のはず）", out)   # 分からないものを OK とは読まない
+        self.assertNotIn("OK    Foundry ai-acme-suika", out)
+        self.assertNotIn("OK    デプロイ", out)
+
+
 # ------------------------------------------------------------------ main（設定・名前・サインイン）
 
 class MainTest(MainCase):
