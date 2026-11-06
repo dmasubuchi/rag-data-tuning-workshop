@@ -5,9 +5,13 @@
   python tools/team.py names       --team suika   名前を検査して、リソース名と PowerShell の1行を表示する
   python tools/team.py check-names --team suika   作る前に、名前が使えるかを Azure に聞く（何も作らない）
   python tools/team.py health      --team suika   作ったものの状態を見る（読み取りだけ）
+  python tools/team.py env --role member --team suika   接続の設定 .env.local を作る（--role は builder か member）
 
 --team を省略すると、環境変数 WORKSHOP_TEAM を使う（PowerShell では $env:WORKSHOP_TEAM = "suika"）。
 --config は組織の設定ファイル（既定は workshop.config。雛形は config/workshop.example.config）。
+
+env は az でキーを読み、Repo 直下の .env.local にだけ書く（画面には出さない）。
+  builder（構築する人）は AI Search の管理者キー、member（メンバー）は検索用のキー。
 
 動かすのは Python の標準ライブラリと az だけ。Azure に何かを作る・変える・消すコマンドは、このファイルに入っていない
 （az に渡せるコマンドは teamlib/az.py の READ_ONLY の一覧に限る）。
@@ -19,11 +23,12 @@ from pathlib import Path
 from typing import NamedTuple
 
 from teamlib.az import ARM, Az, CheckError
+from teamlib.envfile import CHAT_DEPLOYMENT, EMBEDDING_DEPLOYMENT, ENV_FILE, ROLES, write_env
 from teamlib.names import ConfigError, Names, NameRuleError, check_org, check_team, load_config, make_names
 
 ENV_NAME = "WORKSHOP_TEAM"
 DEFAULT_CONFIG = "workshop.config"
-DEPLOYMENTS = ("text-embedding-3-small", "gpt-5-mini")
+DEPLOYMENTS = (EMBEDDING_DEPLOYMENT, CHAT_DEPLOYMENT)
 
 
 # ------------------------------------------------------------------ チームの名前
@@ -344,14 +349,18 @@ def build_parser():
     sub = parser.add_subparsers(dest="command", required=True)
     for name, help_ in (("names", "名前を検査して、リソース名を表示する"),
                         ("check-names", "作る前に、名前が使えるかを確かめる（何も作らない）"),
-                        ("health", "作ったものの状態を見る（読み取りだけ）")):
+                        ("health", "作ったものの状態を見る（読み取りだけ）"),
+                        ("env", "接続の設定 .env.local を作る（キーは画面に出さない）")):
         p = sub.add_parser(name, help=help_)
         p.add_argument("--team", help=f"チームの名前（省略すると環境変数 {ENV_NAME}）")
         p.add_argument("--config", default=DEFAULT_CONFIG, help=f"組織の設定ファイル（既定 {DEFAULT_CONFIG}）")
+        if name == "env":
+            p.add_argument("--role", required=True, choices=sorted(ROLES),
+                           help="builder＝構築する人（AI Search の管理者キー）、member＝メンバー（検索用のキー）")
     return parser
 
 
-def main(argv=None, az=None) -> int:
+def main(argv=None, az=None, env_path=None) -> int:
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8", errors="replace")
@@ -375,6 +384,8 @@ def main(argv=None, az=None) -> int:
         preflight(az)
         if args.command == "check-names":
             text, code = check_names_text(n.team, check_names(az, n))
+        elif args.command == "env":
+            text, code = write_env(az, n, args.role, env_path or ENV_FILE), 0
         else:
             text, code = health_text(n.team, health(az, n))
     except CheckError as error:
