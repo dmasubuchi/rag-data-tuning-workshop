@@ -35,6 +35,9 @@ BANNED_DEFAULT = "~/ai/runtime/public-check/banned.txt"
 EXAMPLE_DOMAINS = {"example.com", "example.jp"}
 
 # 秘密らしい文字列の型。このファイル自身に引っかからないよう、リテラルの "=" は [=] と書く。
+# 名前の規則（最後の型）は、AZURE_SEARCH_ADMIN_KEY、"primaryKey"、"key1"、Ocp-Apim-Subscription-Key のように、
+# 名前に key・secret・token・password・connection string を含み、そのあとに 20 文字以上の値が続くものを拾う。
+# \w*+ は、長い行で正規表現が遅くならないための「戻らない」繰り返し（Python 3.11 以上）。
 SECRET_PATTERNS = [
     re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"),
     re.compile(r"AKIA[0-9A-Z]{16}"),
@@ -42,11 +45,16 @@ SECRET_PATTERNS = [
     re.compile(r"sk-[A-Za-z0-9_-]{32,}"),
     re.compile(r"AccountKey=[A-Za-z0-9+/=]{20,}"),
     re.compile(r"SharedAccessSignature[=]|[?&]sig=[A-Za-z0-9%+/=]{20,}"),
+    re.compile(r"""Authorization["']?\s*[:=]\s*["']?Bearer\s+[A-Za-z0-9+/_.=-]{20,}""", re.IGNORECASE),
     re.compile(
-        r"""(api[_-]?key|secret|token|password|passwd)["']?\s*[:=]\s*["']?[A-Za-z0-9+/_.-]{24,}""",
+        r"""(?:key|secret|token|password|passwd|connection_?string)\w*+["']?\s*[:=]\s*["']?[A-Za-z0-9+/_.-]{20,}""",
         re.IGNORECASE,
     ),
 ]
+# テナント・サブスクリプションなどの ID の形（ARM のリソース ID の /subscriptions/<ID>/ もこれで拾う）
+GUID_PATTERN = re.compile(
+    r"(?<![0-9A-Fa-f])[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}(?![0-9A-Fa-f])"
+)
 ABS_PATH_PATTERN = re.compile(r"/Users/[A-Za-z0-9._-]+/")
 EMAIL_PATTERN = re.compile(r"[A-Za-z0-9._%+-]+@([A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,})")
 
@@ -57,7 +65,7 @@ BATCH_BYTES = 64 * 1024 * 1024  # 履歴を読むとき、1回に git から受�
 class Finding(NamedTuple):
     path: str
     line: int
-    kind: str  # "secret" | "banned" | "abs-path" | "email"
+    kind: str  # "secret" | "guid" | "banned" | "abs-path" | "email"
     excerpt: str  # 見つけた文字列の先頭の数文字だけ。あとは "…" で伏せる
 
 
@@ -92,9 +100,16 @@ def scan_text(path: str, text: str, banned: list[str]) -> list[Finding]:
     banned_patterns = [re.compile(re.escape(term), re.IGNORECASE) for term in banned if term]
     findings: list[Finding] = []
     for lineno, line in enumerate(text.split("\n"), start=1):
+        secret_spans: list[tuple[int, int]] = []
         for pattern in SECRET_PATTERNS:
             for m in pattern.finditer(line):
+                if any(m.start() < end and start < m.end() for start, end in secret_spans):
+                    continue  # 同じ場所を、別の型でも見つけた
+                secret_spans.append(m.span())
                 findings.append(Finding(path, lineno, "secret", _mask(m.group())))
+        for m in GUID_PATTERN.finditer(line):
+            if m.group().strip("0-") != "":  # すべて 0 の GUID は、空の値の印なので除く
+                findings.append(Finding(path, lineno, "guid", _mask(m.group())))
         for m in ABS_PATH_PATTERN.finditer(line):
             findings.append(Finding(path, lineno, "abs-path", _mask(m.group())))
         for m in EMAIL_PATTERN.finditer(line):

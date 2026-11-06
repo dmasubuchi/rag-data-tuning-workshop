@@ -33,6 +33,19 @@ PRIVATE_KEY_HEAD = "-----BEGIN " + "RSA PRIVATE KEY-----"
 SAS_WORD = "SharedAccess" + "Signature=x"
 HOME_PATH = "/Us" + "ers/" + "someone" + "/docs"
 
+# Azure のキーの形の見本（名前と値を、つないで作る）
+ADMIN_KEY_LINE = "AZURE_SEARCH_ADMIN" + "_KEY=" + "c" * 32
+OPENAI_KEY_LINE = "AZURE_OPENAI" + "_KEY=" + "d" * 32
+ADMIN_KEY_QUOTED = "ADMIN" + "_KEY = " + '"' + "e" * 32 + '"'
+PRIMARY_KEY_JSON = '"primary' + 'Key": "' + "f" * 32 + '"'
+KEY1_JSON = '"key' + '1": "' + "g" * 32 + '"'
+CONNECTION_LINE = "connection" + "_string = " + "j" * 30
+APIM_HEADER = "Ocp-Apim-Subscription" + "-Key: " + "h" * 32
+BEARER_HEADER = "Authorization: " + "Bear" + "er " + "i" * 40
+# GUID（テナント・サブスクリプションの ID の形）の見本
+GUID = "0123abcd" + "-4567-" + "89ab-cdef-" + "0123456789ab"
+ARM_ID = "/subscrip" + "tions/" + GUID + "/resourceGroups/rg-x"
+
 
 def kinds(findings):
     return [f.kind for f in findings]
@@ -59,6 +72,16 @@ class ScanTextTests(unittest.TestCase):
             ("sig=", "URL " + SAS_URL, "secret"),
             ("SharedAccessSignature", SAS_WORD, "secret"),
             ("api_key の代入", API_KEY_LINE, "secret"),
+            ("AI Search の管理者キー", ADMIN_KEY_LINE, "secret"),
+            ("Azure OpenAI のキー", OPENAI_KEY_LINE, "secret"),
+            ("引用符つきの ADMIN_KEY", ADMIN_KEY_QUOTED, "secret"),
+            ("JSON の primaryKey", PRIMARY_KEY_JSON, "secret"),
+            ("JSON の key1", KEY1_JSON, "secret"),
+            ("接続文字列の代入", CONNECTION_LINE, "secret"),
+            ("Ocp-Apim-Subscription-Key", APIM_HEADER, "secret"),
+            ("Authorization: Bearer", BEARER_HEADER, "secret"),
+            ("GUID", "テナント " + GUID, "guid"),
+            ("ARM のリソース ID", "id: " + ARM_ID, "guid"),
             ("自分の Mac の絶対パス", "保存先は " + HOME_PATH, "abs-path"),
         ]
         for label, text, kind in cases:
@@ -70,10 +93,51 @@ class ScanTextTests(unittest.TestCase):
                     self.assertNotIn("A" * 12, f.excerpt)
                     self.assertNotIn("a" * 12, f.excerpt)
                     self.assertNotIn("b" * 12, f.excerpt)
+                    for letter in "cdefghij":
+                        self.assertNotIn(letter * 12, f.excerpt)
+                    self.assertNotIn("4567", f.excerpt)
 
     def test_short_values_are_not_secrets(self):
-        # 24 文字に満たない値は、api_key の代入として扱わない
-        self.assertEqual(scan_text("a.txt", "api_key: " + "b" * 23, []), [])
+        # 20 文字に満たない値は、キーの代入として扱わない
+        self.assertEqual(scan_text("a.txt", "api_key: " + "b" * 19, []), [])
+        self.assertEqual(scan_text("a.txt", ADMIN_KEY_LINE[:-13], []), [])
+        self.assertEqual(scan_text("a.txt", "Authorization: Bearer " + "i" * 19, []), [])
+
+    def test_key_name_rule_is_case_insensitive_and_wide(self):
+        for name in ("admin_key", "ADMIN_KEY", "AdminKey", "client_secret", "access_token", "db_password",
+                     "storage_connectionstring", "myPasswd"):
+            with self.subTest(name=name):
+                findings = scan_text("a.txt", name + ' = "' + "k" * 24 + '"', [])
+                self.assertEqual(kinds(findings), ["secret"])
+
+    def test_empty_placeholder_and_code_lines_are_not_secrets(self):
+        clean = [
+            "AZURE_SEARCH_ADMIN_KEY=",
+            "AZURE_SEARCH_API_KEY={search_key}",
+            'f"AZURE_OPENAI_API_KEY={ai_key}"',
+            "AZURE_SEARCH_API_KEY=<ここにキー>",
+            '"key": "short"',
+            "key_role, short, _ = ROLES[role]",
+            "text = env_text(names, role, search_key, ai_key)",
+            "キーは表示しません",
+        ]
+        for text in clean:
+            with self.subTest(text=text):
+                self.assertEqual(scan_text("a.txt", text, []), [])
+
+    def test_all_zero_guid_is_not_reported(self):
+        zero = "00000000-0000-0000-0000-000000000000"
+        self.assertEqual(scan_text("a.txt", zero, []), [])
+        self.assertEqual(kinds(scan_text("a.txt", zero + " と " + GUID, [])), ["guid"])
+
+    def test_guid_is_masked_and_needs_full_shape(self):
+        findings = scan_text("a.txt", GUID.upper(), [])
+        self.assertEqual(kinds(findings), ["guid"])
+        self.assertNotIn(GUID[:12].upper(), findings[0].excerpt)
+        self.assertIn("…", findings[0].excerpt)
+        for short in (GUID[:-1], GUID[1:], "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"):
+            with self.subTest(short=short):
+                self.assertEqual(scan_text("a.txt", short, []), [])
 
     def test_banned_terms_case_insensitive(self):
         findings = scan_text("a.txt", "ACME 社", ["acme"])
