@@ -1,0 +1,10 @@
+# 改行は LF にそろえる（Windows で取り込んでも、作り直した出力と同じになる）
+* text=auto eol=lf
+# 中身を変えてはいけないもの
+*.pdf binary
+*.png binary
+*.jpg binary
+*.docx binary
+*.xlsx binary
+# メールは、元の改行のまま
+*.eml -text
