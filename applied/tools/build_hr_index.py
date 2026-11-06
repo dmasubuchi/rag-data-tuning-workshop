@@ -1,7 +1,7 @@
 """（構築する人用）人事のインデックス hr-docs を、チームの AI Search に作る。メンバーは実行しない。
 
 やること：
-  1. applied/data/ の 23 ファイルを、Storage の入れ物（.env.local の AZURE_STORAGE_CONTAINER。既定 hr-docs）に置く
+  1. Storage の入れ物（.env.local の AZURE_STORAGE_CONTAINER。既定 hr-docs）がなければ作り、applied/data/ の 23 ファイルを置く
      （blob のメタデータに文書ごとの情報を付ける。名前は manifest の相対パスのまま。例 jobs/JOB-REQ042-v3.pdf）
   2. データソース・インデックス・スキルセット・インデクサー（hr-docs-*）を作る（あれば更新）
   3. インデクサーを実行し、終わるまで待つ（数分）
@@ -32,6 +32,8 @@ from lib.config import HR_DATASOURCE, HR_INDEX, HR_INDEXER, HR_SKILLSET  # noqa:
 
 def upload():
     show.section("1. Storage に置く")
+    if docops.ensure_container():
+        print(f"  入れ物 {config.get_settings(need_storage=True).storage_container} を作りました（非公開）")
     # 全部を置き直す（上書き）。build_hr_index.py を実行し直すたびに、インデクサーが全部を取り込み直す。17 の元に戻す（restore）と、同じ docops.put_manifest
     put = docops.put_manifest(only_changed=False)
     print(f"  {len(put)} ファイルを置きました（入れ物 {config.get_settings(need_storage=True).storage_container}）")

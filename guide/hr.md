@@ -14,28 +14,16 @@
 
 1. [ ] Repo 直下で、ライブラリを入れる：`pip install -r applied/requirements.txt`
 2. [ ] 接続の設定 `.env.local` を、構築する人用で作る：`python tools/team.py env --role builder`（[Azure の準備の 4](setup/azure-setup.md#4-接続の設定を作る)）
-3. [ ] Storage に、文書を置く入れ物 `hr-docs` を作る（下）
-4. [ ] 文書を取り込む：`python applied/tools/build_hr_index.py`（OCR を含むので、数分かかります）
-5. [ ] 状態を確かめる：`python applied/tools/build_hr_index.py --status`
-6. [ ] 19・20 を動かすとき：`python applied/tools/build_hr_kb.py`（知識ソース `hr-docs-ks` と知識ベース `hr-docs-kb` を作ります）
-
-入れ物 `hr-docs` の作り方（手順3）：
-
-1. ストレージ `st<org><team>` の「データ ストレージ」の「コンテナー」を開きます。
-2. 「+ コンテナー」を選び、名前に `hr-docs` と入れます。
-3. 「匿名アクセス レベル」は「プライベート (匿名アクセスなし)」のままにして、「作成」を選びます。
-
-az で行うとき（変数は [Azure の準備の補助](setup/azure-setup.md#5-補助az-で作る)と同じです）：
-
-```powershell
-az storage container create -n hr-docs --account-name "st$org$t" --auth-mode key
-```
+3. [ ] 文書を取り込む：`python applied/tools/build_hr_index.py`（OCR を含むので、数分かかります）
+   - Storage の入れ物 `hr-docs` がなければ、この道具が作ります（非公開）
+4. [ ] 状態を確かめる：`python applied/tools/build_hr_index.py --status`
+5. [ ] 19・20 を動かすとき：`python applied/tools/build_hr_kb.py`（知識ソース `hr-docs-ks` と知識ベース `hr-docs-kb` を作ります）
 
 ### メンバー
 
 1. [ ] Repo 直下で、ライブラリを入れる：`pip install -r applied/requirements.txt`
 2. [ ] 構築する人から受け取った `member.local.env` の名前を、`.env.local` に変えて、Repo 直下に置く
-3. [ ] 構築する人が、手順4（文書の取り込み）を終えている
+3. [ ] 構築する人が、手順3（文書の取り込み）を終えている
 
 構築する人とメンバーで、できることが違います。詳しくは [応用編 README の「構築する人とメンバー」](../applied/README.md#構築する人とメンバー)です。
 

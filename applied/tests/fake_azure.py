@@ -45,10 +45,25 @@ class Results(list):
 
 
 class FakeContainer:
+    """Storage の入れ物。exists=False は、まだ作っていない入れ物（本物と同じく、置こうとすると見つからない）。"""
+
     def __init__(self, az):
         self.az = az
+        self.exists = True
+
+    def create_container(self):
+        from azure.core.exceptions import ResourceExistsError
+
+        self.az.log.append(("create_container", self.exists))
+        if self.exists:
+            raise ResourceExistsError("ContainerAlreadyExists")
+        self.exists = True
 
     def upload_blob(self, name, data, overwrite=False, metadata=None, content_settings=None):
+        if not self.exists:
+            from azure.core.exceptions import ResourceNotFoundError
+
+            raise ResourceNotFoundError("ContainerNotFound")
         body = data.read() if hasattr(data, "read") else bytes(data)
         self.az.clock += 1
         self.az.blobs[name] = {"data": body, "metadata": dict(metadata or {}), "version": self.az.clock}

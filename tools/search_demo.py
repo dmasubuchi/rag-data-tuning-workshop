@@ -90,7 +90,11 @@ def show(title, note, body, result):
     print("    " + json.dumps(body, ensure_ascii=False))
 
 
-def http_error_text(e: urllib.error.HTTPError) -> str:
+def http_error_text(e: urllib.error.HTTPError, semantic: bool = False) -> str:
+    """semantic は、セマンティック ランカーを使う段（5）。403 は、キーが合わないほかに、無料枠（月ごと）の使い切りでも出る。"""
+    if e.code == 403 and semantic:
+        return ("エラー 403：キーが合っているか、セマンティック ランカーの無料枠（月ごと。チームの AI Search 全体で使う）を"
+                "使い切っていないかを確かめます。")
     if e.code in (401, 403):
         return f"エラー {e.code}：キーが合いません。{ENV_HOWTO}"
     if e.code == 404:
@@ -120,7 +124,7 @@ def main(argv=None):
             show(title, note, body, search(endpoint, key, body))
         except urllib.error.HTTPError as e:
             failed = True
-            print(f"\n=== {title}\n    {http_error_text(e)}")
+            print(f"\n=== {title}\n    {http_error_text(e, semantic='queryType' in body)}")
         except urllib.error.URLError as e:
             print(f"\n=== {title}\n    つながりません：{e.reason}")
             return 1

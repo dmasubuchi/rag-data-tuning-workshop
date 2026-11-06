@@ -98,7 +98,7 @@ python applied/tools/build_hr_kb.py --recreate
 python applied/tools/build_hr_kb.py --delete
 ```
 
-- `build_hr_index.py` が Storage に置くのは、manifest の 23 文書だけです。インデクサーの後に、全部のチャンクに「見てよい人」を付けます。取り込み直している間は、見てよい人が空になり、検索の結果が空になります
+- `build_hr_index.py` は、Storage の入れ物（`AZURE_STORAGE_CONTAINER`）がなければ非公開で作ります。置くのは、manifest の 23 文書だけです。インデクサーの後に、全部のチャンクに「見てよい人」を付けます。取り込み直している間は、見てよい人が空になり、検索の結果が空になります
 - `build_hr_kb.py` は、`.env.local` の `AZURE_OPENAI_CHAT_MODEL`（モデル名。既定 `gpt-5-mini`）と `AZURE_OPENAI_CHAT_DEPLOYMENT`（デプロイ名）を読んで、知識ベースの LLM にキーでつなぎます。プレビューの API（`2026-08-01-preview`）を使います。このモデルで動くかは、実機で確かめてください
 - 17 が途中で止まったときは、`topics/17-update-delete/cleanup.py` で元に戻します（data/ のとおりにして、インデクサーを動かし、見てよい人を付け直します。何度実行しても同じです）
 

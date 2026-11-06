@@ -345,6 +345,56 @@ class IndexerStatusTest(EnvCase):
         self.assertTrue([s for s in said if "インデクサーが実行中なので待ちます" in s])
 
 
+class BuildContainerTest(EnvCase):
+    """build_hr_index.py は、Storage の入れ物（AZURE_STORAGE_CONTAINER）がなければ作ってから、文書を置く。"""
+
+    def setUp(self):
+        super().setUp()
+        sys.path.insert(0, str(HERE.parent / "tools"))
+        import importlib
+
+        self.build = importlib.import_module("build_hr_index")
+        self.az = FakeAzure()
+
+    def upload(self):
+        with self.az.patched(), contextlib.redirect_stdout(io.StringIO()) as out:
+            self.build.upload()
+        return out.getvalue()
+
+    def test_missing_container_is_created_before_the_documents_are_put(self):
+        self.az.container.exists = False
+        out = self.upload()
+        names = [e[0] for e in self.az.log]
+        self.assertEqual(names[0], "create_container")
+        self.assertLess(names.index("create_container"), names.index("upload_blob"))
+        self.assertEqual(len(self.az.blobs), 23)
+        self.assertTrue(self.az.container.exists)
+        self.assertIn("hr-docs を作りました", out)
+
+    def test_existing_container_is_left_alone_and_running_again_gives_the_same_result(self):
+        self.az.container.exists = False
+        self.upload()
+        first = self.az.snapshot()
+        out = self.upload()                                     # 2回目：入れ物はもうある。何も変わらない
+        self.assertEqual(self.az.snapshot(), first)
+        self.assertNotIn("を作りました（非公開）", out)
+        self.assertEqual([e for e in self.az.log if e[0] == "create_container"], [("create_container", False), ("create_container", True)])
+
+    def test_ensure_container_reports_whether_it_created_one(self):
+        self.az.container.exists = False
+        with self.az.patched():
+            self.assertTrue(docops.ensure_container())
+            self.assertFalse(docops.ensure_container())
+
+    def test_member_settings_cannot_create_the_container(self):
+        self.write_env(MEMBER)
+        self.az.container.exists = False
+        with self.assertRaises(config.SetupError) as cm:
+            docops.ensure_container()                           # clients.container_client を差し替えない：メンバーの設定は、本物の入口で止まる
+        self.assertIn(BUILDER_MESSAGE, str(cm.exception))
+        self.assertFalse(self.az.container.exists)
+
+
 class ReadTopicsTest(EnvCase):
     """14〜16・18 は、メンバーの設定（検索だけのキー、Storage なし）で、最後まで動く。実際に出す検索の絞り込みも見る。"""
     ENV_TEXT = MEMBER

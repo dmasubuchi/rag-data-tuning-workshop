@@ -183,6 +183,13 @@ class GuideTest(unittest.TestCase):
             for url in re.findall(r"https://github\.com/\S+", text):
                 self.assertTrue(url.startswith(allowed_url), f"{name}: {url}")
 
+    def test_vector_paste_instructions_match_query_txt(self):
+        """query.txt は [ から ] まで（4-4）。5-6 は、見本の [ここにベクトルの数を貼る] ごと、それに置き換える（[[…]] にしない）。"""
+        text = guide_texts()["hotel.md"]
+        self.assertEqual(text.count("`[ここにベクトルの数を貼る]` を"), 3)
+        self.assertIn("4-4 でコピーしたベクトル（`[` から `]` まで）に置き換えます", text)
+        self.assertNotIn("`[` と `]` の間", text)
+
     def test_hotel_data_is_pinned_to_the_commit(self):
         text = guide_texts()["hotel.md"]
         self.assertIn("https://github.com/dmasubuchi/azure-search-sample-data-ja/blob/82c5f4a/hotels/ja/HotelsData_toAzureBlobs_ja.json", text)
@@ -400,6 +407,34 @@ class SearchDemoTest(unittest.TestCase):
             code, out = run_tool(search_demo.main, ["--no-pause"], self.env_file)
         self.assertEqual(code, 1)
         self.assertIn("build_hr_index.py", out)
+
+    def test_search_demo_explains_403_by_step(self):
+        """403 は、セマンティック ランカーの段（5）では、無料枠の使い切りも原因として言う。ほかの段ではキーだけ。"""
+        def urlopen(req, timeout=None):
+            self.requests.append(req)
+            if json.loads(req.data).get("queryType") == "semantic":
+                raise urllib.error.HTTPError(req.full_url, 403, "forbidden", {}, io.BytesIO(b"{}"))
+            return respond({"@odata.count": 0, "value": []})
+        with mock.patch("urllib.request.urlopen", side_effect=urlopen):
+            code, out = run_tool(search_demo.main, ["--no-pause"], self.env_file)
+        self.assertEqual(code, 1)
+        self.assertEqual(len(self.requests), 5)
+        self.assertEqual(out.count("エラー 403"), 1)
+        self.assertIn("無料枠", out)
+        self.assertIn("キーが合っているか", out)
+        with mock.patch("urllib.request.urlopen", side_effect=self.fake(status=403)):
+            code, out = run_tool(search_demo.main, ["--no-pause"], self.env_file)
+        self.assertEqual(out.count("エラー 403：キーが合いません"), 4)   # 1〜4 段は、キーだけを言う
+        self.assertIn("無料枠", out)                                       # 5 段目は、無料枠も言う
+
+    def test_default_env_file_is_dot_env_local_in_the_repo(self):
+        """WORKSHOP_ENV_FILE がないときの設定ファイルは、Repo 直下の .env.local（中身は読まない）。"""
+        for module in (search_demo, hotel_vectors):
+            with mock.patch.dict(os.environ):
+                os.environ.pop("WORKSHOP_ENV_FILE", None)
+                self.assertEqual(module.env_path(), REPO_DIR / ".env.local", module.__name__)
+            with mock.patch.dict(os.environ, {"WORKSHOP_ENV_FILE": "/somewhere/else.env"}):
+                self.assertEqual(module.env_path(), Path("/somewhere/else.env"), module.__name__)
 
     def test_search_demo_uses_only_the_standard_library(self):
         tree = ast.parse((REPO_DIR / "tools" / "search_demo.py").read_text(encoding="utf-8"))

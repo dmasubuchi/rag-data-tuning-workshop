@@ -71,6 +71,20 @@ def application_files(application_id: str) -> list:
 
 # ------------------------------------------------------------------ Storage に置く・メタデータ・消す
 
+def ensure_container() -> bool:
+    """Storage の入れ物（.env.local の AZURE_STORAGE_CONTAINER）がなければ、非公開で作る。作ったら True、もうあれば False。
+
+    何度実行しても同じ（あれば何もしない）。構築する人の設定だけ（clients.container_client が、メンバーの設定を止める）。
+    """
+    from azure.core.exceptions import ResourceExistsError
+
+    try:
+        clients.container_client().create_container()
+    except ResourceExistsError:
+        return False
+    return True
+
+
 def put_blob(rel_path: str, source, entry: dict) -> str:
     """source のファイルを、Storage の rel_path に置く（同じ名前があれば上書き）。名前を返す。メタデータは entry（manifest の1ファイル分）から作る。"""
     from azure.storage.blob import ContentSettings

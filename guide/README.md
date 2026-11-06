@@ -19,15 +19,6 @@
 6. [検索デモ](search-demo.md)：条件を変えると結果が変わるのを、AI Search だけで見る
 7. [進行役の手引き](facilitator.md)：開始前の準備、パートの順、各パートで見せるもの、つまずきやすい所
 
-```mermaid
-flowchart LR
-  A["1 PC"] --> B["2 Azure"]
-  B --> C["3 ホテル"]
-  B --> D["4 武将"]
-  D --> E["5 応用（人事）"]
-  E --> F["6 検索デモ"]
-```
-
 ## 道具
 
 - `python tools/team.py names`：チームの名前から、リソースの名前を表示する

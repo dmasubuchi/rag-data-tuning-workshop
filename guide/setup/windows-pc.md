@@ -25,7 +25,7 @@ winget install -e --id Microsoft.AzureCLI
 winget install -e --id Microsoft.VisualStudioCode
 ```
 
-winget が使えないときは、公式サイトから入れます。Git（https://git-scm.com）、Python（https://www.python.org/downloads/ 。「Add python.exe to PATH」にチェック）、az（https://aka.ms/installazurecliwindows）、VS Code（https://code.visualstudio.com）
+winget が使えないときは、公式サイトから入れます。Git（`https://git-scm.com`）、Python（`https://www.python.org/downloads/`。「Add python.exe to PATH」にチェック）、az（`https://aka.ms/installazurecliwindows`）、VS Code（`https://code.visualstudio.com`）
 
 ## 2. VS Code で資料を読む
 
