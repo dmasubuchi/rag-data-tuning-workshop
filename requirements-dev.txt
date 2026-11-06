@@ -1,0 +1,4 @@
+# 教材を作る人の道具（参加者は入れなくてよい）。Notebook を .py から作り直す tools/make_notebooks.py が使う。
+# インストール：pip install -r basic/requirements.txt -r requirements-dev.txt
+jupytext==1.19.6
+nbformat==5.11.1

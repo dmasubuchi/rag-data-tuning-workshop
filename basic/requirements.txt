@@ -1,0 +1,8 @@
+# 基礎編で使うライブラリ（実測の環境で動いた版に固定した）。LangChain は使わない。
+# インストール：pip install -r basic/requirements.txt
+# Python 3.11 で動く（Python 3.12 でも動く）。
+azure-search-documents==12.0.0
+openai==3.37.0
+python-dotenv==1.2.4
+# Notebook（VS Code など）で動かすとき：
+ipykernel==7.4.0

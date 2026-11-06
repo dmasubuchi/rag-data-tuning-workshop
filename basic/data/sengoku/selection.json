@@ -1,0 +1,9 @@
+{
+  "note": "講座で使う質問の選択（2026-10-25）。実測で採用の条件を満たした質問から選んだ。bushou.json・questions.json はこのスナップショットで凍結。データを変えたら測り直してから選び直す",
+  "snapshot": "0dc45cab",
+  "paraphrase": "q21",
+  "climax": "q53",
+  "keyword_wins": "q02",
+  "not_monotonic": ["q59", "q07"],
+  "alternatives": {"paraphrase": ["q23", "q28"], "climax": ["q60", "q09", "q59"]}
+}
