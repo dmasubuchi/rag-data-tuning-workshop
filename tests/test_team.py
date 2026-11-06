@@ -21,8 +21,9 @@ sys.path.insert(0, str(REPO_DIR / "tools"))
 import team  # noqa: E402
 from teamlib.az import READ_ONLY, Az, CheckError, find_az  # noqa: E402
 from teamlib.names import make_names  # noqa: E402
+PREFIX = team.PREFIX
 
-SUB = "sub-for-test"
+SUB = "0123abcd" + "-4567-" + "89ab-cdef-" + "0123456789ab"   # サブスクリプション ID の形（つないで作る）
 TENANT = "tenant-for-test"
 CONFIG_TEXT = (
     f"AZURE_SUBSCRIPTION_ID={SUB}\n"
@@ -203,6 +204,18 @@ class RunTest(unittest.TestCase):
         self.assertIn("--only-show-errors", cmd)
         self.assertEqual(cmd[cmd.index("-o") + 1], "json")
         self.assertEqual(cmd[cmd.index("--subscription") + 1], SUB)
+
+    def test_az_never_reads_from_the_keyboard(self):
+        """az が入力を待って止まらないよう、標準入力は空にする。"""
+        with mock.patch("teamlib.az.subprocess.run", return_value=completed('{"a": 1}')) as run:
+            self.az.run("group", "show", "-n", "rg-acme-suika")
+        self.assertIs(run.call_args.kwargs.get("stdin"), subprocess.DEVNULL)
+
+    def test_post_never_reads_from_the_keyboard_either(self):
+        url = f"https://management.azure.com/subscriptions/{SUB}/providers/Microsoft.Search/checkNameAvailability?api-version=2023-11-01"
+        with mock.patch("teamlib.az.subprocess.run", return_value=completed('{"nameAvailable": true}')) as run:
+            self.az.post(url, {"name": "x", "type": "searchServices"})
+        self.assertIs(run.call_args.kwargs.get("stdin"), subprocess.DEVNULL)
 
     def test_run_false_is_returned_not_none(self):
         with mock.patch("teamlib.az.subprocess.run", return_value=completed("false")):
@@ -393,6 +406,46 @@ class HealthTest(MainCase):
         self.assertIn("OK    リソース グループ rg-acme-suika（Succeeded）", out)
         self.assertIn("まだ  Storage stacmesuika", out)
         self.assertIn("OK 1・まだ 7・NG 0", out)
+
+    def test_health_resource_group_that_is_not_succeeded_is_not_ok(self):
+        """Deleting などは OK にしない。Failed・Canceled は NG（大文字小文字は問わない）。"""
+        cases = (("Deleting", "まだ", 0), ("Creating", "まだ", 0), ("Failed", "NG", 1), ("Canceled", "NG", 1),
+                 ("failed", "NG", 1), ("", "まだ", 0))
+        for state, status, code_wanted in cases:
+            with self.subTest(state=state):
+                group = override(healthy(), (("group", "show"), {"properties": {"provisioningState": state}}))
+                code, out, _ = self.run_main("health", az=FakeAz(group))
+                row = next(line for line in self.lines(out) if "リソース グループ" in line)
+                self.assertTrue(row.startswith(PREFIX[status]), row)
+                self.assertNotIn("OK    リソース グループ", out)
+                self.assertEqual(code, code_wanted, out)
+                if state:
+                    self.assertIn(state, row)
+
+    def test_health_failed_or_canceled_resources_are_ng(self):
+        failed = lambda state: [  # noqa: E731
+            ("Storage stacmesuika", ("storage", "account", "show"), {"provisioningState": state, "sku": {"name": "Standard_LRS"}, "kind": "StorageV2"}),
+            ("AI Search srch-acme-suika", ("search", "service", "show"),
+             {"provisioningState": state, "status": "running", "sku": {"name": "basic"}, "semanticSearch": "free"}),
+            ("Foundry ai-acme-suika", ("cognitiveservices", "account", "show"), {"kind": "AIServices", "properties": {"provisioningState": state}}),
+        ]
+        for state in ("Failed", "Canceled", "failed", "canceled"):
+            for label, prefix, answer in failed(state):
+                with self.subTest(state=state, resource=label):
+                    code, out, _ = self.run_main("health", az=FakeAz(override(healthy(), (prefix, answer))))
+                    self.assertEqual(code, 1, out)
+                    self.assertIn(f"NG    {label}（{state}）", out)
+                    self.assertNotIn(f"OK    {label}", out)
+
+    def test_health_resource_in_progress_is_mada_not_ng(self):
+        for state in ("Creating", "Updating", "Accepted", "Deleting"):
+            with self.subTest(state=state):
+                busy = override(healthy(), (("storage", "account", "show"), {"provisioningState": state}),
+                                (("cognitiveservices", "account", "show"), {"kind": "AIServices", "properties": {"provisioningState": state}}))
+                code, out, _ = self.run_main("health", az=FakeAz(busy))
+                self.assertEqual(code, 0, out)
+                self.assertIn(f"まだ  Storage stacmesuika（{state}）", out)
+                self.assertIn(f"まだ  Foundry ai-acme-suika（{state}）", out)
 
     def test_health_wrong_search_settings_are_ng(self):
         wrong = override(healthy(), (("search", "service", "show"),
@@ -673,6 +726,46 @@ class MainTest(MainCase):
         self.assertEqual(code, 1)
         cmd = run.call_args.args[0]
         self.assertEqual(cmd[cmd.index("--subscription") + 1], SUB)
+
+    def test_default_config_is_in_the_repo_root_not_the_working_folder(self):
+        parser = team.build_parser()
+        elsewhere = tempfile.TemporaryDirectory()
+        self.addCleanup(elsewhere.cleanup)
+        here = os.getcwd()
+        self.addCleanup(os.chdir, here)
+        os.chdir(elsewhere.name)
+        for command in ("names", "check-names", "health"):
+            with self.subTest(command=command):
+                self.assertEqual(Path(parser.parse_args([command]).config), REPO_DIR / "workshop.config")
+        self.assertEqual(Path(parser.parse_args(["env", "--role", "member"]).config), REPO_DIR / "workshop.config")
+
+    def test_missing_default_config_names_the_repo_root_path(self):
+        here = os.getcwd()
+        self.addCleanup(os.chdir, here)
+        os.chdir(self.dir)   # workshop.config があるのは一時フォルダー。Repo 直下の ほうを探すので、見つからない
+        (self.dir / "workshop.config").write_text(CONFIG_TEXT, encoding="utf-8")
+        if (REPO_DIR / "workshop.config").exists():
+            self.skipTest("Repo 直下に workshop.config がある環境")
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = team.main(["names", "--team", "suika"])
+        self.assertEqual(code, 2)
+        self.assertIn("設定ファイルがありません", err.getvalue())
+        self.assertIn(str(REPO_DIR), err.getvalue())
+
+    def test_invalid_subscription_id_stops_before_az(self):
+        class NoAz:
+            def __getattr__(self, name):
+                raise AssertionError("設定が違うとき、az を呼んではいけない")
+
+        for bad in ("sub-for-test", '"' + SUB + '"'):
+            with self.subTest(bad=bad):
+                self.config = self.write_config(CONFIG_TEXT.replace(SUB, bad))
+                for command in ("names", "check-names", "health"):
+                    code, out, err = self.run_main(command, az=NoAz())
+                    self.assertEqual(code, 2)
+                    self.assertIn("AZURE_SUBSCRIPTION_ID", err)
+                    self.assertEqual(out, "")
 
     def test_subcommand_required(self):
         with contextlib.redirect_stderr(io.StringIO()):

@@ -189,6 +189,15 @@ def check_names_text(team: str, rows) -> tuple:
 
 OK, MADA, NG = "OK", "まだ", "NG"
 PREFIX = {OK: "OK    ", MADA: "まだ  ", NG: "NG    "}
+FAILED_STATES = ("failed", "canceled", "cancelled")
+
+
+def state_status(state) -> str:
+    """作成の状態（provisioningState）から、OK・まだ・NG を決める。Succeeded だけが OK、Failed・Canceled は NG、ほかは「まだ」。"""
+    lowered = str(state).lower()
+    if lowered == "succeeded":
+        return OK
+    return NG if lowered in FAILED_STATES else MADA
 
 
 class Row(NamedTuple):
@@ -247,7 +256,8 @@ def health(az, n: Names):
         if group is None:
             later(L_RG, L_ST, L_SR, L_PRICE, L_SEM, L_FD, *L_DEP)
             return rows
-        add(OK, L_RG, _dict(group.get("properties")).get("provisioningState", ""))
+        state = _dict(group.get("properties")).get("provisioningState")
+        add(state_status(state), L_RG, state or "状態が分かりません")   # Deleting などは OK にしない
 
     # Storage
     def storage_section():
@@ -256,8 +266,8 @@ def health(az, n: Names):
             later(L_ST)
             return
         state = st.get("provisioningState")
-        if state != "Succeeded":
-            add(MADA, L_ST, state or "状態が分かりません")
+        if state_status(state) != OK:
+            add(state_status(state), L_ST, state or "状態が分かりません")
             return
         add(OK, L_ST, f"{_dict(st.get('sku')).get('name')}・{st.get('kind')}")
 
@@ -270,8 +280,8 @@ def health(az, n: Names):
             later(L_SR, L_PRICE, L_SEM)
             return
         state = str(sv.get("provisioningState"))
-        ready = state.lower() == "succeeded"
-        add(OK if ready else MADA, L_SR, sv.get("status") if ready else state)
+        status = state_status(state)
+        add(status, L_SR, sv.get("status") if status == OK else state)
         sku = _dict(sv.get("sku")).get("name")
         add(OK if sku == "basic" else NG, L_PRICE, "Basic" if sku == "basic" else f"{sku}。Basic のはず")
         semantic = sv.get("semanticSearch")
@@ -293,7 +303,8 @@ def health(az, n: Names):
         if kind != "AIServices":
             add(NG, L_FD, f"種類 {kind}。AIServices のはず")
         else:
-            add(OK if state == "Succeeded" else MADA, L_FD, "" if state == "Succeeded" else str(state))
+            status = state_status(state)
+            add(status, L_FD, "" if status == OK else str(state))
         try:
             listing = _found(lambda: az.run("cognitiveservices", "account", "deployment", "list", "-n", n.foundry, "-g", rg), list) or []
         except CheckError as error:
@@ -308,12 +319,7 @@ def health(az, n: Names):
             sku = _dict(d.get("sku"))
             dstate = str(_dict(d.get("properties")).get("provisioningState"))
             note = f"{sku.get('name')}・容量{sku.get('capacity')}・{dstate}"
-            if dstate.lower() in ("failed", "canceled"):
-                add(NG, label, note)
-            elif dstate.lower() != "succeeded":
-                add(MADA, label, note)
-            else:
-                add(OK, label, note)
+            add(state_status(dstate), label, note)
 
     guard(L_FD, foundry_section)
     return rows

@@ -80,7 +80,9 @@ class Az:
         if scoped:
             cmd += ["--subscription", self.subscription]
         try:
-            done = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=self.timeout)
+            # stdin を空にして、az が入力を待って止まらないようにする（サインインの案内などで起きる）
+            done = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace",
+                                  timeout=self.timeout, stdin=subprocess.DEVNULL)
         except subprocess.TimeoutExpired:
             raise CheckError("other", "az が時間内に終わりません") from None
         except OSError:

@@ -25,8 +25,10 @@ from teamlib.names import (  # noqa: E402
 
 EXAMPLE_CONFIG = REPO_DIR / "config" / "workshop.example.config"
 
+SUB = "0123abcd" + "-4567-" + "89ab-cdef-" + "0123456789ab"   # サブスクリプション ID の形（つないで作る）
+
 FULL_CONFIG = (
-    "AZURE_SUBSCRIPTION_ID=sub-for-test\n"
+    f"AZURE_SUBSCRIPTION_ID={SUB}\n"
     "AZURE_LOCATION=japaneast\n"
     "WORKSHOP_ORG=acme\n"
     "AZURE_TENANT=tenant-for-test\n"
@@ -132,7 +134,7 @@ class LoadConfigTest(ConfigFileCase):
         self.assertEqual(
             cfg,
             WorkshopConfig(
-                subscription_id="sub-for-test",
+                subscription_id=SUB,
                 location="japaneast",
                 org="acme",
                 tenant="tenant-for-test",
@@ -163,7 +165,7 @@ class LoadConfigTest(ConfigFileCase):
         text = (
             "# 説明の行\n"
             "\n"
-            "  AZURE_SUBSCRIPTION_ID = sub-for-test  \n"
+            f"  AZURE_SUBSCRIPTION_ID = {SUB}  \n"
             "AZURE_LOCATION=japaneast\n"
             "# WORKSHOP_ORG=commented\n"
             "WORKSHOP_ORG=acme\n"
@@ -171,7 +173,7 @@ class LoadConfigTest(ConfigFileCase):
             "AZURE_TENANT=tenant=with=equals\n"
         )
         cfg = load_config(self.write(text))
-        self.assertEqual(cfg.subscription_id, "sub-for-test")
+        self.assertEqual(cfg.subscription_id, SUB)
         self.assertEqual(cfg.org, "acme")
         self.assertEqual(cfg.tenant, "tenant=with=equals")
 
@@ -180,8 +182,35 @@ class LoadConfigTest(ConfigFileCase):
         path = self.dir / "workshop.config"
         path.write_bytes(b"\xef\xbb\xbf" + FULL_CONFIG.replace("\n", "\r\n").encode("utf-8"))
         cfg = load_config(path)
-        self.assertEqual(cfg.subscription_id, "sub-for-test")
+        self.assertEqual(cfg.subscription_id, SUB)
         self.assertEqual(cfg.tenant, "tenant-for-test")
+
+    def test_subscription_id_must_look_like_a_guid(self):
+        for good in (SUB, SUB.upper()):
+            with self.subTest(good=good):
+                cfg = load_config(self.write(FULL_CONFIG.replace(SUB, good)))
+                self.assertEqual(cfg.subscription_id, good)
+        bad_values = ("sub-for-test", SUB[:-1], SUB + "0", SUB.replace("-", ""), "{" + SUB + "}", SUB + " x",
+                      SUB.replace("a", "z", 1), "/subscriptions/" + SUB)
+        for bad in bad_values:
+            with self.subTest(bad=bad):
+                with self.assertRaises(ConfigError) as cm:
+                    load_config(self.write(FULL_CONFIG.replace(SUB, bad)))
+                self.assertIn("AZURE_SUBSCRIPTION_ID", str(cm.exception))
+                self.assertIn("xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx", str(cm.exception))
+
+    def test_quoted_subscription_id_is_stopped_with_a_clear_reason(self):
+        for quoted in ('"' + SUB + '"', "'" + SUB + "'", "\u201c" + SUB + "\u201d", '"' + SUB, SUB + "'"):
+            with self.subTest(quoted=quoted):
+                with self.assertRaises(ConfigError) as cm:
+                    load_config(self.write(FULL_CONFIG.replace(SUB, quoted)))
+                self.assertIn("引用符", str(cm.exception))
+                self.assertIn("AZURE_SUBSCRIPTION_ID", str(cm.exception))
+
+    def test_other_values_are_not_shape_checked(self):
+        # テナントはドメインの形（contoso.onmicrosoft.com）もある。場所・組織は別の規則
+        cfg = load_config(self.write(FULL_CONFIG.replace("tenant-for-test", "contoso.onmicrosoft.com")))
+        self.assertEqual(cfg.tenant, "contoso.onmicrosoft.com")
 
     def test_load_config_file_not_found(self):
         with self.assertRaises(ConfigError) as cm:

@@ -12,6 +12,10 @@ TEAM_MIN, TEAM_MAX = 3, 8
 ORG_RULE = f"組織の名前：小文字の英字と数字だけ、{ORG_MIN}〜{ORG_MAX}文字、英字で始める（例 acme）"
 TEAM_RULE = f"チームの名前：小文字の英字と数字だけ、{TEAM_MIN}〜{TEAM_MAX}文字、英字で始める、shared で始めない（例 suika）"
 
+GUID_SHAPE = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+GUID_RE = re.compile(r"[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}")
+QUOTES = "\"'`\u2018\u2019\u201c\u201d"   # 半角・全角の引用符
+
 # workshop.config のキー → WorkshopConfig の項目（並びは WorkshopConfig と同じ）
 CONFIG_KEYS = (
     ("AZURE_SUBSCRIPTION_ID", "subscription_id"),
@@ -44,7 +48,7 @@ def load_config(path: Path) -> WorkshopConfig:
     try:
         text = path.read_text(encoding="utf-8-sig")  # Windows のメモ帳の BOM も読める
     except FileNotFoundError:
-        raise ConfigError(f"設定ファイルがありません：{path}\n  config/workshop.example.config を {path.name} という名前でコピーして、値を書いてください。") from None
+        raise ConfigError(f"設定ファイルがありません：{path}\n  config/workshop.example.config を {path.name} という名前でコピーして、値を書いてください（置き場所は Repo 直下）。") from None
     except (OSError, UnicodeDecodeError) as e:
         raise ConfigError(f"設定ファイルを読めません：{path}（{e}）") from None
 
@@ -59,7 +63,17 @@ def load_config(path: Path) -> WorkshopConfig:
     missing = [key for key, _ in CONFIG_KEYS if not values.get(key)]
     if missing:
         raise ConfigError(f"設定ファイル {path.name} に、次のキーの値がありません：{'、'.join(missing)}")
+    check_subscription_id(values["AZURE_SUBSCRIPTION_ID"], path.name)
     return WorkshopConfig(**{field: values[key] for key, field in CONFIG_KEYS})
+
+
+def check_subscription_id(value: str, file_name: str) -> None:
+    """サブスクリプション ID が GUID の形かを確かめる。引用符つきで貼った値は、そのことを言って止める。"""
+    if value and (value[0] in QUOTES or value[-1] in QUOTES):
+        raise ConfigError(f"設定ファイル {file_name} の AZURE_SUBSCRIPTION_ID に引用符がついています。引用符は外して、ID だけを書いてください。")
+    if not GUID_RE.fullmatch(value):
+        raise ConfigError(f"設定ファイル {file_name} の AZURE_SUBSCRIPTION_ID が ID の形ではありません。"
+                          f"{GUID_SHAPE} の形で書いてください（Azure ポータルの「サブスクリプション」で見られます）。")
 
 
 # ------------------------------------------------------------------ 名前の規則
