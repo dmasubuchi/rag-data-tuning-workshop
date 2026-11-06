@@ -1,0 +1,8 @@
+# イメージの材料（Docker の文脈）に入れない。接続先とキー、仮想環境、作業の記録、Git の履歴
+.env.local
+.env
+*.local.env
+.venv
+.superpowers
+.git
+**/__pycache__

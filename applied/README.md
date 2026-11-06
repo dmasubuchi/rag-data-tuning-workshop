@@ -67,7 +67,8 @@ pip install -r applied/requirements.txt
   - `score_one.py`：1つの答えを、自前の採点と組み込みの評価器で採点する
   - `score_all.py`：（進行役）19 の答えをまとめて採点し、点のぶれを見る
 
-`assistant/`（採用アシスタントの画面。次の作業で入ります）。
+- `assistant/`：採用アシスタント（Streamlit の画面。LLM が検索の道具を選んで、候補を段ごとに絞る。検索と LLM だけを使うので、メンバーの設定で動く。`assistant/README.md`）
+  - 動かす：Repo 直下で `pip install -r applied/assistant/requirements.txt` のあと `streamlit run applied/assistant/app.py`
 
 ## 中身
 
@@ -78,7 +79,7 @@ pip install -r applied/requirements.txt
   - 17 の道具 `docops.py`（Storage の文書とインデックスを直す。元に戻す `restore`）
   - エージェント型検索 `agentic.py`、採点 `evaluation.py`、表示 `show.py`、エラーの表示 `errors.py`
 - `tools/`：構築する人用（`build_hr_index.py`、`build_hr_kb.py`）
-- `tests/`：通信しない試験
+- `tests/`：通信しない試験（採用アシスタントの試験は `test_assistant_*.py`）
 - `requirements.txt`、`requirements-eval.txt`（20 の組み込みの評価器だけ）
 
 ## 構築する人向け
