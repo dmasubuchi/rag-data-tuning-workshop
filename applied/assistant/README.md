@@ -36,4 +36,4 @@ streamlit run applied/assistant/app.py --client.toolbarMode minimal --theme.prim
 - `ASSISTANT_ACCESS_CODE`：合言葉。決めると、画面を開くときに入力が要ります
 - `ASSISTANT_MAX_QUESTIONS`：1 日の質問の上限（既定 200）
 - `ASSISTANT_STEP_PAUSE`：段を画面に描く最低の間隔（秒、既定 0.6、0 で間隔なし、上限 3）。LLM が検索を続けて頼んだときも、段が 1 つずつ見えるようにします
-- `ASSISTANT_REASONING_EFFORT`：LLM の考える量（`none`・`low`・`medium`・`high`）。決めなければ `.env.local` の `AZURE_OPENAI_REASONING_EFFORT`、それも使える値でなければ `low`。`none` では、資料と人の取り違えが出たことがあります
+- `ASSISTANT_REASONING_EFFORT`：LLM の考える量（`none`・`minimal`・`low`・`medium`・`high`。大文字小文字と前後の空白は問いません）。決めなければ `.env.local` の `AZURE_OPENAI_REASONING_EFFORT`、それも使える値でなければ `low`。`none` では、資料と人の取り違えが出たことがあります

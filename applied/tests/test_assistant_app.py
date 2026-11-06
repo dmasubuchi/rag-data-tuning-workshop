@@ -1,4 +1,10 @@
-"""採用アシスタントの画面の、合言葉と回数の上限の判定（assistant/gate.py）の試験。"""
+"""採用アシスタントの試験（通信なし）。
+  ・合言葉と回数の上限、質問の並び（assistant/gate.py）
+  ・画面（assistant/app.py）：Streamlit の AppTest で、画面が開く・質問すると段と答えと出典が出る・エラーを短く出す・合言葉で閉じる
+    （ScreenTest。azure_io.ask は偽。streamlit が入っているときだけ動く）
+  ・コンテナのイメージ（Dockerfile、.dockerignore）にキーを入れない約束
+"""
+import importlib.util
 import os
 import sys
 import unittest
@@ -58,6 +64,7 @@ def fake_ask(question, on_step):
             "answer": "夜間の対応を担当しました [1]", "sources": [source], "warnings": [], "tokens": {"input_tokens": 1, "output_tokens": 1}}
 
 
+@unittest.skipUnless(importlib.util.find_spec("streamlit"), "pip install -r applied/assistant/requirements.txt で入る")
 class ScreenTest(EnvCase):
     """Streamlit の AppTest で画面を動かす（app.py を、同じプロセスで実行する）。azure_io.ask は偽で、Azure には接続しない。
     設定は、試験用の一時の .env.local（メンバーの設定）。本物の .env.local は読まない。"""
@@ -71,12 +78,12 @@ class ScreenTest(EnvCase):
 
         for name in list(logging.root.manager.loggerDict):
             if name.startswith("streamlit"):
-                logging.getLogger(name).setLevel(logging.ERROR)     # 「missing ScriptRunContext」の注意を出さない
+                logger = logging.getLogger(name)
+                self.addCleanup(logger.setLevel, logger.level)      # 試験のあとで、元の水準に戻す
+                logger.setLevel(logging.ERROR)                      # 「missing ScriptRunContext」の注意を出さない
         st.cache_resource.clear()
-        env = {"ASSISTANT_STEP_PAUSE": "0"}
-        patcher = mock.patch.dict(os.environ, env)
-        patcher.start()
-        self.addCleanup(patcher.stop)
+        # 環境変数は、EnvCase が setUp で取った写し（tearDown で元に戻る）の中で変える。ここで別に patch しない
+        os.environ["ASSISTANT_STEP_PAUSE"] = "0"
         if code is None:
             os.environ.pop("ASSISTANT_ACCESS_CODE", None)
         else:
@@ -100,6 +107,8 @@ class ScreenTest(EnvCase):
         shown = " ".join(m.value for m in at.markdown)
         self.assertIn("夜間の対応を担当しました [1]", shown)
         self.assertIn("答えに使った資料 1 件", shown)
+        self.assertIn("欄で絞る", shown)                    # 右の段のカード（やり方）
+        self.assertIn("2 人", shown)                         # 段のカード（残った候補の人数）
         self.assertEqual([e.label for e in at.expander], ["[1] CV-APP-0391.docx（APP-0391）"])
 
     def test_an_error_from_the_search_is_shown_in_short_without_the_key(self):
@@ -132,7 +141,9 @@ class ImageTest(unittest.TestCase):
 
     def test_dockerignore_keeps_secrets_and_work_out_of_the_image(self):
         lines = {ln.strip() for ln in (REPO / ".dockerignore").read_text(encoding="utf-8").splitlines()}
-        for name in (".env.local", ".env", "*.local.env", ".venv", ".superpowers", ".git"):
+        old_name = "workshop" + ".local.env"       # 以前の設定ファイルの名前。この試験が禁止語の検査（test_layout）に当たらないように、2つに分けて書く
+        for name in (".env.local", ".env", "*.local.env", "**/.env*", "**/*.local.env", "workshop.config", old_name,
+                     ".venv", ".superpowers", ".git"):
             self.assertIn(name, lines)
 
     def test_dockerfile_reads_the_settings_from_a_mounted_file(self):

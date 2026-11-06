@@ -115,3 +115,4 @@ cd applied
 
 Windows（PowerShell）では `.venv\Scripts\python` を使います。Notebook の試験（`tests/test_layout.py` の最後の1本）は、jupytext が入っているときだけ動きます（`requirements-dev.txt`）。
 `azure-ai-evaluation`（`requirements-eval.txt`）が入っていないときは、1本が飛ばされます。
+採用アシスタントの画面の試験（`tests/test_assistant_app.py` の `ScreenTest`）は、streamlit が入っているときだけ動きます（`pip install -r applied/assistant/requirements.txt`）。入っていなければ飛ばされます。

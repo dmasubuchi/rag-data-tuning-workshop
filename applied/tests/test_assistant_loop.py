@@ -785,10 +785,19 @@ class MemberSettingsTest(EnvCase):
         # 環境変数が使えない値なら、.env.local の値へ
         self.assertEqual(sent("AZURE_OPENAI_REASONING_EFFORT=medium\n", process_env="max"), "medium")
         self.assertEqual(sent("", process_env="max"), "low")
+        # minimal も使える。大文字小文字と前後の空白は問わない
+        self.assertEqual(sent("AZURE_OPENAI_REASONING_EFFORT=minimal\n"), "minimal")
+        self.assertEqual(sent("AZURE_OPENAI_REASONING_EFFORT=MINIMAL\n"), "minimal")
+        self.assertEqual(sent("AZURE_OPENAI_REASONING_EFFORT= Medium \n"), "medium")
+        self.assertEqual(sent("AZURE_OPENAI_REASONING_EFFORT=none\n", process_env=" Low "), "low")
+        self.assertEqual(sent("", process_env=" MINIMAL "), "minimal")
         # 関数そのものの順番
         self.assertEqual(azure_io.reasoning_effort({}, "high"), "high")
         self.assertEqual(azure_io.reasoning_effort({"ASSISTANT_REASONING_EFFORT": "none"}, "high"), "none")
         self.assertEqual(azure_io.reasoning_effort({}, "max"), "low")
+        self.assertEqual(azure_io.reasoning_effort({}, " Low "), "low")
+        self.assertEqual(azure_io.reasoning_effort({"ASSISTANT_REASONING_EFFORT": "Minimal "}, "high"), "minimal")
+        self.assertEqual(azure_io.reasoning_effort({"ASSISTANT_REASONING_EFFORT": " "}, "high"), "high")
 
     def test_the_whole_loop_runs_with_member_settings(self):
         """通信する部品（Azure の検索と OpenAI の接続）は偽、設定の読み取り（lib.config）と道具の実行は本物。メンバーの設定で最後まで通る。"""

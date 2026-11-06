@@ -27,7 +27,7 @@ SUMMARY = {"fields": (50, 0), "keyword": (20, 300), "vector": (8, 300), "follow"
 MAX_LLM_CALLS = MAX_STEPS + 3
 LLM_TIMEOUT = 60           # 秒。ハンズオン中に止まったまま待たないように、短めにする
 SEARCH_TIMEOUT = 30        # 秒
-EFFORTS = ("none", "low", "medium", "high")
+EFFORTS = ("none", "minimal", "low", "medium", "high")     # minimal は gpt-5-mini の一番低い考える量
 DEFAULT_EFFORT = "low"
 RETRIES = 4
 RETRY_WAIT = 15
@@ -107,13 +107,14 @@ def search(text: str | None, vector_text: str | None, extra_filter: str | None, 
 
 
 def reasoning_effort(env: dict, configured: str = "") -> str:
-    """LLM の考える量（none・low・medium・high）。次の順で、最初に見つかった、使える値にする。
+    """LLM の考える量（none・minimal・low・medium・high）。次の順で、最初に見つかった、使える値にする。
       1. 環境変数 ASSISTANT_REASONING_EFFORT（人に見せるときの、アプリだけの指定）
       2. configured（.env.local の AZURE_OPENAI_REASONING_EFFORT。呼び出し側が渡す）
       3. 既定の low
-    上の 4 つ以外の値は、書いていないものとして次へ進む。
+    前後の空白と大文字小文字は問わない（" Low " は low）。使える値以外（空を含む）は、書いていないものとして次へ進む。
     既定を low にしているのは、none（考えない）では、資料と人の取り違えが出たことがあるため。"""
     for value in (env.get("ASSISTANT_REASONING_EFFORT", ""), configured):
+        value = (value or "").strip().lower()
         if value in EFFORTS:
             return value
     return DEFAULT_EFFORT
