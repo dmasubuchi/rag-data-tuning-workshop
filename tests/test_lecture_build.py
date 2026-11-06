@@ -92,6 +92,45 @@ class BuildTest(unittest.TestCase):
                 for mod in mods:
                     self.assertIn(mod, sys.stdlib_module_names, f"{path.name} が標準ライブラリ以外（{mod}）を import している")
 
+    def test_options_without_value_stop_with_usage(self):
+        # 値のない --out・--decks は、IndexError でなく使い方を出して 2 で止まる
+        for opt in ("--out", "--decks"):
+            r = subprocess.run([sys.executable, str(BUILD), opt], capture_output=True, text=True)
+            self.assertEqual(r.returncode, 2, opt)
+            self.assertIn("usage:", r.stderr)
+            self.assertNotIn("Traceback", r.stderr)
+
+    def test_edition_comes_from_topic_path(self):
+        build = load_build()
+        topics = json.loads(DECKS.read_text(encoding="utf-8"))["topics"]
+        self.assertEqual(build.edition("basic/topics/01-keyword-search"), "基礎")
+        self.assertEqual(build.edition("applied/topics/14-mixed-documents"), "応用")
+        with self.assertRaises(SystemExit):
+            build.edition("other/topics/99-x")
+        for no, t in topics.items():
+            self.assertEqual(build.topic_ref(topics, no)["ed"], "基礎" if t["path"].startswith("basic/") else "応用")
+        # 番号が 13 以下でも、applied/ のフォルダなら応用編（番号では決めない）
+        self.assertEqual(build.topic_ref({"05": {"name": "x", "path": "applied/topics/05-x"}}, "05")["ed"], "応用")
+
+    def test_no_references_to_files_outside_this_repo(self):
+        # この Repo にない道具・約束書を指さない（slide-player の写し player.js は元のまま）
+        gone = ("CONTRACT.md", "CONTRACT §", "_common.py", "build_deck.py", "build_video.py", "lecture-short")
+        files = [LECTURE / "deck.html", LECTURE / "README.md", LECTURE / "catalog.css", *sorted((LECTURE / "tools").glob("*.py")),
+                 *sorted((LECTURE / "diagrams").glob("*.py"))]
+        for f in files:
+            text = f.read_text(encoding="utf-8")
+            for word in gone:
+                self.assertNotIn(word, text, f"{f.relative_to(REPO_DIR)} が、この Repo にない {word} を指している")
+
+    def test_write_is_lf_only(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "lecture"
+            run_build(out)
+            htmls = list(out.rglob("*.html"))
+            self.assertEqual(len(htmls), 7)
+            for p in htmls:
+                self.assertNotIn(b"\r", p.read_bytes(), p.name)
+
     def test_site_lecture_is_up_to_date(self):
         # 生成物 site/lecture/ は Git に入れる。原稿を直したら build.py で作り直す
         with tempfile.TemporaryDirectory() as tmp:

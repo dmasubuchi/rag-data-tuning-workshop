@@ -247,11 +247,11 @@ def p20():
         1600, 620,
         text(290, 132, "単純な文書の検索", B, GRAY, True),
         box(20, 150, 540, 190), doc(52, 188, 86, 112),
-        text(170, 232, "規程 PDF 1本", B, INK, True, "start"), text(170, 282, "＝ 1つの検索の単位", B, anchor="start"),
+        text(170, 232, "文書 1本", B, INK, True, "start"), text(170, 282, "＝ 1つの検索の単位", B, anchor="start"),
         step(0, arrow([(290, 344), (290, 412)], ORANGE),
              lines(290, 452, ["① 当たれば文書全体が返る。", "答えがどこにあるかは読む人が探す"], 28, ORANGE, True, gap=36)),
         step(1, text(1110, 36, "文書の中の構造の検索", B, BLUE, True),
-             box(880, 60, 460, 80, stroke=BLUE, fill=SOFT), text(1110, 112, "規程 PDF（親）", H, BLUE, True),
+             box(880, 60, 460, 80, stroke=BLUE, fill=SOFT), text(1110, 112, "文書（親）", H, BLUE, True),
              *[box(x, 240, 260, 80, stroke=BLUE, fill=SOFT) + text(x + 130, 292, n, B, BLUE, True)
                   for x, n in [(640, "第1章"), (980, "第2章"), (1320, "第3章")]],
              arrow([(1110, 142), (1110, 190), (770, 190), (770, 238)], BLUE), arrow([(1110, 142), (1110, 238)], BLUE),

@@ -6,7 +6,7 @@
 <title>__TITLE__</title>
 <style>
 /* 描画先（舞台）。メインの舞台 #stage のほか、縮小一覧などの描画先にも class sp-target が付く。
-   中身の CSS はすべて .sp-target の中だけに効くように書く（CONTRACT §2.5） */
+   中身の CSS はすべて .sp-target の中だけに効くように書く（プレイヤーとの約束） */
 .sp-target {
   position: relative; width: 1920px; height: 1080px; overflow: hidden; background: var(--bg);
   font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif; color: var(--ink);
@@ -120,6 +120,7 @@
 .sp-target table.tb td { font-size: 26px; padding: 13px 18px; border-top: 1px solid var(--line); line-height: 1.4; vertical-align: top; }
 .sp-target table.tb tr.hl td { background: var(--warn-soft); }
 .sp-target table.tb tr.hl td:first-child { box-shadow: inset 6px 0 0 var(--warn); }
+.sp-target .tfoot { margin-top: 18px; padding: 0 6px; font-size: 24px; color: var(--sub); }
 /* stat */
 .sp-target .stat { width: 100%; display: flex; gap: 28px; }
 .sp-target .stat .it { flex: 1; background: #fff; border-radius: 16px; padding: 34px 24px; text-align: center; border: 3px solid var(--line); }
@@ -225,9 +226,9 @@
 .sp-target .kw .kcol li { margin: .1em 0; }
 .sp-target .kw .kcol code { font-size: .88em; background: var(--gray-soft); padding: 0 .2em; }
 
-/* ?render（動画づくり）のとき、舞台を左上に縮小せずに置く（CONTRACT §3.1。プレイヤーに置き換えても残す） */
+/* ?render のとき、舞台を左上に縮小せずに置く（静止画を撮る tools/check.py が使う。プレイヤーに置き換えても残す） */
 .render #stage { left: 0; top: 0; transform: none !important; }
-/* 動画の静止画では舞台を左上 (0,0) に置く（約束 v1.1 §3.1）。閲覧用の CSS を消しても残す */
+/* 静止画を撮るときは舞台を左上 (0,0) に置く。閲覧用の CSS を消しても残す */
 html, body { margin: 0; }
 
 </style>
@@ -236,15 +237,14 @@ html, body { margin: 0; }
 <div id="stage" class="sp-target"></div>
 <script>
 /* ============================================================
-   中身（描画）。プレイヤーとの約束（slide-player/CONTRACT.md §2）の形。
+   中身（描画）。プレイヤー（player.js。slide-player の写し）との約束の形。
    window.slideDeck を作り、window.renderSlide / window.deckInfo を残す。
    ============================================================ */
 const DECK = /*__DATA__*/null;
 const META = DECK.meta || {};
 
 const E = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
-// 段階の指定は 0 以上の整数だけ（tools/_common.py の is_step と同じ決まり）。正しくない値は 0（最初から見える）として扱う。
-// 正しくない値は tools/build_deck.py が不合格にする
+// 段階の指定は 0 以上の整数だけ。正しくない値は 0（最初から見える）として扱う（decks.json では整数で書く）
 const isStep = v => typeof v === 'number' && Number.isInteger(v) && v >= 0;
 const stepOf = v => isStep(v) ? v : 0;
 // data-step 属性（文字列）：数字だけの文字列を段階に読む。それ以外は 0
@@ -384,6 +384,7 @@ C.table = (s, st) => {
   t.innerHTML = `<tr>${s.head.map((h, i) => `<th${s.colW ? ` style="width:${s.colW[i]}"` : ''}>${fmt(h)}</th>`).join('')}</tr>` +
     s.rows.map((r, i) => { const step = stepOf((s.rowSteps || [])[i]); return `<tr class="${hl.has(i) ? 'hl' : ''}${step > st ? ' hide' : ''}">${r.map(c => `<td>${fmt(c)}</td>`).join('')}</tr>`; }).join('');
   const w = E('div', ''); w.style.width = '100%'; w.append(t);
+  if (s.foot) w.append(E('div', 'tfoot', fmt(s.foot)));   // 表の下の小さな注（1行）
   return w;
 };
 
@@ -479,7 +480,7 @@ const chkHtml = s => `<span class="ck">確かめる</span>` +
 
 // ---- 操作のページ（run）と、実測の出力のページ（output）----
 const termHead = (label, right) => `<div class="thead"><span class="dots"><i></i><i></i><i></i></span><span class="tl">${label}</span>${right ? `<span class="tr">${right}</span>` : ''}</div>`;
-// 行が少ないときは字を大きくする（8行まで 32px、11行まで 28px、それより多いと 24px）。build_deck.py の幅の見積もりも同じ
+// 行が少ないときは字を大きくする（8行まで 32px、11行まで 28px、それより多いと 24px）
 const termSize = n => n <= 8 ? ' fs-l' : n <= 11 ? ' fs-m' : '';
 const termLines = (lines, cls) => lines.map((l, i) => `<span class="ln${cls ? cls(i + 1) : ''}">${esc(l) || '&nbsp;'}</span>`).join('');
 
@@ -524,8 +525,8 @@ const slideLinks = s => {
   return s.type === 'run' && typeof s.cmd === 'string' && s.cmd ? base.concat([{ label: 'コマンド', kind: 'copy', text: s.cmd }]) : base;
 };
 
-// メインの舞台以外に描いたとき、描いた中の id と、その参照（url(#id)、href="#id"）に描画先ごとの接尾辞を付ける（CONTRACT §2.5）。
-// 新しい中身は SVG に id を使わない（build_deck.py が不合格にする）ので、ふだんは何もしない。念のための処理
+// メインの舞台以外に描いたとき、描いた中の id と、その参照（url(#id)、href="#id"）に描画先ごとの接尾辞を付ける（プレイヤーとの約束）。
+// いまの図の SVG は id を使わないので、ふだんは何もしない。念のための処理
 let TARGET_SEQ = 0;
 const TARGET_NO = new WeakMap();
 function suffixIds(target) {
@@ -627,7 +628,7 @@ window.slideDeck = {
   },
   render
 };
-// 動画づくり（tools/build_deck.py --check、tools/build_video.py）が使う。?render のときも通常のときも同じ名前で残す
+// 静止画を撮る tools/check.py が使う。?render のときも通常のときも同じ名前で残す
 window.renderSlide = (i, st) => render(i, st);
 window.deckInfo = () => DECK.slides.map((s, i) => ({ id: s.id, steps: steps[i] }));
 if (new URLSearchParams(location.search).has('render')) document.body.classList.add('render');

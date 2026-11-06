@@ -109,7 +109,7 @@ def main(argv: list[str]) -> int:
     global OUT_SITE
     opts = {"--out", "--site", "--decks"}
     out = Path(argv[argv.index("--out") + 1]) if "--out" in argv else Path(tempfile.gettempdir()) / "lecture-check"
-    if "--site" in argv:        # 調べるフォルダー（既定は site/lecture）。短縮版は --site site/lecture-short
+    if "--site" in argv:        # 調べるフォルダー（既定は site/lecture）。別の場所に作ったものを調べるとき
         OUT_SITE = Path(argv[argv.index("--site") + 1]).resolve()
     decks_path = Path(argv[argv.index("--decks") + 1]).resolve() if "--decks" in argv else HERE.parent / "decks.json"
     ids = [a for k, a in enumerate(argv) if not a.startswith("--") and (k == 0 or argv[k - 1] not in opts)]

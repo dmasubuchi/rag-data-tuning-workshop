@@ -4,6 +4,7 @@
 実行（Repo の直下で）：python3 docs/lecture/tools/build.py
   --decks  デッキの構成の JSON（既定は docs/lecture/decks.json）
   --out    書き出し先（既定は site/lecture）
+HTML のスライドは、原稿（keywords.md・decks.json・diagrams/）から作る。
 確認の check.py は playwright も使う（作る人の道具。参加者は要らない）。
 
 読むもの（docs/lecture/）
@@ -19,6 +20,7 @@
 """
 from __future__ import annotations
 
+import argparse
 import html
 import json
 import re
@@ -29,8 +31,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 LECTURE = HERE.parent
 REPO = LECTURE.parent.parent
-SITE = REPO / "site"
-OUT = SITE / "lecture"
+SITE_LECTURE = REPO / "site" / "lecture"        # --out の既定
 PLAYER_SRC = LECTURE / "player.js"
 CATALOG_CSS = LECTURE / "catalog.css"     # 目次のページの見た目
 
@@ -161,10 +162,25 @@ def notes_text(page: dict) -> str:
 
 # ---------------- デッキを組み立てる ----------------
 
+def edition(path: str) -> str:
+    """トピックのフォルダ（decks.json の path）の先頭で、基礎編か応用編かを決める（番号では決めない）"""
+    head = path.split("/")[0]
+    if head == "basic":
+        return "基礎"
+    if head == "applied":
+        return "応用"
+    raise SystemExit(f"トピックのフォルダ {path} が basic/ でも applied/ でも始まらない")
+
+
 def topic_ref(topics: dict, no: str) -> dict:
     t = topics[no]
-    ed = "基礎" if int(no) <= 13 else "応用"
-    return {"ed": ed, "no": no, "name": t["name"], "dir": t["path"].split("/")[-1]}
+    return {"ed": edition(t["path"]), "no": no, "name": t["name"], "dir": t["path"].split("/")[-1]}
+
+
+def load_diagram(no: int) -> dict | None:
+    """図のページ（diagrams/pNN.json：title・caption・svg・notes）。なければ None。HTML も Markdown も、ここから読む"""
+    dpath = LECTURE / "diagrams" / f"p{no:02d}.json"
+    return json.loads(dpath.read_text(encoding="utf-8")) if dpath.exists() else None
 
 
 def page_slides(page: dict, item: dict, topics: dict) -> list[dict]:
@@ -186,9 +202,8 @@ def page_slides(page: dict, item: dict, topics: dict) -> list[dict]:
         slides.append({"id": f"p{no:02d}t{k + 1}", "type": "table", "title": f"{short}：{t['title'] or '比べる'}",
                        "kicker": f"p.{no}", "head": t["head"], "rows": t["rows"],
                        "notes": f"p.{no} の表。{t['title']}", **common})
-    dpath = LECTURE / "diagrams" / f"p{no:02d}.json"
-    if dpath.exists():      # SVG の図（diagrams/figures.py が書く）
-        dg = json.loads(dpath.read_text(encoding="utf-8"))
+    dg = load_diagram(no)      # SVG の図（diagrams/figures.py が書く）
+    if dg:
         slides.append({"id": f"p{no:02d}d", "type": "diagram", "title": dg["title"], "kicker": f"p.{no}",
                        "svg": dg["svg"], "caption": dg.get("caption", ""), "notes": dg["notes"], **common})
     else:
@@ -200,10 +215,11 @@ def auto_slide(item: dict, conf: dict, decks: list[dict], pages: dict) -> dict:
     topics = conf["topics"]
     if item["auto"] == "topics":
         a, b = item["range"]
-        rows = [[f"{'基礎' if int(n) <= 13 else '応用'} {n}", t["name"], t["data"], t["path"]]
+        rows = [[f"{edition(t['path'])} {n}", t["name"], t["data"], t["path"]]
                 for n, t in topics.items() if a <= n <= b]
         return {"id": item["id"], "type": "table", "section": item["section"], "title": item["title"],
                 "head": ["番号", "トピック", "データ", "フォルダ"], "rows": rows, "colW": ["11%", "38%", "10%", "41%"],
+                **({"foot": item["foot"]} if item.get("foot") else {}),         # 表の下の1行（応用編の番号が 14 から始まる理由など）
                 "notes": item.get("notes", "トピックの一覧。番号はデータと前提の順で、この順なら必ず動く。進行は部の順で、各ページの「確かめる」のトピックを開く。")}
     if item["auto"] == "chapter_map":
         rows = []
@@ -220,9 +236,8 @@ def auto_slide(item: dict, conf: dict, decks: list[dict], pages: dict) -> dict:
     raise SystemExit(f"未知の auto：{item['auto']}")
 
 
-def build_deck(d: dict, conf: dict, pages: dict) -> dict:
-    topics = conf["topics"]
-    slides: list[dict] = []
+def deck_meta(d: dict) -> list[str]:
+    """部の表紙の下に出す2行（ページの範囲と、確かめるトピック）。HTML の表紙も Markdown の冒頭も同じ"""
     nos = [x["page"] for x in d["items"] if "page" in x]
     used = sorted({c for x in d["items"] for c in (x.get("check") or x.get("slide", {}).get("check") or [])})
     meta = []
@@ -230,6 +245,13 @@ def build_deck(d: dict, conf: dict, pages: dict) -> dict:
         meta.append(f"ハンズオン資料 p.{min(nos)}〜{max(nos)}")
     if used:
         meta.append("確かめるトピック：" + "・".join(used))
+    return meta
+
+
+def build_deck(d: dict, conf: dict, pages: dict) -> dict:
+    topics = conf["topics"]
+    slides: list[dict] = []
+    meta = deck_meta(d)
     slides.append({"id": "cover", "type": "cover", "label": conf["title"], "title": d["title"], "lead": d["lead"],
                    "meta": meta, "notes": d["lead"]})
     for item in d["items"]:
@@ -252,17 +274,21 @@ def build_deck(d: dict, conf: dict, pages: dict) -> dict:
             "slides": [esc_tree(s) for s in slides]}
 
 
-def write_deck(deck: dict, template: str):
+def write_text(path: Path, text: str):
+    """UTF-8・改行は LF で書く（Windows で作っても、生成物が変わらない）"""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8", newline="\n")
+
+
+def write_deck(deck: dict, template: str, out: Path):
     data = json.dumps(deck, ensure_ascii=False).replace("</", "<\\/")
     page = template.replace("__TITLE__", html.escape(deck["meta"]["title"].replace("　", " "))).replace("/*__DATA__*/null", data)
-    d = OUT / deck["meta"]["id"]
-    d.mkdir(parents=True, exist_ok=True)
-    (d / "slides.html").write_text(page, encoding="utf-8")
+    write_text(out / deck["meta"]["id"] / "slides.html", page)
 
 
 # ---------------- 目次 ----------------
 
-def write_index(conf: dict, decks: list[dict]):
+def write_index(conf: dict, decks: list[dict], out: Path):
     cards = []
     for d, deck in zip(conf["decks"], decks):
         n = len(deck["slides"])
@@ -272,32 +298,37 @@ def write_index(conf: dict, decks: list[dict]):
     style = "<style>" + CATALOG_CSS.read_text(encoding="utf-8") + "</style>"
     page = ('<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'
             f"<title>{html.escape(conf['title'])}</title>\n{style}</head>\n<body>\n"
-            "<!-- 目次のデータ（約束 v1.1 §4 の window.slideCatalog）。カードの描き方はプレイヤーが持つ -->\n"
+            "<!-- 目次のデータ（プレイヤーとの約束の window.slideCatalog）。カードの描き方はプレイヤーが持つ -->\n"
             f"<script>\nwindow.slideCatalog = {json.dumps(catalog, ensure_ascii=False, indent=1)};\n</script>\n"
             '<script src="player.js"></script>\n</body></html>\n')
-    (OUT / "index.html").write_text(page, encoding="utf-8")
+    write_text(out / "index.html", page)
+
+
+def parse_args(argv: list[str]) -> argparse.Namespace:
+    ap = argparse.ArgumentParser(prog="build.py", allow_abbrev=False, description="ハンズオン資料の原稿から、HTML のスライドを作る")
+    ap.add_argument("--decks", type=Path, default=LECTURE / "decks.json", help="デッキの構成の JSON（既定は docs/lecture/decks.json）")
+    ap.add_argument("--out", type=Path, default=SITE_LECTURE, help="書き出し先（既定は site/lecture）")
+    return ap.parse_args(argv)
 
 
 def main(argv: list[str]) -> int:
-    global OUT
-    if "--out" in argv:         # 書き出し先（既定は site/lecture）
-        OUT = Path(argv[argv.index("--out") + 1]).resolve()
-    decks_path = Path(argv[argv.index("--decks") + 1]).resolve() if "--decks" in argv else LECTURE / "decks.json"
-    conf = json.loads(decks_path.read_text(encoding="utf-8"))
+    a = parse_args(argv)
+    conf = json.loads(a.decks.resolve().read_text(encoding="utf-8"))
     pages = parse_keywords(LECTURE / "keywords.md")
-    template = (LECTURE / "deck.html").read_text(encoding="utf-8")
-    OUT.mkdir(parents=True, exist_ok=True)
-    decks = [build_deck(d, conf, pages) for d in conf["decks"]]
+    out = a.out.resolve()
     used_pages = {x["page"] for d in conf["decks"] for x in d["items"] if "page" in x}
     missing = sorted(set(pages) - used_pages)
     if missing:
         print("注意：デッキに入っていないページ", missing)
+    template = (LECTURE / "deck.html").read_text(encoding="utf-8")
+    decks = [build_deck(d, conf, pages) for d in conf["decks"]]
     for deck in decks:
-        write_deck(deck, template)
-    shutil.copyfile(PLAYER_SRC, OUT / "player.js")
-    write_index(conf, decks)
+        write_deck(deck, template, out)
+    out.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(PLAYER_SRC, out / "player.js")
+    write_index(conf, decks, out)
     total = sum(len(d["slides"]) for d in decks)
-    print(f"{len(decks)} デッキ・{total} 枚を {OUT} に書いた")
+    print(f"{len(decks)} デッキ・{total} 枚を {out} に書いた")
     for deck in decks:
         print(f"  {deck['meta']['id']}: {len(deck['slides'])} 枚")
     return 0

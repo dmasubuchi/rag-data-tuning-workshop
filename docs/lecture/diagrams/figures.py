@@ -1,7 +1,7 @@
 """図のページ（diagram）を作る。ページごとに diagrams/pNN.json（題、キャプション、SVG、ノート）を書き出し、build.py がそれを読む。
 
 実行（Repo の直下で）：python3 docs/lecture/diagrams/figures.py [ページ番号 …]
-- 図は部ごとのファイル figs_part1.py・figs_part2.py・figs_part3.py・figs_eval.py・figs_wrapup.py に書く
+- 図は部ごとのファイル figs_part1a.py（p.1〜8）・figs_part1b.py（p.9〜15）・figs_part2.py（p.16〜22）・figs_part2b.py（p.23〜30）・figs_part3.py（p.31〜38）・figs_eval.py（p.39〜45）・figs_wrapup.py（p.46〜52）に書く
 - 描き方の決まりは docs/lecture/README.md の「図の描き方の決まり」。部品は tools/svgparts.py だけを使う
 """
 import importlib
