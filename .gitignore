@@ -1,0 +1,10 @@
+# 接続の設定（キーを含む）
+.env.local
+workshop.config
+
+# Python
+.venv/
+__pycache__/
+
+# 作業用
+_work/
