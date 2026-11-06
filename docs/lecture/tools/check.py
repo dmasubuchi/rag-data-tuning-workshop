@@ -10,6 +10,7 @@
 """
 from __future__ import annotations
 
+import argparse
 import json
 import shutil
 import subprocess
@@ -104,17 +105,24 @@ def check_player(p, out: Path) -> list[str]:
     return errors
 
 
+def parse_args(argv: list[str]) -> argparse.Namespace:
+    ap = argparse.ArgumentParser(prog="check.py", allow_abbrev=False,
+                                 description="site/lecture のデッキを Playwright で開き、全スライドの静止画と、はみ出し・JS のエラーを調べる")
+    ap.add_argument("--out", type=Path, default=Path(tempfile.gettempdir()) / "lecture-check", help="静止画の置き場（既定は OS の一時フォルダーの lecture-check/）")
+    ap.add_argument("--site", type=Path, default=OUT_SITE, help="調べるフォルダー（既定は site/lecture）。別の場所に作ったものを調べるとき")
+    ap.add_argument("--decks", type=Path, default=HERE.parent / "decks.json", help="デッキの構成の JSON（既定は docs/lecture/decks.json）")
+    ap.add_argument("ids", nargs="*", help="調べるデッキの id（省くと全部）")
+    return ap.parse_args(argv)
+
+
 def main(argv: list[str]) -> int:
-    from playwright.sync_api import sync_playwright
     global OUT_SITE
-    opts = {"--out", "--site", "--decks"}
-    out = Path(argv[argv.index("--out") + 1]) if "--out" in argv else Path(tempfile.gettempdir()) / "lecture-check"
-    if "--site" in argv:        # 調べるフォルダー（既定は site/lecture）。別の場所に作ったものを調べるとき
-        OUT_SITE = Path(argv[argv.index("--site") + 1]).resolve()
-    decks_path = Path(argv[argv.index("--decks") + 1]).resolve() if "--decks" in argv else HERE.parent / "decks.json"
-    ids = [a for k, a in enumerate(argv) if not a.startswith("--") and (k == 0 or argv[k - 1] not in opts)]
-    conf = json.loads(decks_path.read_text(encoding="utf-8"))
-    ids = ids or [d["id"] for d in conf["decks"]]
+    a = parse_args(argv)            # 引数の誤りは、playwright を読み込む前に、使い方を出して止まる
+    from playwright.sync_api import sync_playwright
+    out = a.out
+    OUT_SITE = a.site.resolve()
+    conf = json.loads(a.decks.resolve().read_text(encoding="utf-8"))
+    ids = a.ids or [d["id"] for d in conf["decks"]]
     out.mkdir(parents=True, exist_ok=True)
     all_err: list[str] = []
     all_notes: list[str] = []

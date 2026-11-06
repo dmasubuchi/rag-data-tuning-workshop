@@ -55,7 +55,18 @@ class MdTest(unittest.TestCase):
         run_build("--out", str(cls.html), "--md", str(cls.md))
         cls.conf = json.loads(DECKS.read_text(encoding="utf-8"))
         cls.build = load_build()
-        cls.pages = cls.build.parse_keywords(LECTURE / "keywords.md")
+        # 期待する題は、build.parse_keywords を通さず、keywords.md の行から別に読む（「## p.N 見出し」のあとの「- タイトル：…」）
+        cls.titles: dict[int, str] = {}
+        cur = None
+        for ln in (LECTURE / "keywords.md").read_text(encoding="utf-8").splitlines():
+            h = re.match(r"^## p\.(\d+) (.+)$", ln)
+            if h:
+                cur = int(h.group(1))
+                cls.titles[cur] = h.group(2)           # タイトルの行がないページは、見出しが題
+                continue
+            t = re.match(r"^- タイトル：(.+)$", ln)
+            if t and cur is not None:
+                cls.titles[cur] = t.group(1).strip()
 
     @classmethod
     def tearDownClass(cls):
@@ -71,9 +82,8 @@ class MdTest(unittest.TestCase):
                 if s["type"] == "diagram":
                     html_svgs[s["id"]] = s["svg"]
         md_all = "\n".join((self.md / f"{d['id']}.md").read_text(encoding="utf-8") for d in self.conf["decks"])
-        self.assertEqual(len(self.pages), 52)
-        for no, page in self.pages.items():
-            title = page["fields"].get("タイトル") or page["heading"]
+        self.assertEqual(len(self.titles), 52)
+        for no, title in self.titles.items():
             self.assertEqual(html_titles.get(f"p{no:02d}"), title, f"p.{no} の題が HTML のスライドにない")
             self.assertEqual(md_all.count(f"\n### p.{no} {title}\n"), 1, f"p.{no} の題が Markdown にない")
             dpath = LECTURE / "diagrams" / f"p{no:02d}.json"
@@ -196,6 +206,33 @@ class MdTest(unittest.TestCase):
                 else:                                     # 部の Markdown・図。作った場所からの相対パス
                     self.assertTrue((self.md / target).is_file(), f"{md.name} のリンク先 {target} がない")
         self.assertGreater(n_topic_links, 50)
+
+    def test_md_has_no_raw_html_tags(self):
+        # 生の <tag> は、畳むための details・summary と、表の中の改行 <br> だけ。コードの中は対象外（<Repo の URL> など）
+        allowed = {"details", "summary", "br"}
+        for md in sorted(self.md.glob("*.md")):
+            fenced = False
+            for no, ln in enumerate(md.read_text(encoding="utf-8").splitlines(), 1):
+                if ln.lstrip().startswith("```"):
+                    fenced = not fenced
+                    continue
+                if fenced:
+                    continue
+                text = re.sub(r"`[^`]*`", "", ln)
+                for m in re.finditer(r"</?([A-Za-z][\w-]*)", text):
+                    self.assertIn(m.group(1).lower(), allowed, f"{md.name}:{no} に、生のタグ <{m.group(1)}> がある")
+                    if m.group(1).lower() == "br":
+                        self.assertTrue(ln.lstrip().startswith("|"), f"{md.name}:{no} の <br> が、表の外にある")
+
+    def test_md_to_other_dir_warns_about_topic_links(self):
+        # docs/lecture/md 以外に作るときは、「確かめる」のリンクがずれることを stderr に知らせる。docs/lecture/md なら知らせない
+        with tempfile.TemporaryDirectory() as tmp:
+            r = run_build("--md", str(Path(tmp) / "md"))
+            self.assertIn("docs/lecture/md", r.stderr)
+            self.assertIn("注意", r.stderr)
+        self.assertEqual(self.build.md_dir_note(MD_DIR), "")
+        self.assertEqual(self.build.md_dir_note(MD_DIR / ".." / "md"), "")
+        self.assertIn("docs/lecture/md", self.build.md_dir_note(self.md))
 
     def test_md_page_shape(self):
         md = (self.md / "part1-search.md").read_text(encoding="utf-8")

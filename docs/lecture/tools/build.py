@@ -156,6 +156,11 @@ def parse_body(lines: list[str]) -> tuple[list[dict], list[dict]]:
     return cols, tables
 
 
+def page_title(page: dict) -> str:
+    """ページの題（「- タイトル：」の欄。なければ「## p.N」の見出し）。HTML のスライドも Markdown も、ここで決める"""
+    return page["fields"].get("タイトル") or page["heading"]
+
+
 def notes_text(page: dict) -> str:
     out = []
     for ln in page["スピーカーノート"]:
@@ -194,7 +199,7 @@ def load_diagram(no: int) -> dict | None:
 
 def page_slides(page: dict, item: dict, topics: dict) -> list[dict]:
     no = page["no"]
-    title = page["fields"].get("タイトル") or page["heading"]
+    title = page_title(page)
     short = page["heading"] if len(title) > 26 else title     # 表・図のページの題（長い題は見出しの短い方を使う）
     sub = page["fields"].get("サブタイトル", "")
     cols, tables = parse_body(page["本文"])
@@ -349,7 +354,8 @@ def standalone_svg(svg: str, name: str = "") -> str:
     root = {"xmlns": SVG_NS, "viewBox": attrs["viewBox"], "width": w, "height": h, "font-family": FONT_FAMILY}
     root.update(attrs)                       # もとの SVG にあるものは、もとの値を使う
     head = " ".join(f'{k}="{v.replace(chr(34), "&quot;")}"' for k, v in root.items())
-    out = f"<svg {head}><rect x='{x}' y='{y}' width='{w}' height='{h}' fill='#ffffff'/>{re.sub(r"<[^>]*>", lambda t: DATA_STEP.sub("", t.group(0)), body)}"
+    body = re.sub(r"<[^>]*>", lambda t: DATA_STEP.sub("", t.group(0)), body)      # 段ごとに出す印を外す（要素の属性だけ）
+    out = f"<svg {head}><rect x='{x}' y='{y}' width='{w}' height='{h}' fill='#ffffff'/>{body}"
     out = out.rstrip() + "\n"
     try:
         ET.fromstring(out)
@@ -505,8 +511,7 @@ def md_slide(s: dict, topics: dict) -> list[str]:
 def md_page(page: dict, item: dict, topics: dict, files: dict[str, str]) -> list[str]:
     """keywords.md のページ：題・サブタイトル・本文（原稿のまま）・図とキャプション・「確かめる」・ノート。図の SVG は files に足す"""
     no = page["no"]
-    title = page["fields"].get("タイトル") or page["heading"]
-    blocks = [f"### p.{no} {md_plain(title)}"]
+    blocks = [f"### p.{no} {md_plain(page_title(page))}"]
     if page["fields"].get("サブタイトル"):
         blocks.append(f"*{md_plain(page['fields']['サブタイトル'])}*")
     body = trim_blank(page["本文"])
@@ -581,6 +586,14 @@ def build_markdown(conf: dict, pages: dict) -> dict[str, str]:
     return files
 
 
+def md_dir_note(md_out: Path) -> str:
+    """--md が docs/lecture/md でないときの注意（「確かめる」のリンクは docs/lecture/md からの相対パスで書くため）。ふつうは空"""
+    if md_out.resolve() == (LECTURE / "md").resolve():
+        return ""
+    return (f"注意：--md の書き出し先が docs/lecture/md ではない（{md_out.resolve()}）。「確かめる」のリンクは docs/lecture/md からの"
+            "相対パス（../../../）で書くので、ここではリンク先がずれる。Repo に入れる Markdown は docs/lecture/md に作る")
+
+
 def parse_args(argv: list[str]) -> argparse.Namespace:
     ap = argparse.ArgumentParser(prog="build.py", allow_abbrev=False, description="ハンズオン資料の原稿から、HTML のスライドと Markdown を作る")
     ap.add_argument("--decks", type=Path, default=LECTURE / "decks.json", help="デッキの構成の JSON（既定は docs/lecture/decks.json）")
@@ -611,6 +624,9 @@ def main(argv: list[str]) -> int:
         for deck in decks:
             print(f"  {deck['meta']['id']}: {len(deck['slides'])} 枚")
     if a.md:
+        note = md_dir_note(a.md)
+        if note:
+            print(note, file=sys.stderr)
         files = build_markdown(conf, pages)
         for name, text in files.items():
             write_text(a.md.resolve() / name, text)

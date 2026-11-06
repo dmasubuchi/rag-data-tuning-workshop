@@ -6,17 +6,21 @@
 
 import ast
 import importlib.util
+import io
 import json
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
+import tokenize
 import unittest
 from pathlib import Path
 
 REPO_DIR = Path(__file__).resolve().parent.parent
 LECTURE = REPO_DIR / "docs" / "lecture"
 BUILD = LECTURE / "tools" / "build.py"
+CHECK = LECTURE / "tools" / "check.py"
 DECKS = LECTURE / "decks.json"
 SITE_LECTURE = REPO_DIR / "site" / "lecture"
 
@@ -93,12 +97,40 @@ class BuildTest(unittest.TestCase):
                     self.assertIn(mod, sys.stdlib_module_names, f"{path.name} が標準ライブラリ以外（{mod}）を import している")
 
     def test_options_without_value_stop_with_usage(self):
-        # 値のない --out・--decks・--md は、IndexError でなく使い方を出して 2 で止まる
-        for opt in ("--out", "--decks", "--md"):
-            r = subprocess.run([sys.executable, str(BUILD), opt], capture_output=True, text=True)
-            self.assertEqual(r.returncode, 2, opt)
-            self.assertIn("usage:", r.stderr)
-            self.assertNotIn("Traceback", r.stderr)
+        # 値のない --out・--decks・--md（check.py は --out・--site・--decks）は、IndexError でなく使い方を出して 2 で止まる
+        # （check.py は playwright がなくても、引数を先に読むので同じ）
+        for script, opts in ((BUILD, ("--out", "--decks", "--md")), (CHECK, ("--out", "--site", "--decks"))):
+            for opt in opts:
+                r = subprocess.run([sys.executable, str(script), opt], capture_output=True, text=True)
+                self.assertEqual(r.returncode, 2, f"{script.name} {opt}")
+                self.assertIn("usage:", r.stderr)
+                self.assertNotIn("Traceback", r.stderr)
+
+    def test_tools_parse_on_python_3_10(self):
+        # README・docstring は Python 3.10 以上と書いている。3.12 だけの書き方（PEP 701：f-string の式の中で、外と同じ引用符を使う）を入れない
+        sources = sorted((LECTURE / "tools").glob("*.py")) + [LECTURE / "diagrams" / "figures.py"]
+        for path in sources:
+            text = path.read_text(encoding="utf-8")
+            ast.parse(text, filename=str(path), feature_version=(3, 10))       # 3.10 で使えない構文
+            if sys.version_info >= (3, 12):
+                # ast.parse(feature_version=…) は PEP 701 を通してしまうので、字句で調べる：f-string の中の式にある文字列が、外と同じ引用符
+                stack: list[str] = []
+                for tok in tokenize.generate_tokens(io.StringIO(text).readline):
+                    if tok.type == tokenize.FSTRING_START:
+                        if stack and tok.string[-1] == stack[-1]:
+                            self.fail(f"{path.name}:{tok.start[0]} の f-string の式の中で、外と同じ引用符を使っている（3.12 以上でしか動かない）")
+                        stack.append(tok.string[-1])
+                    elif tok.type == tokenize.FSTRING_END:
+                        stack.pop()
+                    elif tok.type == tokenize.STRING and stack and tok.string.lstrip("rbuRBU")[0] == stack[-1]:
+                        self.fail(f"{path.name}:{tok.start[0]} の f-string の式の中で、外と同じ引用符を使っている（3.12 以上でしか動かない）")
+        # 3.10・3.11 の実機があれば、本物の構文解析でも確かめる（なければ飛ばす）
+        found = [p for p in (shutil.which("python3.10"), shutil.which("python3.11")) if p]
+        for exe in found:
+            for path in sources:
+                r = subprocess.run([exe, "-c", "import ast,sys; ast.parse(open(sys.argv[1], encoding='utf-8').read())", str(path)],
+                                   capture_output=True, text=True)
+                self.assertEqual(r.returncode, 0, f"{exe} で {path.name} を読めない：{r.stderr[-300:]}")
 
     def test_edition_comes_from_topic_path(self):
         build = load_build()
