@@ -106,12 +106,17 @@ def search(text: str | None, vector_text: str | None, extra_filter: str | None, 
         raise config.SetupError(f"AI Search の応答が {SEARCH_TIMEOUT} 秒で返りませんでした。もう一度押してください") from e
 
 
-def reasoning_effort(env: dict) -> str:
-    """LLM の考える量。none（考えない）では、資料と人の取り違えが出たので、既定は low。
-    .env.local の AZURE_OPENAI_REASONING_EFFORT は見ない（ほかのトピックの設定で、このアシスタントの精度が変わらないように）。
-    環境変数 ASSISTANT_REASONING_EFFORT（none・low・medium・high）で変えられる。"""
-    value = env.get("ASSISTANT_REASONING_EFFORT", DEFAULT_EFFORT)
-    return value if value in EFFORTS else DEFAULT_EFFORT
+def reasoning_effort(env: dict, configured: str = "") -> str:
+    """LLM の考える量（none・low・medium・high）。次の順で、最初に見つかった、使える値にする。
+      1. 環境変数 ASSISTANT_REASONING_EFFORT（人に見せるときの、アプリだけの指定）
+      2. configured（.env.local の AZURE_OPENAI_REASONING_EFFORT。呼び出し側が渡す）
+      3. 既定の low
+    上の 4 つ以外の値は、書いていないものとして次へ進む。
+    既定を low にしているのは、none（考えない）では、資料と人の取り違えが出たことがあるため。"""
+    for value in (env.get("ASSISTANT_REASONING_EFFORT", ""), configured):
+        if value in EFFORTS:
+            return value
+    return DEFAULT_EFFORT
 
 
 def openai_llm(messages: list, tools: list, tool_choice: str) -> dict:
@@ -121,7 +126,7 @@ def openai_llm(messages: list, tools: list, tool_choice: str) -> dict:
     from lib import agentic
 
     s = config.get_settings()
-    kwargs = {"max_completion_tokens": 6000, "reasoning_effort": reasoning_effort(os.environ)}
+    kwargs = {"max_completion_tokens": 6000, "reasoning_effort": reasoning_effort(os.environ, s.reasoning_effort)}
     client = agentic.openai_client().with_options(timeout=LLM_TIMEOUT, max_retries=1)
     try:
         res = client.chat.completions.create(model=s.chat_deployment, messages=messages, tools=tools,

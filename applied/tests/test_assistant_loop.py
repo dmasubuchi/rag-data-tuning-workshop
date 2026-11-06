@@ -156,7 +156,7 @@ class RobustnessTest(unittest.TestCase):
                 seen.update(kwargs)
                 return SimpleNamespace(chat=SimpleNamespace(completions=Completions()))
 
-        settings = SimpleNamespace(chat_deployment="d")
+        settings = SimpleNamespace(chat_deployment="d", reasoning_effort="")
         with mock.patch("lib.agentic.openai_client", return_value=Client()), \
                 mock.patch("lib.config.get_settings", return_value=settings):
             with self.assertRaises(azure_io.config.SetupError) as cm:
@@ -746,19 +746,49 @@ class MemberSettingsTest(EnvCase):
         self.assertIsNone(seen["text"])
         self.assertEqual([q.fields for q in seen["vector_queries"]], [config.VECTOR_FIELD])
 
-    def test_llm_uses_the_chat_deployment_and_low_effort_whatever_env_local_says(self):
-        for env_text in (MEMBER, MEMBER.replace("AZURE_OPENAI_REASONING_EFFORT=low", "AZURE_OPENAI_REASONING_EFFORT=none")):
-            self.write_env(env_text)
-            with mock.patch.dict(os.environ):
-                os.environ.pop("ASSISTANT_REASONING_EFFORT", None)
-                with mock.patch("openai.OpenAI", FakeOpenAI):
-                    out = azure_io.openai_llm([{"role": "user", "content": "q"}], azure_io.TOOLS, "auto")
-            seen = FakeOpenAI.seen
-            self.assertEqual(seen["base_url"], "https://b.azure.com/openai/v1/")
-            self.assertEqual(seen["create"]["model"], "c")                 # .env.local のチャットのデプロイ
-            self.assertEqual(seen["create"]["reasoning_effort"], "low")    # .env.local の値（none でも）は見ない
-            self.assertEqual(seen["options"]["timeout"], azure_io.LLM_TIMEOUT)
-            self.assertEqual(out, {"content": "答えです [1]", "tool_calls": [], "usage": {"input_tokens": 7, "output_tokens": 3}})
+    def call_llm(self, process_env=None):
+        """偽の OpenAI に 1 回頼み、(返事, 渡された引数) を返す。process_env は ASSISTANT_REASONING_EFFORT の値（なければ未設定）。"""
+        with mock.patch.dict(os.environ):
+            os.environ.pop("ASSISTANT_REASONING_EFFORT", None)
+            if process_env is not None:
+                os.environ["ASSISTANT_REASONING_EFFORT"] = process_env
+            with mock.patch("openai.OpenAI", FakeOpenAI):
+                out = azure_io.openai_llm([{"role": "user", "content": "q"}], azure_io.TOOLS, "auto")
+        return out, FakeOpenAI.seen
+
+    def test_llm_uses_the_chat_deployment(self):
+        out, seen = self.call_llm()
+        self.assertEqual(seen["base_url"], "https://b.azure.com/openai/v1/")
+        self.assertEqual(seen["create"]["model"], "c")                 # .env.local のチャットのデプロイ
+        self.assertEqual(seen["options"]["timeout"], azure_io.LLM_TIMEOUT)
+        self.assertEqual(out, {"content": "答えです [1]", "tool_calls": [], "usage": {"input_tokens": 7, "output_tokens": 3}})
+
+    def test_reasoning_effort_reads_env_local_then_default(self):
+        """考える量：環境変数 → .env.local（一時のファイル）→ 既定 low。使えない値は、書いていないものとして次へ。"""
+        line = "AZURE_OPENAI_REASONING_EFFORT=low\n"
+        self.assertIn(line, MEMBER)
+
+        def sent(env_line, process_env=None):
+            self.write_env(MEMBER.replace(line, env_line))
+            return self.call_llm(process_env)[1]["create"]["reasoning_effort"]
+
+        # .env.local の値に従う（none も、medium も）
+        self.assertEqual(sent("AZURE_OPENAI_REASONING_EFFORT=medium\n"), "medium")
+        self.assertEqual(sent("AZURE_OPENAI_REASONING_EFFORT=none\n"), "none")
+        # .env.local に書いていない・空・使えない値なら、既定の low
+        self.assertEqual(sent(""), "low")
+        self.assertEqual(sent("AZURE_OPENAI_REASONING_EFFORT=\n"), "low")
+        self.assertEqual(sent("AZURE_OPENAI_REASONING_EFFORT=max\n"), "low")
+        # 環境変数があれば、.env.local より先
+        self.assertEqual(sent("AZURE_OPENAI_REASONING_EFFORT=none\n", process_env="high"), "high")
+        self.assertEqual(sent("", process_env="medium"), "medium")
+        # 環境変数が使えない値なら、.env.local の値へ
+        self.assertEqual(sent("AZURE_OPENAI_REASONING_EFFORT=medium\n", process_env="max"), "medium")
+        self.assertEqual(sent("", process_env="max"), "low")
+        # 関数そのものの順番
+        self.assertEqual(azure_io.reasoning_effort({}, "high"), "high")
+        self.assertEqual(azure_io.reasoning_effort({"ASSISTANT_REASONING_EFFORT": "none"}, "high"), "none")
+        self.assertEqual(azure_io.reasoning_effort({}, "max"), "low")
 
     def test_the_whole_loop_runs_with_member_settings(self):
         """通信する部品（Azure の検索と OpenAI の接続）は偽、設定の読み取り（lib.config）と道具の実行は本物。メンバーの設定で最後まで通る。"""
