@@ -1,6 +1,6 @@
 # ハンズオン資料の原稿（検索と RAG の仕組み）
 
-HTML のスライド（`site/lecture/`）の原稿と、作るための道具です。
+HTML のスライド（`site/lecture/`）と Markdown（`docs/lecture/md/`）の原稿と、作るための道具です。
 
 - スライドは仕組みの説明（手法、Azure のリソース、検索の考え方）に集中する。検索の結果や順位は、各ページの下の「確かめる」が指すトピック（`basic/topics/…`、`applied/topics/…`）のスクリプトと Notebook で確かめる
 - 進行は部の順（はじめに → 第1部 検索方法 → 第2部 取り込み → 第3部 関係とエージェント型検索 → 評価 → 比較と締め）。トピックの番号は、データと前提の順で、進行の順とは別
@@ -13,7 +13,8 @@ HTML のスライド（`site/lecture/`）の原稿と、作るための道具で
 - `player.js`：スライドのプレイヤー（slide-player の `player/player.js` の写し。MIT License）
 - `catalog.css`：目次のページの見た目
 - `diagrams/`：図。`pNN.json`（題、キャプション、SVG、ノート）は `figures.py` が `figs_*.py` から書き出す。どのページにも図がある
-- `tools/build.py`：`site/lecture/` を作る
+- `tools/build.py`：`site/lecture/`（HTML のスライド）と `docs/lecture/md/`（Markdown）を作る
+- `md/`：Markdown 版。部ごとの `.md`（節・ページ・本文・図・「確かめる」のリンク・ノート）と `index.md`、図の SVG（`img/pNN.svg`）。`build.py --md` が作る生成物なので、直接は直さない
 - `tools/check.py`：全スライドを静止画にして、はみ出しと JS のエラーを調べる。プレイヤーの操作も確かめる
 - `tools/svgparts.py`：図の部品（色、人・索引の箱・書棚・文書のアイコン、矢印、文字の大きさ）。どの図もこれだけを使う
 
@@ -38,17 +39,20 @@ Repo の直下で実行します。`build.py` は Python 3.10 以上の標準ラ
 
 ```
 python3 docs/lecture/tools/build.py
+python3 docs/lecture/tools/build.py --md docs/lecture/md
 python3 docs/lecture/tools/check.py --out <静止画の置き場>
 ```
 
 - `build.py --decks <JSON> --out <書き出し先>`：デッキの構成と書き出し先を変えられる
+- `build.py --md docs/lecture/md`：同じ原稿から Markdown を作る（`--md` だけのときは HTML を作らない）。図は `img/pNN.svg` に、xmlns・字体・白い背景つきの1枚のファイルで書く（段ごとの `data-step` は外し、全部の段が見える）。両方を作り直すときは `build.py --out site/lecture --md docs/lecture/md`
+- 原稿（`keywords.md`・`decks.json`・`diagrams/`）を直したら、`site/lecture/` と `docs/lecture/md/` を作り直して、いっしょにコミットする（試験が、作り直したものと同じかを確かめる）
 - できたものは `site/lecture/index.html` をブラウザで開きます（目次 → カードを選ぶ。→ キーで進む、N でノート、H で目次）
 - `check.py` は、`site/lecture/` を調べます。静止画の一覧（`contact.png`）は ffmpeg があるときだけ作ります
 - 試験（通信なし）：`python3 -m unittest discover -s tests`
 
 ## 公開の出力に出さないもの
 
-`site/lecture/` は参加者に公開します。次のものは `keywords.md`・`decks.json`・`diagrams/` に書きません（`build.py` も出しません）。
+`site/lecture/` と `docs/lecture/md/` は参加者に公開します。次のものは `keywords.md`・`decks.json`・`diagrams/` に書きません（`build.py` も出しません）。
 
 - 制作のメモ（未確認、記憶にもとづく、あったはず、確かめる必要がある）
 - 内部の呼び名、別の講座や別の教材の名前
@@ -57,7 +61,7 @@ python3 docs/lecture/tools/check.py --out <静止画の置き場>
 作り直したあとの確認（図の中の文字は対象外）：
 
 ```
-grep -rnE "未確認|記憶|あったはず|シリーズ|第[0-9]+回" site/lecture
+grep -rnE "未確認|記憶|あったはず|シリーズ|第[0-9]+回" site/lecture docs/lecture/md
 ```
 
 ## 本文の根拠にした Microsoft Learn（2026年11月に読んだ版）

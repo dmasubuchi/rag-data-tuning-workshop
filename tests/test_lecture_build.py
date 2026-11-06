@@ -93,8 +93,8 @@ class BuildTest(unittest.TestCase):
                     self.assertIn(mod, sys.stdlib_module_names, f"{path.name} が標準ライブラリ以外（{mod}）を import している")
 
     def test_options_without_value_stop_with_usage(self):
-        # 値のない --out・--decks は、IndexError でなく使い方を出して 2 で止まる
-        for opt in ("--out", "--decks"):
+        # 値のない --out・--decks・--md は、IndexError でなく使い方を出して 2 で止まる
+        for opt in ("--out", "--decks", "--md"):
             r = subprocess.run([sys.executable, str(BUILD), opt], capture_output=True, text=True)
             self.assertEqual(r.returncode, 2, opt)
             self.assertIn("usage:", r.stderr)
