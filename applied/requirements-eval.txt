@@ -1,0 +1,6 @@
+# 20（答えを評価する）の組み込みの評価器だけで使うライブラリ。
+# 重い（約 150MB、依存の約 33 個が増える。入れるのは 10 秒ほど）ので、requirements.txt とは分けてある。
+# 入れなくても、自前の採点（score_one.py・score_all.py の自前の部分）は動く。
+# インストール：Repo 直下で  pip install -r applied/requirements-eval.txt
+-r requirements.txt
+azure-ai-evaluation==1.18.10
