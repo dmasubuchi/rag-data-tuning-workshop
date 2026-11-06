@@ -1,0 +1,637 @@
+{
+ "base_time": "2026-10-30T10:00:00+09:00",
+ "requisitions": [
+  {
+   "req_id": "REQ-042",
+   "title": "バックエンドエンジニア（プロダクト開発）",
+   "current_version": "v3",
+   "versions": [
+    {
+     "approved_by": "U-1002",
+     "doc_id": "JOB-REQ042-v1",
+     "valid_from": "2026-09-01T00:00:00+09:00",
+     "valid_to": "2026-10-13T00:00:00+09:00",
+     "version": "v1"
+    },
+    {
+     "approved_by": "U-1002",
+     "doc_id": "JOB-REQ042-v3",
+     "valid_from": "2026-10-13T00:00:00+09:00",
+     "valid_to": null,
+     "version": "v3"
+    }
+   ],
+   "required_skills": [
+    "Python または Go での API 開発の実務経験3年以上",
+    "AWS の本番環境の運用経験"
+   ],
+   "current_version_updated_at": "2026-10-13T11:00:00+09:00"
+  },
+  {
+   "req_id": "REQ-043",
+   "title": "バックエンドエンジニア（決済基盤）",
+   "current_version": "v1",
+   "versions": [
+    {
+     "approved_by": "U-1002",
+     "doc_id": "JOB-REQ043-v1",
+     "valid_from": "2026-09-02T00:00:00+09:00",
+     "valid_to": null,
+     "version": "v1"
+    }
+   ],
+   "required_skills": [
+    "Go、Python、Java のいずれかでの開発の実務経験が3年以上あること",
+    "データベースの設計の経験があること"
+   ],
+   "current_version_updated_at": "2026-09-02T09:00:00+09:00"
+  },
+  {
+   "req_id": "REQ-047",
+   "title": "SRE エンジニア",
+   "current_version": "v2",
+   "versions": [
+    {
+     "approved_by": "U-1002",
+     "doc_id": "JOB-REQ047-v1",
+     "valid_from": "2026-09-10T00:00:00+09:00",
+     "valid_to": "2026-09-29T00:00:00+09:00",
+     "version": "v1"
+    },
+    {
+     "approved_by": "U-1002",
+     "doc_id": "JOB-REQ047-v2",
+     "valid_from": "2026-09-29T00:00:00+09:00",
+     "valid_to": null,
+     "version": "v2"
+    }
+   ],
+   "required_skills": [
+    "クラウド環境の構築と運用の実務経験が3年以上あること",
+    "監視の設計と障害対応の経験があること"
+   ],
+   "current_version_updated_at": "2026-09-29T11:00:00+09:00"
+  }
+ ],
+ "persons": [
+  {
+   "person_key": "C-017",
+   "display_name": "岩崎 俊介"
+  },
+  {
+   "person_key": "C-039",
+   "display_name": "大西 明日香"
+  },
+  {
+   "person_key": "C-071",
+   "display_name": "岩崎 俊樹"
+  },
+  {
+   "person_key": "C-115",
+   "display_name": "石田 裕太"
+  },
+  {
+   "person_key": "C-120",
+   "display_name": "市川 浩二"
+  },
+  {
+   "person_key": "C-121",
+   "display_name": "田村 朋美"
+  },
+  {
+   "person_key": "C-128",
+   "display_name": "中島 美和"
+  }
+ ],
+ "applications": [
+  {
+   "application_id": "APP-0386",
+   "person_key": "C-115",
+   "req_id": "REQ-043",
+   "req_version": "v1",
+   "received_at": "2026-09-15T16:29:00+09:00",
+   "route": "agency",
+   "agency_id": "AG-GAMMA",
+   "step": "内定",
+   "status": "内定",
+   "interview_at": null,
+   "updated_at": "2026-10-19T10:43:00+09:00"
+  },
+  {
+   "application_id": "APP-0391",
+   "person_key": "C-120",
+   "req_id": "REQ-042",
+   "req_version": "v1",
+   "received_at": "2026-09-24T13:31:00+09:00",
+   "route": "agency",
+   "agency_id": "AG-ALPHA",
+   "step": "二次面接",
+   "status": "結果待ち",
+   "interview_at": null,
+   "updated_at": "2026-10-22T09:00:00+09:00"
+  },
+  {
+   "application_id": "APP-0392",
+   "person_key": "C-121",
+   "req_id": "REQ-042",
+   "req_version": "v1",
+   "received_at": "2026-09-25T09:00:00+09:00",
+   "route": "agency",
+   "agency_id": "AG-ALPHA",
+   "step": "二次面接",
+   "status": "不通過",
+   "interview_at": null,
+   "updated_at": "2026-10-14T12:49:00+09:00"
+  },
+  {
+   "application_id": "APP-0417",
+   "person_key": "C-017",
+   "req_id": "REQ-042",
+   "req_version": "v3",
+   "received_at": "2026-10-14T10:30:00+09:00",
+   "route": "agency",
+   "agency_id": "AG-ALPHA",
+   "step": "二次面接",
+   "status": "面接待ち",
+   "interview_at": "2026-11-02T15:00:00+09:00",
+   "updated_at": "2026-10-21T17:50:00+09:00"
+  },
+  {
+   "application_id": "APP-0439",
+   "person_key": "C-039",
+   "req_id": "REQ-042",
+   "req_version": "v3",
+   "received_at": "2026-10-15T14:10:00+09:00",
+   "route": "agency",
+   "agency_id": "AG-ALPHA",
+   "step": "一次面接",
+   "status": "結果待ち",
+   "interview_at": null,
+   "updated_at": "2026-10-22T16:00:00+09:00"
+  },
+  {
+   "application_id": "APP-0471",
+   "person_key": "C-071",
+   "req_id": "REQ-042",
+   "req_version": "v3",
+   "received_at": "2026-10-28T11:00:00+09:00",
+   "route": "agency",
+   "agency_id": "AG-BETA",
+   "step": "書類選考",
+   "status": "選考中",
+   "interview_at": null,
+   "updated_at": "2026-10-28T11:00:00+09:00"
+  },
+  {
+   "application_id": "APP-0603",
+   "person_key": "C-128",
+   "req_id": "REQ-047",
+   "req_version": "v2",
+   "received_at": "2026-09-30T09:01:00+09:00",
+   "route": "direct",
+   "agency_id": null,
+   "step": "最終面接",
+   "status": "日程調整中",
+   "interview_at": null,
+   "updated_at": "2026-10-21T11:53:00+09:00"
+  }
+ ],
+ "stage_events": [
+  {
+   "event_id": 34,
+   "application_id": "APP-0386",
+   "step": "書類選考",
+   "event_type": "受付",
+   "at": "2026-09-15T16:29:00+09:00"
+  },
+  {
+   "event_id": 40,
+   "application_id": "APP-0386",
+   "step": "書類選考",
+   "event_type": "書類通過",
+   "at": "2026-09-18T09:30:00+09:00"
+  },
+  {
+   "event_id": 57,
+   "application_id": "APP-0386",
+   "step": "一次面接",
+   "event_type": "面接実施",
+   "at": "2026-09-29T14:00:00+09:00"
+  },
+  {
+   "event_id": 75,
+   "application_id": "APP-0386",
+   "step": "一次面接",
+   "event_type": "通過",
+   "at": "2026-10-01T13:28:00+09:00"
+  },
+  {
+   "event_id": 125,
+   "application_id": "APP-0386",
+   "step": "二次面接",
+   "event_type": "面接実施",
+   "at": "2026-10-06T15:00:00+09:00"
+  },
+  {
+   "event_id": 157,
+   "application_id": "APP-0386",
+   "step": "二次面接",
+   "event_type": "通過",
+   "at": "2026-10-08T16:13:00+09:00"
+  },
+  {
+   "event_id": 192,
+   "application_id": "APP-0386",
+   "step": "最終面接",
+   "event_type": "面接実施",
+   "at": "2026-10-14T11:00:00+09:00"
+  },
+  {
+   "event_id": 272,
+   "application_id": "APP-0386",
+   "step": "最終面接",
+   "event_type": "通過",
+   "at": "2026-10-16T14:07:00+09:00"
+  },
+  {
+   "event_id": 293,
+   "application_id": "APP-0386",
+   "step": "内定",
+   "event_type": "内定",
+   "at": "2026-10-19T10:43:00+09:00"
+  },
+  {
+   "event_id": 44,
+   "application_id": "APP-0391",
+   "step": "書類選考",
+   "event_type": "受付",
+   "at": "2026-09-24T13:31:00+09:00"
+  },
+  {
+   "event_id": 52,
+   "application_id": "APP-0391",
+   "step": "書類選考",
+   "event_type": "書類通過",
+   "at": "2026-09-25T12:53:00+09:00"
+  },
+  {
+   "event_id": 92,
+   "application_id": "APP-0391",
+   "step": "一次面接",
+   "event_type": "面接実施",
+   "at": "2026-10-02T16:00:00+09:00"
+  },
+  {
+   "event_id": 114,
+   "application_id": "APP-0391",
+   "step": "一次面接",
+   "event_type": "通過",
+   "at": "2026-10-06T11:09:00+09:00"
+  },
+  {
+   "event_id": 373,
+   "application_id": "APP-0391",
+   "step": "二次面接",
+   "event_type": "面接実施",
+   "at": "2026-10-22T09:00:00+09:00"
+  },
+  {
+   "event_id": 46,
+   "application_id": "APP-0392",
+   "step": "書類選考",
+   "event_type": "受付",
+   "at": "2026-09-25T09:00:00+09:00"
+  },
+  {
+   "event_id": 47,
+   "application_id": "APP-0392",
+   "step": "書類選考",
+   "event_type": "書類通過",
+   "at": "2026-09-25T09:30:00+09:00"
+  },
+  {
+   "event_id": 49,
+   "application_id": "APP-0392",
+   "step": "一次面接",
+   "event_type": "面接実施",
+   "at": "2026-09-25T10:00:00+09:00"
+  },
+  {
+   "event_id": 89,
+   "application_id": "APP-0392",
+   "step": "一次面接",
+   "event_type": "通過",
+   "at": "2026-10-02T14:30:00+09:00"
+  },
+  {
+   "event_id": 151,
+   "application_id": "APP-0392",
+   "step": "二次面接",
+   "event_type": "面接実施",
+   "at": "2026-10-08T15:00:00+09:00"
+  },
+  {
+   "event_id": 200,
+   "application_id": "APP-0392",
+   "step": "二次面接",
+   "event_type": "不通過",
+   "at": "2026-10-14T12:49:00+09:00"
+  },
+  {
+   "event_id": 189,
+   "application_id": "APP-0417",
+   "step": "書類選考",
+   "event_type": "受付",
+   "at": "2026-10-14T10:30:00+09:00"
+  },
+  {
+   "event_id": 277,
+   "application_id": "APP-0417",
+   "step": "書類選考",
+   "event_type": "書類通過",
+   "at": "2026-10-16T15:04:00+09:00"
+  },
+  {
+   "event_id": 366,
+   "application_id": "APP-0417",
+   "step": "一次面接",
+   "event_type": "面接実施",
+   "at": "2026-10-21T14:00:00+09:00"
+  },
+  {
+   "event_id": 372,
+   "application_id": "APP-0417",
+   "step": "一次面接",
+   "event_type": "通過",
+   "at": "2026-10-21T17:50:00+09:00"
+  },
+  {
+   "event_id": 239,
+   "application_id": "APP-0439",
+   "step": "書類選考",
+   "event_type": "受付",
+   "at": "2026-10-15T14:10:00+09:00"
+  },
+  {
+   "event_id": 317,
+   "application_id": "APP-0439",
+   "step": "書類選考",
+   "event_type": "書類通過",
+   "at": "2026-10-20T10:28:00+09:00"
+  },
+  {
+   "event_id": 404,
+   "application_id": "APP-0439",
+   "step": "一次面接",
+   "event_type": "面接実施",
+   "at": "2026-10-22T16:00:00+09:00"
+  },
+  {
+   "event_id": 516,
+   "application_id": "APP-0471",
+   "step": "書類選考",
+   "event_type": "受付",
+   "at": "2026-10-28T11:00:00+09:00"
+  },
+  {
+   "event_id": 61,
+   "application_id": "APP-0603",
+   "step": "書類選考",
+   "event_type": "受付",
+   "at": "2026-09-30T09:01:00+09:00"
+  },
+  {
+   "event_id": 73,
+   "application_id": "APP-0603",
+   "step": "書類選考",
+   "event_type": "書類通過",
+   "at": "2026-10-01T13:08:00+09:00"
+  },
+  {
+   "event_id": 132,
+   "application_id": "APP-0603",
+   "step": "一次面接",
+   "event_type": "面接実施",
+   "at": "2026-10-07T10:00:00+09:00"
+  },
+  {
+   "event_id": 171,
+   "application_id": "APP-0603",
+   "step": "一次面接",
+   "event_type": "通過",
+   "at": "2026-10-13T13:45:00+09:00"
+  },
+  {
+   "event_id": 332,
+   "application_id": "APP-0603",
+   "step": "二次面接",
+   "event_type": "面接実施",
+   "at": "2026-10-20T14:00:00+09:00"
+  },
+  {
+   "event_id": 357,
+   "application_id": "APP-0603",
+   "step": "二次面接",
+   "event_type": "通過",
+   "at": "2026-10-21T11:53:00+09:00"
+  }
+ ],
+ "interviewer_assignments": [
+  {
+   "user_id": "U-1006",
+   "application_id": "APP-0417",
+   "req_id": "REQ-042",
+   "stage": "一次面接",
+   "assigned_from": "2026-10-16T00:00:00+09:00",
+   "assigned_to": "2026-10-22T00:00:00+09:00",
+   "evaluation_status": "submitted",
+   "evaluation_submitted_at": "2026-10-21T17:30:00+09:00",
+   "evaluation_doc_id": "EVAL-APP-0417-1ST"
+  },
+  {
+   "user_id": "U-1006",
+   "application_id": "APP-0417",
+   "req_id": "REQ-042",
+   "stage": "二次面接",
+   "assigned_from": "2026-10-22T00:00:00+09:00",
+   "assigned_to": null,
+   "evaluation_status": "none",
+   "evaluation_submitted_at": null,
+   "evaluation_doc_id": null
+  },
+  {
+   "user_id": "U-1007",
+   "application_id": "APP-0417",
+   "req_id": "REQ-042",
+   "stage": "二次面接",
+   "assigned_from": "2026-10-22T00:00:00+09:00",
+   "assigned_to": null,
+   "evaluation_status": "none",
+   "evaluation_submitted_at": null,
+   "evaluation_doc_id": null
+  },
+  {
+   "user_id": "U-1007",
+   "application_id": "APP-0439",
+   "req_id": "REQ-042",
+   "stage": "一次面接",
+   "assigned_from": "2026-10-20T00:00:00+09:00",
+   "assigned_to": null,
+   "evaluation_status": "draft",
+   "evaluation_submitted_at": null,
+   "evaluation_doc_id": "EVAL-DRAFT-APP-0439-1ST"
+  }
+ ],
+ "recruiter_assignments": [
+  {
+   "assigned_from": "2026-09-01T00:00:00+09:00",
+   "assigned_to": "2026-10-26T00:00:00+09:00",
+   "req_id": "REQ-042",
+   "user_id": "U-1001"
+  },
+  {
+   "assigned_from": "2026-10-26T00:00:00+09:00",
+   "assigned_to": null,
+   "req_id": "REQ-042",
+   "user_id": "U-1004"
+  },
+  {
+   "assigned_from": "2026-09-02T00:00:00+09:00",
+   "assigned_to": null,
+   "req_id": "REQ-043",
+   "user_id": "U-1004"
+  },
+  {
+   "assigned_from": "2026-09-10T00:00:00+09:00",
+   "assigned_to": null,
+   "req_id": "REQ-047",
+   "user_id": "U-1004"
+  }
+ ],
+ "agencies": [
+  {
+   "agency_id": "AG-ALPHA",
+   "aliases": [
+    "Alpha",
+    "アルファ"
+   ],
+   "contacts": [
+    {
+     "email": "yuki.kamei@alpha.example",
+     "name": "亀井 由紀"
+    }
+   ],
+   "name": "Alpha社"
+  },
+  {
+   "agency_id": "AG-BETA",
+   "aliases": [
+    "Beta",
+    "ベータ"
+   ],
+   "contacts": [
+    {
+     "email": "sho.sato@beta.example",
+     "name": "佐藤 翔"
+    },
+    {
+     "email": "misaki.tanaka@beta.example",
+     "name": "田中 美咲"
+    }
+   ],
+   "name": "Beta社"
+  },
+  {
+   "agency_id": "AG-GAMMA",
+   "aliases": [
+    "Gamma",
+    "ガンマ"
+   ],
+   "contacts": [
+    {
+     "email": "megumi.matsuda@gamma.example",
+     "name": "松田 恵"
+    }
+   ],
+   "name": "Gamma社"
+  },
+  {
+   "agency_id": "AG-DELTA",
+   "aliases": [
+    "Delta",
+    "デルタ"
+   ],
+   "contacts": [
+    {
+     "email": "takumi.morita@delta.example",
+     "name": "森田 拓海"
+    },
+    {
+     "email": "naoki.aoki@delta.example",
+     "name": "青木 直樹"
+    }
+   ],
+   "name": "Delta社"
+  },
+  {
+   "agency_id": "AG-EPSILON",
+   "aliases": [
+    "Epsilon",
+    "イプシロン"
+   ],
+   "contacts": [
+    {
+     "email": "mai.ishii@epsilon.example",
+     "name": "石井 麻衣"
+    }
+   ],
+   "name": "Epsilon社"
+  }
+ ],
+ "users": [
+  {
+   "email": "hanako.yamamoto@sampletech.example",
+   "name": "山本 花子",
+   "role": "recruiter",
+   "user_id": "U-1001"
+  },
+  {
+   "email": "ken.mogi@sampletech.example",
+   "name": "茂木 健",
+   "role": "recruit_manager",
+   "user_id": "U-1002"
+  },
+  {
+   "email": "daisuke.nakamura@sampletech.example",
+   "name": "中村 大輔",
+   "role": "hiring_manager",
+   "user_id": "U-1003"
+  },
+  {
+   "email": "aya.kato@sampletech.example",
+   "name": "加藤 彩",
+   "role": "recruiter",
+   "user_id": "U-1004"
+  },
+  {
+   "email": "sho.kobayashi@sampletech.example",
+   "name": "小林 翔",
+   "role": "recruiter",
+   "user_id": "U-1005"
+  },
+  {
+   "email": "makoto.yoshida@sampletech.example",
+   "name": "吉田 誠",
+   "note": "開発部の面接官",
+   "role": "interviewer",
+   "user_id": "U-1006"
+  },
+  {
+   "email": "rina.matsumoto@sampletech.example",
+   "name": "松本 里奈",
+   "note": "開発部の面接官",
+   "role": "interviewer",
+   "user_id": "U-1007"
+  }
+ ]
+}

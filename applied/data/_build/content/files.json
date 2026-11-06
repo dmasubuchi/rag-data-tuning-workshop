@@ -1,0 +1,195 @@
+{
+ "files": [
+  {
+   "path": "jobs/JOB-REQ042-v3.pdf",
+   "kind": "job_posting",
+   "doc_id": "JOB-REQ042-v3",
+   "req_id": "REQ-042",
+   "req_version": "v3",
+   "application_ids": [],
+   "person_keys": [],
+   "text_layer": true,
+   "ocr_required": false,
+   "source": {
+    "origin": "converted",
+    "basis": "求人票 JOB-REQ042-v3（原データの文書）を PDF に整形",
+    "added": "会社名、募集の背景、選考の流れ"
+   }
+  },
+  {
+   "path": "jobs/JOB-REQ043-v1.pdf",
+   "kind": "job_posting",
+   "doc_id": "JOB-REQ043-v1",
+   "req_id": "REQ-043",
+   "req_version": "v1",
+   "application_ids": [],
+   "person_keys": [],
+   "text_layer": true,
+   "ocr_required": false,
+   "source": {
+    "origin": "converted",
+    "basis": "求人票 JOB-REQ043-v1（原データの文書）を PDF に整形",
+    "added": "会社名、募集の背景、選考の流れ"
+   }
+  },
+  {
+   "path": "jobs/JOB-REQ047-v2.pdf",
+   "kind": "job_posting",
+   "doc_id": "JOB-REQ047-v2",
+   "req_id": "REQ-047",
+   "req_version": "v2",
+   "application_ids": [],
+   "person_keys": [],
+   "text_layer": true,
+   "ocr_required": false,
+   "source": {
+    "origin": "converted",
+    "basis": "求人票 JOB-REQ047-v2（原データの文書）を PDF に整形",
+    "added": "会社名、募集の背景、選考の流れ"
+   }
+  },
+  {
+   "path": "resumes/CV-APP-0417.docx",
+   "kind": "resume",
+   "doc_id": "CV-APP-0417",
+   "req_id": "REQ-042",
+   "application_ids": [
+    "APP-0417"
+   ],
+   "person_keys": [
+    "C-017"
+   ],
+   "text_layer": true,
+   "ocr_required": false,
+   "source": {
+    "origin": "converted",
+    "basis": "職務経歴書 CV-APP-0417（原データの文書）と履歴書 RESUME-APP-0417 の資格欄",
+    "added": "氏名・作成日、活かせる経験・技術、資格。本人希望欄（希望年収など）は入れていない"
+   }
+  },
+  {
+   "path": "resumes/CV-APP-0471.docx",
+   "kind": "resume",
+   "doc_id": "CV-APP-0471",
+   "req_id": "REQ-042",
+   "application_ids": [
+    "APP-0471"
+   ],
+   "person_keys": [
+    "C-071"
+   ],
+   "text_layer": true,
+   "ocr_required": false,
+   "source": {
+    "origin": "converted",
+    "basis": "職務経歴書 CV-APP-0471（原データの文書）",
+    "added": "氏名・作成日、活かせる経験・技術"
+   }
+  },
+  {
+   "path": "resumes/CV-APP-0391.docx",
+   "kind": "resume",
+   "doc_id": "CV-APP-0391",
+   "req_id": "REQ-042",
+   "application_ids": [
+    "APP-0391"
+   ],
+   "person_keys": [
+    "C-120"
+   ],
+   "text_layer": true,
+   "ocr_required": false,
+   "source": {
+    "origin": "generated",
+    "basis": "採用管理システムの応募 APP-0391（人物 C-120、求人 REQ-042）",
+    "added": "経歴の本文はすべて新しく作成"
+   }
+  },
+  {
+   "path": "resumes/CV-APP-0392.docx",
+   "kind": "resume",
+   "doc_id": "CV-APP-0392",
+   "req_id": "REQ-042",
+   "application_ids": [
+    "APP-0392"
+   ],
+   "person_keys": [
+    "C-121"
+   ],
+   "text_layer": true,
+   "ocr_required": false,
+   "source": {
+    "origin": "generated",
+    "basis": "採用管理システムの応募 APP-0392（人物 C-121、求人 REQ-042）",
+    "added": "経歴の本文はすべて新しく作成"
+   }
+  },
+  {
+   "path": "resumes/CV-APP-0386.docx",
+   "kind": "resume",
+   "doc_id": "CV-APP-0386",
+   "req_id": "REQ-043",
+   "application_ids": [
+    "APP-0386"
+   ],
+   "person_keys": [
+    "C-115"
+   ],
+   "text_layer": true,
+   "ocr_required": false,
+   "source": {
+    "origin": "generated",
+    "basis": "採用管理システムの応募 APP-0386（人物 C-115、求人 REQ-043）",
+    "added": "経歴の本文はすべて新しく作成"
+   }
+  },
+  {
+   "path": "resumes/CV-APP-0603.docx",
+   "kind": "resume",
+   "doc_id": "CV-APP-0603",
+   "req_id": "REQ-047",
+   "application_ids": [
+    "APP-0603"
+   ],
+   "person_keys": [
+    "C-128"
+   ],
+   "text_layer": true,
+   "ocr_required": false,
+   "source": {
+    "origin": "generated",
+    "basis": "採用管理システムの応募 APP-0603（人物 C-128、求人 REQ-047）",
+    "added": "経歴の本文はすべて新しく作成"
+   }
+  },
+  {
+   "path": "evaluations/EVAL-INTERVIEWS-2026-10.xlsx",
+   "kind": "interview_evaluations",
+   "doc_id": "EVAL-INTERVIEWS-2026-10",
+   "req_id": null,
+   "application_ids": [
+    "APP-0391",
+    "APP-0392",
+    "APP-0417",
+    "APP-0439",
+    "APP-0386",
+    "APP-0603"
+   ],
+   "person_keys": [
+    "C-120",
+    "C-121",
+    "C-017",
+    "C-039",
+    "C-115",
+    "C-128"
+   ],
+   "text_layer": true,
+   "ocr_required": false,
+   "source": {
+    "origin": "converted+generated",
+    "basis": "選考履歴（stage_events）、面接官の割当て（interviewer_assignments）、面接評価 EVAL-APP-0417-1ST、下書き EVAL-DRAFT-APP-0439-1ST（原データ）",
+    "added": "APP-0417 と APP-0439 の2行は原データの評価。残りの10行は選考履歴の日付に合わせて新しく作成。シート: 面接評価・選考状況・選考履歴・評価基準・注記"
+   }
+  }
+ ]
+}

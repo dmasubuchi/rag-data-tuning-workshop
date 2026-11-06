@@ -1,0 +1,39 @@
+{
+ "scans": [
+  {
+   "id": "SCAN-01",
+   "file": "SCAN-MEMO-APP-0391-2ND.pdf",
+   "application_id": "APP-0391",
+   "req_id": "REQ-042",
+   "what": "面接官（松本 里奈）の手書きの面接メモ。二次面接（2026-10-22）。評価一覧の EV-003 と同じ内容",
+   "form": "画像だけの PDF 1 ページ。手書き、赤ペンの丸、認印、コーヒーの染み",
+   "basis": "採用管理システムの選考履歴 APP-0391 二次面接（2026-10-22 09:00 実施）",
+   "evaluation_id": "EV-003",
+   "kind": "memo"
+  },
+  {
+   "id": "SCAN-02",
+   "file": "SCAN-OFFER-APP-0386.pdf",
+   "application_id": "APP-0386",
+   "req_id": "REQ-043",
+   "what": "内定承諾書。氏名の手書きと認印、会社の受付印（2026-10-26）つき",
+   "form": "画像だけの PDF 1 ページ。押印、受付印、少し傾いた取り込み",
+   "basis": "採用管理システムの選考履歴 APP-0386 内定（2026-10-19）",
+   "kind": "offer",
+   "written_on": "2026-10-23",
+   "received_on": "2026-10-26"
+  },
+  {
+   "id": "SCAN-03",
+   "file": "SCAN-COVER-APP-0471.png",
+   "application_id": "APP-0471",
+   "req_id": "REQ-042",
+   "what": "紹介会社（Beta社）からの書類送付状（FAX）。社内で応募番号と受付印を書き足したもの（2026-10-28）",
+   "form": "グレースケールの PNG 1 枚。FAX 風のかすれ、社印、手書きの応募番号、受付印",
+   "basis": "採用管理システムの応募 APP-0471（2026-10-28 11:00 受付）",
+   "kind": "cover",
+   "sent_at": "2026-10-28T10:52:00+09:00",
+   "contact_email": "sho.sato@beta.example"
+  }
+ ]
+}

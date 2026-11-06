@@ -1,0 +1,913 @@
+{
+ "dataset": "応用編の採用の文書",
+ "version": "1.0",
+ "synthetic": true,
+ "notice": "このフォルダーのデータはすべて研修用の架空データです。実在の人物・企業・メールアドレス・電話番号とは関係ありません。",
+ "company": "サンプルテック（架空の会社）",
+ "base_time": "2026-10-30T10:00:00+09:00",
+ "id_conventions": {
+  "req_id": "求人番号（REQ-nnn）。求人票・職務経歴書・メール・スキャンに共通",
+  "application_id": "応募番号（APP-nnnn）。1 回の応募。職務経歴書・面接の評価・メール・スキャンに共通",
+  "person_key": "人物キー（C-nnn）。同じ人の別の応募をつなぐ番号",
+  "evaluation_id": "面接の評価の行の番号（EV-nnn）。面接の評価一覧の「面接評価」シートの 1 列目",
+  "user_id": "社内の利用者（採用担当 U-1001 / U-1004、面接官 U-1006 / U-1007、部門長 U-1003 など）"
+ },
+ "counts": {
+  "job_posting": 3,
+  "resume": 6,
+  "interview_evaluations": 1,
+  "mail": 10,
+  "scan": 3,
+  "total": 23
+ },
+ "requisitions": [
+  {
+   "req_id": "REQ-042",
+   "title": "バックエンドエンジニア（プロダクト開発）",
+   "current_version": "v3",
+   "valid_from": "2026-10-13T00:00:00+09:00",
+   "required_skills": [
+    "Python または Go での API 開発の実務経験3年以上",
+    "AWS の本番環境の運用経験"
+   ],
+   "job_posting": [
+    "jobs/JOB-REQ042-v3.pdf"
+   ],
+   "application_ids": [
+    "APP-0391",
+    "APP-0392",
+    "APP-0417",
+    "APP-0439",
+    "APP-0471"
+   ]
+  },
+  {
+   "req_id": "REQ-043",
+   "title": "バックエンドエンジニア（決済基盤）",
+   "current_version": "v1",
+   "valid_from": "2026-09-02T00:00:00+09:00",
+   "required_skills": [
+    "Go、Python、Java のいずれかでの開発の実務経験が3年以上あること",
+    "データベースの設計の経験があること"
+   ],
+   "job_posting": [
+    "jobs/JOB-REQ043-v1.pdf"
+   ],
+   "application_ids": [
+    "APP-0386"
+   ]
+  },
+  {
+   "req_id": "REQ-047",
+   "title": "SRE エンジニア",
+   "current_version": "v2",
+   "valid_from": "2026-09-29T00:00:00+09:00",
+   "required_skills": [
+    "クラウド環境の構築と運用の実務経験が3年以上あること",
+    "監視の設計と障害対応の経験があること"
+   ],
+   "job_posting": [
+    "jobs/JOB-REQ047-v2.pdf"
+   ],
+   "application_ids": [
+    "APP-0603"
+   ]
+  }
+ ],
+ "applications": [
+  {
+   "application_id": "APP-0386",
+   "person_key": "C-115",
+   "candidate_name": "石田 裕太",
+   "req_id": "REQ-043",
+   "req_version": "v1",
+   "received_at": "2026-09-15T16:29:00+09:00",
+   "route": "agency",
+   "route_label": "紹介会社",
+   "agency_id": "AG-GAMMA",
+   "agency_name": "Gamma社",
+   "step": "内定",
+   "status": "内定",
+   "interview_at": null,
+   "updated_at": "2026-10-19T10:43:00+09:00",
+   "documents": {
+    "resume": [
+     "resumes/CV-APP-0386.docx"
+    ],
+    "evaluation_ids": [
+     "EV-008",
+     "EV-009",
+     "EV-010"
+    ],
+    "evaluation_workbook": "evaluations/EVAL-INTERVIEWS-2026-10.xlsx",
+    "mail": [
+     "mail/MAIL-09_REQ-043_APP-0386.eml"
+    ],
+    "scans": [
+     "scans/SCAN-OFFER-APP-0386.pdf"
+    ]
+   }
+  },
+  {
+   "application_id": "APP-0391",
+   "person_key": "C-120",
+   "candidate_name": "市川 浩二",
+   "req_id": "REQ-042",
+   "req_version": "v1",
+   "received_at": "2026-09-24T13:31:00+09:00",
+   "route": "agency",
+   "route_label": "紹介会社",
+   "agency_id": "AG-ALPHA",
+   "agency_name": "Alpha社",
+   "step": "二次面接",
+   "status": "結果待ち",
+   "interview_at": null,
+   "updated_at": "2026-10-22T09:00:00+09:00",
+   "documents": {
+    "resume": [
+     "resumes/CV-APP-0391.docx"
+    ],
+    "evaluation_ids": [
+     "EV-001",
+     "EV-002",
+     "EV-003"
+    ],
+    "evaluation_workbook": "evaluations/EVAL-INTERVIEWS-2026-10.xlsx",
+    "mail": [
+     "mail/MAIL-05_REQ-042_APP-0391.eml",
+     "mail/MAIL-06_REQ-042_APP-0391.eml"
+    ],
+    "scans": [
+     "scans/SCAN-MEMO-APP-0391-2ND.pdf"
+    ]
+   }
+  },
+  {
+   "application_id": "APP-0392",
+   "person_key": "C-121",
+   "candidate_name": "田村 朋美",
+   "req_id": "REQ-042",
+   "req_version": "v1",
+   "received_at": "2026-09-25T09:00:00+09:00",
+   "route": "agency",
+   "route_label": "紹介会社",
+   "agency_id": "AG-ALPHA",
+   "agency_name": "Alpha社",
+   "step": "二次面接",
+   "status": "不通過",
+   "interview_at": null,
+   "updated_at": "2026-10-14T12:49:00+09:00",
+   "documents": {
+    "resume": [
+     "resumes/CV-APP-0392.docx"
+    ],
+    "evaluation_ids": [
+     "EV-004",
+     "EV-005"
+    ],
+    "evaluation_workbook": "evaluations/EVAL-INTERVIEWS-2026-10.xlsx",
+    "mail": [
+     "mail/MAIL-07_REQ-042_APP-0392.eml"
+    ],
+    "scans": []
+   }
+  },
+  {
+   "application_id": "APP-0417",
+   "person_key": "C-017",
+   "candidate_name": "岩崎 俊介",
+   "req_id": "REQ-042",
+   "req_version": "v3",
+   "received_at": "2026-10-14T10:30:00+09:00",
+   "route": "agency",
+   "route_label": "紹介会社",
+   "agency_id": "AG-ALPHA",
+   "agency_name": "Alpha社",
+   "step": "二次面接",
+   "status": "面接待ち",
+   "interview_at": "2026-11-02T15:00:00+09:00",
+   "updated_at": "2026-10-21T17:50:00+09:00",
+   "documents": {
+    "resume": [
+     "resumes/CV-APP-0417.docx"
+    ],
+    "evaluation_ids": [
+     "EV-006"
+    ],
+    "evaluation_workbook": "evaluations/EVAL-INTERVIEWS-2026-10.xlsx",
+    "mail": [
+     "mail/MAIL-01_REQ-042_APP-0417.eml",
+     "mail/MAIL-02_REQ-042_APP-0417.eml",
+     "mail/MAIL-03_REQ-042_APP-0417.eml",
+     "mail/MAIL-04_REQ-042_APP-0417.eml"
+    ],
+    "scans": []
+   }
+  },
+  {
+   "application_id": "APP-0439",
+   "person_key": "C-039",
+   "candidate_name": "大西 明日香",
+   "req_id": "REQ-042",
+   "req_version": "v3",
+   "received_at": "2026-10-15T14:10:00+09:00",
+   "route": "agency",
+   "route_label": "紹介会社",
+   "agency_id": "AG-ALPHA",
+   "agency_name": "Alpha社",
+   "step": "一次面接",
+   "status": "結果待ち",
+   "interview_at": null,
+   "updated_at": "2026-10-22T16:00:00+09:00",
+   "documents": {
+    "resume": [],
+    "evaluation_ids": [
+     "EV-007"
+    ],
+    "evaluation_workbook": "evaluations/EVAL-INTERVIEWS-2026-10.xlsx",
+    "mail": [],
+    "scans": []
+   }
+  },
+  {
+   "application_id": "APP-0471",
+   "person_key": "C-071",
+   "candidate_name": "岩崎 俊樹",
+   "req_id": "REQ-042",
+   "req_version": "v3",
+   "received_at": "2026-10-28T11:00:00+09:00",
+   "route": "agency",
+   "route_label": "紹介会社",
+   "agency_id": "AG-BETA",
+   "agency_name": "Beta社",
+   "step": "書類選考",
+   "status": "選考中",
+   "interview_at": null,
+   "updated_at": "2026-10-28T11:00:00+09:00",
+   "documents": {
+    "resume": [
+     "resumes/CV-APP-0471.docx"
+    ],
+    "evaluation_ids": [],
+    "evaluation_workbook": null,
+    "mail": [
+     "mail/MAIL-08_REQ-042_APP-0471.eml"
+    ],
+    "scans": [
+     "scans/SCAN-COVER-APP-0471.png"
+    ]
+   }
+  },
+  {
+   "application_id": "APP-0603",
+   "person_key": "C-128",
+   "candidate_name": "中島 美和",
+   "req_id": "REQ-047",
+   "req_version": "v2",
+   "received_at": "2026-09-30T09:01:00+09:00",
+   "route": "direct",
+   "route_label": "直接応募",
+   "agency_id": null,
+   "agency_name": null,
+   "step": "最終面接",
+   "status": "日程調整中",
+   "interview_at": null,
+   "updated_at": "2026-10-21T11:53:00+09:00",
+   "documents": {
+    "resume": [
+     "resumes/CV-APP-0603.docx"
+    ],
+    "evaluation_ids": [
+     "EV-011",
+     "EV-012"
+    ],
+    "evaluation_workbook": "evaluations/EVAL-INTERVIEWS-2026-10.xlsx",
+    "mail": [
+     "mail/MAIL-10_REQ-047_APP-0603.eml"
+    ],
+    "scans": []
+   }
+  }
+ ],
+ "files": [
+  {
+   "path": "evaluations/EVAL-INTERVIEWS-2026-10.xlsx",
+   "kind": "interview_evaluations",
+   "doc_id": "EVAL-INTERVIEWS-2026-10",
+   "req_id": null,
+   "application_ids": [
+    "APP-0391",
+    "APP-0392",
+    "APP-0417",
+    "APP-0439",
+    "APP-0386",
+    "APP-0603"
+   ],
+   "person_keys": [
+    "C-120",
+    "C-121",
+    "C-017",
+    "C-039",
+    "C-115",
+    "C-128"
+   ],
+   "text_layer": true,
+   "ocr_required": false,
+   "source": {
+    "origin": "converted+generated",
+    "basis": "選考履歴（stage_events）、面接官の割当て（interviewer_assignments）、面接評価 EVAL-APP-0417-1ST、下書き EVAL-DRAFT-APP-0439-1ST（原データ）",
+    "added": "APP-0417 と APP-0439 の2行は原データの評価。残りの10行は選考履歴の日付に合わせて新しく作成。シート: 面接評価・選考状況・選考履歴・評価基準・注記"
+   },
+   "format": "xlsx",
+   "bytes": 15329,
+   "kind_label": "面接の評価一覧"
+  },
+  {
+   "path": "jobs/JOB-REQ042-v3.pdf",
+   "kind": "job_posting",
+   "doc_id": "JOB-REQ042-v3",
+   "req_id": "REQ-042",
+   "req_version": "v3",
+   "application_ids": [],
+   "person_keys": [],
+   "text_layer": true,
+   "ocr_required": false,
+   "source": {
+    "origin": "converted",
+    "basis": "求人票 JOB-REQ042-v3（原データの文書）を PDF に整形",
+    "added": "会社名、募集の背景、選考の流れ"
+   },
+   "format": "pdf",
+   "bytes": 6243,
+   "kind_label": "求人票"
+  },
+  {
+   "path": "jobs/JOB-REQ043-v1.pdf",
+   "kind": "job_posting",
+   "doc_id": "JOB-REQ043-v1",
+   "req_id": "REQ-043",
+   "req_version": "v1",
+   "application_ids": [],
+   "person_keys": [],
+   "text_layer": true,
+   "ocr_required": false,
+   "source": {
+    "origin": "converted",
+    "basis": "求人票 JOB-REQ043-v1（原データの文書）を PDF に整形",
+    "added": "会社名、募集の背景、選考の流れ"
+   },
+   "format": "pdf",
+   "bytes": 6280,
+   "kind_label": "求人票"
+  },
+  {
+   "path": "jobs/JOB-REQ047-v2.pdf",
+   "kind": "job_posting",
+   "doc_id": "JOB-REQ047-v2",
+   "req_id": "REQ-047",
+   "req_version": "v2",
+   "application_ids": [],
+   "person_keys": [],
+   "text_layer": true,
+   "ocr_required": false,
+   "source": {
+    "origin": "converted",
+    "basis": "求人票 JOB-REQ047-v2（原データの文書）を PDF に整形",
+    "added": "会社名、募集の背景、選考の流れ"
+   },
+   "format": "pdf",
+   "bytes": 6106,
+   "kind_label": "求人票"
+  },
+  {
+   "path": "mail/MAIL-01_REQ-042_APP-0417.eml",
+   "kind": "mail",
+   "doc_id": "MAIL-01",
+   "req_id": "REQ-042",
+   "application_ids": [
+    "APP-0417"
+   ],
+   "person_keys": [
+    "C-017"
+   ],
+   "mail": {
+    "date": "2026-10-16T16:20:00+09:00",
+    "from": "hanako.yamamoto@sampletech.example",
+    "to": [
+     "yuki.kamei@alpha.example"
+    ],
+    "subject": "【REQ-042】岩崎 俊介様（APP-0417）書類選考通過と一次面接のご相談",
+    "in_reply_to": null,
+    "topic": "書類通過と一次面接の日程候補"
+   },
+   "text_layer": true,
+   "ocr_required": false,
+   "source": {
+    "origin": "generated",
+    "basis": "選考履歴 APP-0417 書類通過（2026-10-16 15:04）",
+    "added": "本文はすべて新しく作成"
+   },
+   "format": "eml",
+   "bytes": 1099,
+   "kind_label": "面接の連絡メール"
+  },
+  {
+   "path": "mail/MAIL-02_REQ-042_APP-0417.eml",
+   "kind": "mail",
+   "doc_id": "MAIL-02",
+   "req_id": "REQ-042",
+   "application_ids": [
+    "APP-0417"
+   ],
+   "person_keys": [
+    "C-017"
+   ],
+   "mail": {
+    "date": "2026-10-19T10:05:00+09:00",
+    "from": "yuki.kamei@alpha.example",
+    "to": [
+     "hanako.yamamoto@sampletech.example"
+    ],
+    "subject": "Re: 【REQ-042】岩崎 俊介様（APP-0417）書類選考通過と一次面接のご相談",
+    "in_reply_to": "MAIL-01",
+    "topic": "一次面接の日程の了承"
+   },
+   "text_layer": true,
+   "ocr_required": false,
+   "source": {
+    "origin": "generated",
+    "basis": "選考履歴 APP-0417 一次面接（2026-10-21 14:00）",
+    "added": "本文はすべて新しく作成"
+   },
+   "format": "eml",
+   "bytes": 1057,
+   "kind_label": "面接の連絡メール"
+  },
+  {
+   "path": "mail/MAIL-03_REQ-042_APP-0417.eml",
+   "kind": "mail",
+   "doc_id": "MAIL-03",
+   "req_id": "REQ-042",
+   "application_ids": [
+    "APP-0417"
+   ],
+   "person_keys": [
+    "C-017"
+   ],
+   "mail": {
+    "date": "2026-10-21T17:45:00+09:00",
+    "from": "makoto.yoshida@sampletech.example",
+    "to": [
+     "hanako.yamamoto@sampletech.example"
+    ],
+    "subject": "【REQ-042】APP-0417 一次面接の評価を提出しました（申し送り）",
+    "in_reply_to": null,
+    "topic": "一次面接の評価提出と二次面接への申し送り"
+   },
+   "text_layer": true,
+   "ocr_required": false,
+   "source": {
+    "origin": "generated",
+    "basis": "申し送り HANDOFF-APP-0417-1ST、面接評価 EVAL-APP-0417-1ST（原データの文書）",
+    "added": "本文はすべて新しく作成"
+   },
+   "format": "eml",
+   "bytes": 1134,
+   "kind_label": "面接の連絡メール"
+  },
+  {
+   "path": "mail/MAIL-04_REQ-042_APP-0417.eml",
+   "kind": "mail",
+   "doc_id": "MAIL-04",
+   "req_id": "REQ-042",
+   "application_ids": [
+    "APP-0417"
+   ],
+   "person_keys": [
+    "C-017"
+   ],
+   "mail": {
+    "date": "2026-10-22T10:15:00+09:00",
+    "from": "hanako.yamamoto@sampletech.example",
+    "to": [
+     "yuki.kamei@alpha.example"
+    ],
+    "subject": "【REQ-042】岩崎 俊介様（APP-0417）一次面接の結果と二次面接のご案内",
+    "in_reply_to": null,
+    "topic": "一次面接の結果と二次面接の案内"
+   },
+   "text_layer": true,
+   "ocr_required": false,
+   "source": {
+    "origin": "generated",
+    "basis": "選考履歴 APP-0417 一次面接 通過（2026-10-21）、応募の次回面接 2026-11-02 15:00",
+    "added": "本文はすべて新しく作成"
+   },
+   "format": "eml",
+   "bytes": 1062,
+   "kind_label": "面接の連絡メール"
+  },
+  {
+   "path": "mail/MAIL-05_REQ-042_APP-0391.eml",
+   "kind": "mail",
+   "doc_id": "MAIL-05",
+   "req_id": "REQ-042",
+   "application_ids": [
+    "APP-0391"
+   ],
+   "person_keys": [
+    "C-120"
+   ],
+   "mail": {
+    "date": "2026-10-13T15:40:00+09:00",
+    "from": "hanako.yamamoto@sampletech.example",
+    "to": [
+     "yuki.kamei@alpha.example"
+    ],
+    "subject": "【REQ-042】市川 浩二様（APP-0391）二次面接のご案内",
+    "in_reply_to": null,
+    "topic": "二次面接の案内"
+   },
+   "text_layer": true,
+   "ocr_required": false,
+   "source": {
+    "origin": "generated",
+    "basis": "選考履歴 APP-0391 一次面接 通過（2026-10-06）、二次面接（2026-10-22 09:00）",
+    "added": "本文はすべて新しく作成"
+   },
+   "format": "eml",
+   "bytes": 1006,
+   "kind_label": "面接の連絡メール"
+  },
+  {
+   "path": "mail/MAIL-06_REQ-042_APP-0391.eml",
+   "kind": "mail",
+   "doc_id": "MAIL-06",
+   "req_id": "REQ-042",
+   "application_ids": [
+    "APP-0391"
+   ],
+   "person_keys": [
+    "C-120"
+   ],
+   "mail": {
+    "date": "2026-10-27T14:00:00+09:00",
+    "from": "aya.kato@sampletech.example",
+    "to": [
+     "yuki.kamei@alpha.example"
+    ],
+    "subject": "【REQ-042】市川 浩二様（APP-0391）二次面接の結果について",
+    "in_reply_to": null,
+    "topic": "担当交代のあいさつと結果待ちの連絡"
+   },
+   "text_layer": true,
+   "ocr_required": false,
+   "source": {
+    "origin": "generated",
+    "basis": "応募 APP-0391 状況 結果待ち、求人 REQ-042 の担当の交代（2026-10-26）",
+    "added": "本文はすべて新しく作成"
+   },
+   "format": "eml",
+   "bytes": 1018,
+   "kind_label": "面接の連絡メール"
+  },
+  {
+   "path": "mail/MAIL-07_REQ-042_APP-0392.eml",
+   "kind": "mail",
+   "doc_id": "MAIL-07",
+   "req_id": "REQ-042",
+   "application_ids": [
+    "APP-0392"
+   ],
+   "person_keys": [
+    "C-121"
+   ],
+   "mail": {
+    "date": "2026-10-14T13:10:00+09:00",
+    "from": "hanako.yamamoto@sampletech.example",
+    "to": [
+     "yuki.kamei@alpha.example"
+    ],
+    "subject": "【REQ-042】田村 朋美様（APP-0392）二次面接の結果のご連絡",
+    "in_reply_to": null,
+    "topic": "二次面接の結果（見送り）"
+   },
+   "text_layer": true,
+   "ocr_required": false,
+   "source": {
+    "origin": "generated",
+    "basis": "選考履歴 APP-0392 二次面接 不通過（2026-10-14 12:49）",
+    "added": "本文はすべて新しく作成"
+   },
+   "format": "eml",
+   "bytes": 1158,
+   "kind_label": "面接の連絡メール"
+  },
+  {
+   "path": "mail/MAIL-08_REQ-042_APP-0471.eml",
+   "kind": "mail",
+   "doc_id": "MAIL-08",
+   "req_id": "REQ-042",
+   "application_ids": [
+    "APP-0471"
+   ],
+   "person_keys": [
+    "C-071"
+   ],
+   "mail": {
+    "date": "2026-10-28T10:40:00+09:00",
+    "from": "sho.sato@beta.example",
+    "to": [
+     "aya.kato@sampletech.example"
+    ],
+    "subject": "【REQ-042】岩崎 俊樹様のご推薦と職務経歴書のお送り",
+    "in_reply_to": null,
+    "topic": "紹介会社からの候補者の推薦（応募番号は付く前）"
+   },
+   "text_layer": true,
+   "ocr_required": false,
+   "source": {
+    "origin": "generated",
+    "basis": "応募 APP-0471 受付（2026-10-28 11:00、紹介会社 Beta社）",
+    "added": "本文はすべて新しく作成"
+   },
+   "format": "eml",
+   "bytes": 991,
+   "kind_label": "面接の連絡メール"
+  },
+  {
+   "path": "mail/MAIL-09_REQ-043_APP-0386.eml",
+   "kind": "mail",
+   "doc_id": "MAIL-09",
+   "req_id": "REQ-043",
+   "application_ids": [
+    "APP-0386"
+   ],
+   "person_keys": [
+    "C-115"
+   ],
+   "mail": {
+    "date": "2026-10-19T11:20:00+09:00",
+    "from": "aya.kato@sampletech.example",
+    "to": [
+     "megumi.matsuda@gamma.example"
+    ],
+    "subject": "【REQ-043】石田 裕太様（APP-0386）内定のご連絡",
+    "in_reply_to": null,
+    "topic": "内定の連絡と承諾書の期限"
+   },
+   "text_layer": true,
+   "ocr_required": false,
+   "source": {
+    "origin": "generated",
+    "basis": "選考履歴 APP-0386 内定（2026-10-19 10:43）",
+    "added": "本文はすべて新しく作成"
+   },
+   "format": "eml",
+   "bytes": 1063,
+   "kind_label": "面接の連絡メール"
+  },
+  {
+   "path": "mail/MAIL-10_REQ-047_APP-0603.eml",
+   "kind": "mail",
+   "doc_id": "MAIL-10",
+   "req_id": "REQ-047",
+   "application_ids": [
+    "APP-0603"
+   ],
+   "person_keys": [
+    "C-128"
+   ],
+   "mail": {
+    "date": "2026-10-21T15:30:00+09:00",
+    "from": "aya.kato@sampletech.example",
+    "to": [
+     "miwa.nakajima@candidate.example"
+    ],
+    "subject": "【REQ-047】中島 美和様（APP-0603）最終面接の日程調整のお願い",
+    "in_reply_to": null,
+    "topic": "二次面接通過と最終面接の日程調整"
+   },
+   "text_layer": true,
+   "ocr_required": false,
+   "source": {
+    "origin": "generated",
+    "basis": "選考履歴 APP-0603 二次面接 通過（2026-10-21 11:53）、応募の状況 日程調整中",
+    "added": "本文はすべて新しく作成"
+   },
+   "format": "eml",
+   "bytes": 1229,
+   "kind_label": "面接の連絡メール"
+  },
+  {
+   "path": "resumes/CV-APP-0386.docx",
+   "kind": "resume",
+   "doc_id": "CV-APP-0386",
+   "req_id": "REQ-043",
+   "application_ids": [
+    "APP-0386"
+   ],
+   "person_keys": [
+    "C-115"
+   ],
+   "text_layer": true,
+   "ocr_required": false,
+   "source": {
+    "origin": "generated",
+    "basis": "採用管理システムの応募 APP-0386（人物 C-115、求人 REQ-043）",
+    "added": "経歴の本文はすべて新しく作成"
+   },
+   "format": "docx",
+   "bytes": 39104,
+   "kind_label": "職務経歴書"
+  },
+  {
+   "path": "resumes/CV-APP-0391.docx",
+   "kind": "resume",
+   "doc_id": "CV-APP-0391",
+   "req_id": "REQ-042",
+   "application_ids": [
+    "APP-0391"
+   ],
+   "person_keys": [
+    "C-120"
+   ],
+   "text_layer": true,
+   "ocr_required": false,
+   "source": {
+    "origin": "generated",
+    "basis": "採用管理システムの応募 APP-0391（人物 C-120、求人 REQ-042）",
+    "added": "経歴の本文はすべて新しく作成"
+   },
+   "format": "docx",
+   "bytes": 39077,
+   "kind_label": "職務経歴書"
+  },
+  {
+   "path": "resumes/CV-APP-0392.docx",
+   "kind": "resume",
+   "doc_id": "CV-APP-0392",
+   "req_id": "REQ-042",
+   "application_ids": [
+    "APP-0392"
+   ],
+   "person_keys": [
+    "C-121"
+   ],
+   "text_layer": true,
+   "ocr_required": false,
+   "source": {
+    "origin": "generated",
+    "basis": "採用管理システムの応募 APP-0392（人物 C-121、求人 REQ-042）",
+    "added": "経歴の本文はすべて新しく作成"
+   },
+   "format": "docx",
+   "bytes": 38995,
+   "kind_label": "職務経歴書"
+  },
+  {
+   "path": "resumes/CV-APP-0417.docx",
+   "kind": "resume",
+   "doc_id": "CV-APP-0417",
+   "req_id": "REQ-042",
+   "application_ids": [
+    "APP-0417"
+   ],
+   "person_keys": [
+    "C-017"
+   ],
+   "text_layer": true,
+   "ocr_required": false,
+   "source": {
+    "origin": "converted",
+    "basis": "職務経歴書 CV-APP-0417（原データの文書）と履歴書 RESUME-APP-0417 の資格欄",
+    "added": "氏名・作成日、活かせる経験・技術、資格。本人希望欄（希望年収など）は入れていない"
+   },
+   "format": "docx",
+   "bytes": 39044,
+   "kind_label": "職務経歴書"
+  },
+  {
+   "path": "resumes/CV-APP-0471.docx",
+   "kind": "resume",
+   "doc_id": "CV-APP-0471",
+   "req_id": "REQ-042",
+   "application_ids": [
+    "APP-0471"
+   ],
+   "person_keys": [
+    "C-071"
+   ],
+   "text_layer": true,
+   "ocr_required": false,
+   "source": {
+    "origin": "converted",
+    "basis": "職務経歴書 CV-APP-0471（原データの文書）",
+    "added": "氏名・作成日、活かせる経験・技術"
+   },
+   "format": "docx",
+   "bytes": 38815,
+   "kind_label": "職務経歴書"
+  },
+  {
+   "path": "resumes/CV-APP-0603.docx",
+   "kind": "resume",
+   "doc_id": "CV-APP-0603",
+   "req_id": "REQ-047",
+   "application_ids": [
+    "APP-0603"
+   ],
+   "person_keys": [
+    "C-128"
+   ],
+   "text_layer": true,
+   "ocr_required": false,
+   "source": {
+    "origin": "generated",
+    "basis": "採用管理システムの応募 APP-0603（人物 C-128、求人 REQ-047）",
+    "added": "経歴の本文はすべて新しく作成"
+   },
+   "format": "docx",
+   "bytes": 39205,
+   "kind_label": "職務経歴書"
+  },
+  {
+   "path": "scans/SCAN-COVER-APP-0471.png",
+   "kind": "scan",
+   "doc_id": "SCAN-03",
+   "req_id": "REQ-042",
+   "application_ids": [
+    "APP-0471"
+   ],
+   "person_keys": [
+    "C-071"
+   ],
+   "scan": {
+    "what": "紹介会社（Beta社）からの書類送付状（FAX）。社内で応募番号と受付印を書き足したもの（2026-10-28）",
+    "form": "グレースケールの PNG 1 枚。FAX 風のかすれ、社印、手書きの応募番号、受付印"
+   },
+   "text_layer": false,
+   "ocr_required": true,
+   "source": {
+    "origin": "generated",
+    "basis": "採用管理システムの応募 APP-0471（2026-10-28 11:00 受付）",
+    "added": "画像だけの書類。傾き・汚れ・押印を足してある"
+   },
+   "format": "png",
+   "bytes": 216817,
+   "kind_label": "スキャンした書類"
+  },
+  {
+   "path": "scans/SCAN-MEMO-APP-0391-2ND.pdf",
+   "kind": "scan",
+   "doc_id": "SCAN-01",
+   "req_id": "REQ-042",
+   "application_ids": [
+    "APP-0391"
+   ],
+   "person_keys": [
+    "C-120"
+   ],
+   "scan": {
+    "what": "面接官（松本 里奈）の手書きの面接メモ。二次面接（2026-10-22）。評価一覧の EV-003 と同じ内容",
+    "form": "画像だけの PDF 1 ページ。手書き、赤ペンの丸、認印、コーヒーの染み"
+   },
+   "text_layer": false,
+   "ocr_required": true,
+   "source": {
+    "origin": "generated",
+    "basis": "採用管理システムの選考履歴 APP-0391 二次面接（2026-10-22 09:00 実施）",
+    "added": "画像だけの書類。傾き・汚れ・押印を足してある"
+   },
+   "format": "pdf",
+   "bytes": 269108,
+   "kind_label": "スキャンした書類"
+  },
+  {
+   "path": "scans/SCAN-OFFER-APP-0386.pdf",
+   "kind": "scan",
+   "doc_id": "SCAN-02",
+   "req_id": "REQ-043",
+   "application_ids": [
+    "APP-0386"
+   ],
+   "person_keys": [
+    "C-115"
+   ],
+   "scan": {
+    "what": "内定承諾書。氏名の手書きと認印、会社の受付印（2026-10-26）つき",
+    "form": "画像だけの PDF 1 ページ。押印、受付印、少し傾いた取り込み"
+   },
+   "text_layer": false,
+   "ocr_required": true,
+   "source": {
+    "origin": "generated",
+    "basis": "採用管理システムの選考履歴 APP-0386 内定（2026-10-19）",
+    "added": "画像だけの書類。傾き・汚れ・押印を足してある"
+   },
+   "format": "pdf",
+   "bytes": 206120,
+   "kind_label": "スキャンした書類"
+  }
+ ]
+}
