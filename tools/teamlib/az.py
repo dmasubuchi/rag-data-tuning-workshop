@@ -19,6 +19,7 @@ READ_ONLY = (
     ("group", "exists"), ("group", "show"),
     ("resource", "list"),
     ("storage", "account", "check-name"), ("storage", "account", "show"), ("storage", "container-rm", "show"),
+    ("storage", "account", "show-connection-string"),   # builder の .env.local だけ（資料を入れるため）
     ("cosmosdb", "check-name-exists"), ("cosmosdb", "show"),
     ("search", "service", "show"), ("search", "admin-key", "show"), ("search", "query-key", "list"),
     ("cognitiveservices", "account", "keys", "list"),

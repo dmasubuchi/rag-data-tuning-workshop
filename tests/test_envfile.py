@@ -42,11 +42,15 @@ QUERY = "QUERY" + "FIRST" + "0003"
 QUERY2 = "QUERY" + "NEXT" + "0004"
 AI = "FOUNDRY" + "ONE" + "0005"
 AI2 = "FOUNDRY" + "TWO" + "0006"
-ALL_KEYS = (ADMIN, ADMIN2, QUERY, QUERY2, AI, AI2)
+# Storage の接続文字列には、アカウントのキーが入っている（builder だけが読む）。キーの部分は、ほかの見本の一部にならない
+STORAGE_KEY = "STORAGE" + "KEY" + "0007"
+STORAGE_CONN = "DefaultEndpointsProtocol=https;AccountName=stacmesuika;AccountKey=" + STORAGE_KEY + ";EndpointSuffix=core.windows.net"
+ALL_KEYS = (ADMIN, ADMIN2, QUERY, QUERY2, AI, AI2, STORAGE_KEY)
 
 ADMIN_CALL = ("search", "admin-key", "show")
 QUERY_CALL = ("search", "query-key", "list")
 AI_CALL = ("cognitiveservices", "account", "keys", "list")
+STORAGE_CALL = ("storage", "account", "show-connection-string")
 BAD = "az の答えの形が想定外です"
 
 
@@ -74,14 +78,16 @@ class FakeAz(Az):
 
 
 def answers(**changes):
-    """キーを読む3つの答え。changes（admin、query、ai）で差し替える。"""
+    """キーを読む4つの答え。changes（admin、query、ai、storage）で差し替える。"""
     base = {
         "admin": {"primaryKey": ADMIN, "secondaryKey": ADMIN2},
         "query": [{"name": "", "key": QUERY}, {"name": "second", "key": QUERY2}],
         "ai": {"key1": AI, "key2": AI2},
+        "storage": {"connectionString": STORAGE_CONN},
     }
     base.update(changes)
-    return FakeAz([(ADMIN_CALL, base["admin"]), (QUERY_CALL, base["query"]), (AI_CALL, base["ai"])])
+    return FakeAz([(ADMIN_CALL, base["admin"]), (QUERY_CALL, base["query"]), (AI_CALL, base["ai"]),
+                   (STORAGE_CALL, base["storage"])])
 
 
 class TempCase(unittest.TestCase):
@@ -104,7 +110,7 @@ class TempCase(unittest.TestCase):
 
 class EnvTextTest(unittest.TestCase):
     def test_builder_items(self):
-        text = env_text(NAMES, "builder", ADMIN, AI)
+        text = env_text(NAMES, "builder", ADMIN, AI, STORAGE_CONN)
         lines = [line for line in text.splitlines() if line and not line.startswith("#")]
         self.assertEqual(lines, [
             "AZURE_SEARCH_ENDPOINT=https://srch-acme-suika.search.windows.net",
@@ -114,13 +120,40 @@ class EnvTextTest(unittest.TestCase):
             f"AZURE_OPENAI_API_KEY={AI}",
             "AZURE_OPENAI_EMBEDDING_DEPLOYMENT=text-embedding-3-small",
             "AZURE_OPENAI_CHAT_DEPLOYMENT=gpt-5-mini",
+            "AZURE_OPENAI_CHAT_MODEL=gpt-5-mini",
+            "AZURE_OPENAI_REASONING_EFFORT=low",
             "EMBEDDING_DIMENSIONS=1536",
+            f"AZURE_STORAGE_CONNECTION_STRING={STORAGE_CONN}",
+            "AZURE_STORAGE_CONTAINER=hr-docs",
         ])
 
+    def test_chat_model_and_effort_defaults(self):
+        """チャットのモデル名と推論の強さは、どちらの役割にも入る（ナレッジベースがモデル名を使う）。"""
+        for role, search_key, storage in (("builder", ADMIN, STORAGE_CONN), ("member", QUERY, None)):
+            with self.subTest(role=role):
+                lines = env_text(NAMES, role, search_key, AI, storage).splitlines()
+                self.assertIn("AZURE_OPENAI_CHAT_MODEL=gpt-5-mini", lines)
+                self.assertIn("AZURE_OPENAI_REASONING_EFFORT=low", lines)
+                self.assertEqual(sum(line.startswith("AZURE_OPENAI_CHAT_MODEL=") for line in lines), 1)
+                self.assertEqual(sum(line.startswith("AZURE_OPENAI_REASONING_EFFORT=") for line in lines), 1)
+
+    def test_member_text_has_no_storage_lines(self):
+        text = env_text(NAMES, "member", QUERY, AI)
+        self.assertFalse([line for line in text.splitlines() if "AZURE_STORAGE_" in line])
+        self.assertNotIn("AccountKey", text)
+
+    def test_storage_connection_is_for_the_builder_only(self):
+        """member に Storage の接続文字列を渡しても、書かずに止める。builder で渡し忘れても、空のまま書かずに止める。"""
+        with self.assertRaises(ValueError):
+            env_text(NAMES, "member", QUERY, AI, STORAGE_CONN)
+        for missing in (None, ""):
+            with self.subTest(missing=missing), self.assertRaises(ValueError):
+                env_text(NAMES, "builder", ADMIN, AI, missing)
     def test_member_items_differ_only_in_search_key_and_role(self):
-        builder = env_text(NAMES, "builder", ADMIN, AI).replace(ADMIN, QUERY).replace("KEY_ROLE=admin", "KEY_ROLE=query")
+        builder = env_text(NAMES, "builder", ADMIN, AI, STORAGE_CONN).replace(ADMIN, QUERY).replace("KEY_ROLE=admin", "KEY_ROLE=query")
         member = env_text(NAMES, "member", QUERY, AI)
-        body = lambda text: [line for line in text.splitlines() if not line.startswith("#")]  # noqa: E731
+        body = lambda text: [line for line in text.splitlines()  # noqa: E731
+                             if not line.startswith("#") and not line.startswith("AZURE_STORAGE_")]
         self.assertEqual(body(member), body(builder))
         self.assertIn("AZURE_SEARCH_KEY_ROLE=query", member)
 
@@ -132,7 +165,7 @@ class EnvTextTest(unittest.TestCase):
 
     def test_header_says_who_may_hold_the_file(self):
         """構築する人用は「人に渡さない」、メンバー用は「チームの外に渡さない」（メンバーには渡す）。"""
-        builder = env_text(NAMES, "builder", ADMIN, AI).splitlines()[0]
+        builder = env_text(NAMES, "builder", ADMIN, AI, STORAGE_CONN).splitlines()[0]
         member = env_text(NAMES, "member", QUERY, AI).splitlines()[0]
         self.assertIn("人に渡さない", builder)
         self.assertIn("チームの外に渡さない", member)
@@ -148,7 +181,8 @@ class EnvTextTest(unittest.TestCase):
         """config/env.example は、項目の名前だけ。env_text が書く項目と同じ並び。"""
         example = (REPO_DIR / "config" / "env.example").read_text(encoding="utf-8")
         names = [line.split("=", 1)[0] for line in example.splitlines() if line.strip() and not line.startswith("#")]
-        written = [line.split("=", 1)[0] for line in env_text(NAMES, "builder", ADMIN, AI).splitlines() if line and not line.startswith("#")]
+        written = [line.split("=", 1)[0] for line in env_text(NAMES, "builder", ADMIN, AI, STORAGE_CONN).splitlines()
+                   if line and not line.startswith("#")]
         self.assertEqual(names, written)
         for line in example.splitlines():
             if line.strip() and not line.startswith("#"):
@@ -176,9 +210,69 @@ class WriteEnvTest(TempCase):
         self.assertEqual(self.items()["AZURE_SEARCH_API_KEY"], ADMIN)
         self.assertNotIn(QUERY_CALL, [call[:3] for call in az.calls])
 
+    def test_member_has_no_storage(self):
+        """メンバーの .env.local に、Storage の行も接続文字列（アカウントのキー）も入らない。読みにも行かない。"""
+        az = answers()
+        write_env(az, NAMES, "member", self.path)
+        text = self.read()
+        self.assertFalse([line for line in text.splitlines() if "AZURE_STORAGE_" in line], text)
+        self.assertNotIn("AccountKey", text)
+        self.assertNotIn(STORAGE_KEY, text)
+        self.assertNotIn(STORAGE_CALL, [call[:3] for call in az.calls], "メンバーのために、Storage の接続文字列を読んではいけない")
+        self.assertFalse(any("storage" in call for call in az.calls))
+
+    def test_member_ignores_the_storage_answer(self):
+        """メンバーは Storage を読まないので、Storage の答えがどんな形でも書ける。"""
+        for bad in (None, {}, "x", {"connectionString": ""}, FakeAz([])):
+            with self.subTest(answer=bad):
+                write_env(answers(storage=bad), NAMES, "member", self.path)
+                self.assertNotIn("AZURE_STORAGE_", self.read())
+
+    def test_builder_has_storage(self):
+        """構築する人の .env.local に、Storage の接続文字列と、資料を入れるコンテナーの名前が入る。"""
+        az = answers()
+        write_env(az, NAMES, "builder", self.path)
+        self.assertEqual(self.items()["AZURE_STORAGE_CONNECTION_STRING"], STORAGE_CONN)
+        self.assertEqual(self.items()["AZURE_STORAGE_CONTAINER"], "hr-docs")
+        storage = next(call for call in az.calls if call[:3] == STORAGE_CALL)
+        self.assertEqual(storage[3:], ("-n", "stacmesuika", "-g", "rg-acme-suika"))
+
+    def test_chat_model_and_effort_defaults(self):
+        for role in ("builder", "member"):
+            with self.subTest(role=role):
+                write_env(answers(), NAMES, role, self.path)
+                self.assertEqual(self.items()["AZURE_OPENAI_CHAT_MODEL"], "gpt-5-mini")
+                self.assertEqual(self.items()["AZURE_OPENAI_REASONING_EFFORT"], "low")
+
+    def test_storage_answer_shape(self):
+        """Storage の答えが想定外（dict でない・connectionString がない・空・空白や改行を含む）なら、何も書かない。"""
+        bad_answers = (None, {}, [], "x", 3, {"connectionString": ""}, {"connectionString": None}, {"connectionString": 3},
+                       {"connectionString": ["a"]}, {"connection_string": STORAGE_CONN},
+                       {"connectionString": STORAGE_CONN + "\nAZURE_SEARCH_KEY_ROLE=query"},
+                       {"connectionString": STORAGE_CONN + " x"}, {"connectionString": STORAGE_CONN + "\r"})
+        for bad in bad_answers:
+            with self.subTest(answer=bad):
+                with self.assertRaises(CheckError) as caught:
+                    write_env(answers(storage=bad), NAMES, "builder", self.path)
+                self.assertEqual(caught.exception.detail, BAD)
+                self.assertNotIn(STORAGE_KEY, caught.exception.detail)
+                self.assertFalse(self.path.exists())
+
+    def test_storage_command_is_allowed_and_keys_list_is_not(self):
+        """接続文字列を読む show-connection-string は許可の一覧に入る。キーの一覧や再作成など、ほかの Storage のコマンドは入らない。"""
+        from teamlib.az import READ_ONLY
+        self.assertIn(STORAGE_CALL, READ_ONLY)
+        az = Az(exe="fake-az", subscription=SUB)
+        with mock.patch("teamlib.az.subprocess.run", side_effect=AssertionError("az を実行してはいけない")):
+            for args in (("storage", "account", "keys", "list"), ("storage", "account", "keys", "renew"),
+                         ("storage", "account", "update"), ("storage", "account", "delete"),
+                         ("storage", "container", "create")):
+                with self.subTest(args=args), self.assertRaises(CheckError):
+                    az.run(*args)
+
     def test_only_the_expected_keys_are_written(self):
-        """管理者は primaryKey、検索用は先頭の key、Foundry は key1。ほかのキーは書かない。"""
-        for role, wanted in (("builder", (ADMIN, AI)), ("member", (QUERY, AI))):
+        """管理者は primaryKey、検索用は先頭の key、Foundry は key1、Storage は接続文字列。ほかのキーは書かない。"""
+        for role, wanted in (("builder", (ADMIN, AI, STORAGE_KEY)), ("member", (QUERY, AI))):
             with self.subTest(role=role):
                 write_env(answers(), NAMES, role, self.path)
                 text = self.read()
@@ -202,11 +296,13 @@ class WriteEnvTest(TempCase):
 
     def test_keys_are_not_in_az_arguments(self):
         """az に渡す引数にも、キーは出ない（読む側の引数にあるのは、名前だけ）。"""
-        az = answers()
-        write_env(az, NAMES, "member", self.path)
-        for call in az.calls:
-            for key in ALL_KEYS:
-                self.assertFalse(any(key in part for part in call), call)
+        for role in ("builder", "member"):
+            with self.subTest(role=role):
+                az = answers()
+                write_env(az, NAMES, role, self.path)
+                for call in az.calls:
+                    for key in ALL_KEYS:
+                        self.assertFalse(any(key in part for part in call), call)
 
     def test_az_is_asked_for_this_teams_resources(self):
         az = answers()
@@ -287,11 +383,14 @@ class WriteEnvTest(TempCase):
             ("denied", "member", QUERY_CALL, "キーを読む権限がありません"),
             ("notfound", "member", AI_CALL, "がまだありません"),
             ("denied", "member", AI_CALL, "キーを読む権限がありません"),
+            ("notfound", "builder", STORAGE_CALL, "Storage stacmesuika がまだありません"),
+            ("denied", "builder", STORAGE_CALL, "Storage stacmesuika のキーを読む権限がありません"),
         )
         for kind, role, call, message in cases:
             with self.subTest(kind=kind, role=role, call=call[:3]):
                 az = FakeAz([(call, CheckError(kind, "ERROR: raw az text")),
-                             (ADMIN_CALL, {"primaryKey": ADMIN}), (QUERY_CALL, [{"key": QUERY}]), (AI_CALL, {"key1": AI})])
+                             (ADMIN_CALL, {"primaryKey": ADMIN}), (QUERY_CALL, [{"key": QUERY}]), (AI_CALL, {"key1": AI}),
+                             (STORAGE_CALL, {"connectionString": STORAGE_CONN})])
                 with self.assertRaises(CheckError) as caught:
                     write_env(az, NAMES, role, self.path)
                 self.assertEqual(caught.exception.kind, "other")
@@ -307,6 +406,13 @@ class WriteEnvTest(TempCase):
         self.assertEqual(caught.exception.kind, "login")
         self.assertFalse(self.path.exists())
 
+    def test_login_error_while_reading_storage_passes_through(self):
+        az = answers(storage=CheckError("login", ""))
+        with self.assertRaises(CheckError) as caught:
+            write_env(az, NAMES, "builder", self.path)
+        self.assertEqual(caught.exception.kind, "login")
+        self.assertFalse(self.path.exists())
+
     def test_unwritable_path_is_a_plain_error(self):
         with self.assertRaises(CheckError) as caught:
             write_env(answers(), NAMES, "member", self.dir / "no-such-dir" / ".env.local")
@@ -316,10 +422,13 @@ class WriteEnvTest(TempCase):
             self.assertNotIn(key, caught.exception.detail)
 
     def test_shown_text_tells_who_may_hold_the_file(self):
-        self.assertIn("人に渡しません", write_env(answers(), NAMES, "builder", self.path))
+        builder = write_env(answers(), NAMES, "builder", self.path)
+        self.assertIn("人に渡しません", builder)
+        self.assertIn("Storage", builder)
         shown = write_env(answers(), NAMES, "member", self.path)
         self.assertIn("チームの外には渡しません", shown)
         self.assertNotIn("人に渡しません", shown)
+        self.assertNotIn("Storage", shown)
 
     def test_written_as_utf8(self):
         write_env(answers(), NAMES, "member", self.path)
@@ -450,6 +559,7 @@ class EnvCommandTest(TempCase):
         self.assertEqual(code, 0, out)
         self.assertEqual(self.items()["AZURE_SEARCH_KEY_ROLE"], "admin")
         self.assertEqual(self.items()["AZURE_SEARCH_API_KEY"], ADMIN)
+        self.assertEqual(self.items()["AZURE_STORAGE_CONNECTION_STRING"], STORAGE_CONN)
         for key in ALL_KEYS:
             self.assertNotIn(key, out)
 
@@ -464,7 +574,9 @@ class EnvCommandTest(TempCase):
         self.assertIn("AZURE_SEARCH_KEY_ROLE=query", text)
         self.assertIn("チームの外に渡さない", text.splitlines()[0])
         self.assertNotIn(ADMIN, text)
+        self.assertNotIn("AZURE_STORAGE_", text)
         self.assertNotIn(ADMIN_CALL, [call[:3] for call in az.calls])
+        self.assertNotIn(STORAGE_CALL, [call[:3] for call in az.calls])
         self.assertFalse(self.path.exists(), "--out があるとき、既定の場所には書かない")
         self.assertIn("member.local.env", out)
         for key in ALL_KEYS:

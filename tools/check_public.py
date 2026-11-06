@@ -43,7 +43,10 @@ from typing import Iterator, NamedTuple
 
 BANNED_ENV = "PUBLIC_CHECK_BANNED"
 NO_BANNED_GIVEN = f"禁止語のリストの場所を --banned か {BANNED_ENV} で渡す"
-EXAMPLE_DOMAINS = {"example.com", "example.jp"}
+# メールの例に使ってよいドメイン。RFC 2606 の予約名（example.com・.net・.org と、.example・.test・.invalid・.localhost で
+# 終わるドメイン）と、日本の example.jp。example.com などは、ドメイン全体が一致するものだけ除く。
+EXAMPLE_DOMAINS = {"example.com", "example.net", "example.org", "example.jp"}
+RESERVED_SUFFIXES = (".example", ".test", ".invalid", ".localhost")
 # 個人のメールではない noreply のアドレス。GitHub の noreply（<数字>+<名前>@users.noreply.github.com など）と、
 # 共著者（Co-Authored-By）に書く AI のアドレス。ドメイン全体・アドレス全体が一致するものだけ除く。
 NOREPLY_DOMAINS = {"users.noreply.github.com"}
@@ -146,9 +149,10 @@ def _compile_banned(banned: list[str]) -> list[re.Pattern]:
 
 
 def _is_allowed_email(address: str, domain: str) -> bool:
-    """検査から除くメールか（example のドメイン、GitHub と AI の noreply）。"""
+    """検査から除くメールか（example・予約名のドメイン、GitHub と AI の noreply）。"""
     domain = domain.lower()
-    return domain in EXAMPLE_DOMAINS or domain in NOREPLY_DOMAINS or address.lower() in NOREPLY_ADDRESSES
+    return (domain in EXAMPLE_DOMAINS or domain.endswith(RESERVED_SUFFIXES)
+            or domain in NOREPLY_DOMAINS or address.lower() in NOREPLY_ADDRESSES)
 
 
 def _line_matches(line: str, banned_patterns: list[re.Pattern]) -> list[tuple[str, int, int]]:

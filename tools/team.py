@@ -15,7 +15,8 @@ config/workshop.example.config）。
 env は az でキーを読み、設定ファイルに書く（画面には出さない）。書き先は、既定では Repo 直下の .env.local。
 --out PATH を付けると、そこに書く（構築する人が、メンバー用の設定を書き出して渡すとき）。Repo の中に書くなら、
 Git に入らない名前（.env.local、*.local.env）にする。
-  builder（構築する人）は AI Search の管理者キー（人に渡さない）、member（メンバー）は検索用のキー（チームの外に渡さない）。
+  builder（構築する人）は AI Search の管理者キーと Storage の接続文字列（人に渡さない）、
+  member（メンバー）は検索用のキー（チームの外に渡さない。Storage の接続文字列は入らない）。
 
 動かすのは Python の標準ライブラリと az だけ。Azure に何かを作る・変える・消すコマンドは、このファイルに入っていない
 （az に渡せるコマンドは teamlib/az.py の READ_ONLY の一覧に限る）。

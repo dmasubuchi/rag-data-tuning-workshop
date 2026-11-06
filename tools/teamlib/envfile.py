@@ -1,10 +1,11 @@
 """接続の設定ファイル .env.local を作る。キーは az で読み、このファイルにだけ書く（画面にも引数にも出さない）。
 
 役割は2つ。
-  builder（構築する人）：AI Search の管理者キー。インデックスを作れる。人に渡さない。
+  builder（構築する人）：AI Search の管理者キー。インデックスを作れる。Storage の接続文字列も入る（資料を入れるため）。人に渡さない。
   member（メンバー）  ：AI Search の検索用キー。検索だけできる（管理者キーは、読みもしないし、書かない）。
+                        Storage の接続文字列は、読みもしないし、書かない。
                         構築する人が書き出して、チームのメンバーに渡す。チームの外には渡さない。
-Foundry のキーは、どちらも同じ（key1）。
+Foundry のキーは、どちらも同じ（key1）。チャットのモデル名と推論の強さも、どちらも同じ。
 
 書き込みは、同じフォルダーの一時ファイル（持ち主だけが読める）に書いてから置き換える。失敗したら、前の設定ファイルはそのまま。
 
@@ -23,11 +24,14 @@ ENV_FILE = Path(__file__).resolve().parents[2] / ".env.local"
 EMBEDDING_DEPLOYMENT = "text-embedding-3-small"
 CHAT_DEPLOYMENT = "gpt-5-mini"
 EMBEDDING_DIMENSIONS = "1536"
+CHAT_MODEL = "gpt-5-mini"          # ナレッジベースが使うチャットのモデル名
+REASONING_EFFORT = "low"           # 推論の強さ
+STORAGE_CONTAINER = "hr-docs"      # 人事の資料を入れるコンテナーの名前（builder だけ）
 
 ROLES = {
     # role: (AZURE_SEARCH_KEY_ROLE の値, 設定ファイルの先頭に書く呼び方, 画面に出す呼び方,
     #        設定ファイルの先頭に書く渡し方の注意, 画面に出す渡し方の注意)
-    "builder": ("admin", "構築する人用", "構築する人用、AI Search は管理者キー",
+    "builder": ("admin", "構築する人用", "構築する人用、AI Search は管理者キーと Storage の接続文字列つき",
                 "人に渡さない", "人に渡しません"),
     "member": ("query", "メンバー用", "メンバー用、AI Search は検索だけのキー",
                "チームの外に渡さない", "チームのメンバーに渡せます。チームの外には渡しません"),
@@ -36,10 +40,18 @@ ROLES = {
 UNEXPECTED = "az の答えの形が想定外です"
 
 
-def env_text(names: Names, role: str, search_key: str, ai_key: str) -> str:
-    """.env.local の中身。role は "builder" か "member"。search_key はその役割のキー、ai_key は Foundry のキー。"""
+def env_text(names: Names, role: str, search_key: str, ai_key: str, storage_connection: str | None = None) -> str:
+    """.env.local の中身。role は "builder" か "member"。search_key はその役割のキー、ai_key は Foundry のキー。
+
+    storage_connection（Storage の接続文字列）は builder だけ。builder で渡さない・member で渡すと ValueError
+    （member の設定に、アカウントのキーが入ってしまわないようにする）。
+    """
     if role not in ROLES:
         raise ValueError(f"role は builder か member です（今は {role!r}）")
+    if role == "builder" and not storage_connection:
+        raise ValueError("builder には、Storage の接続文字列が要ります")
+    if role == "member" and storage_connection is not None:
+        raise ValueError("member の設定に、Storage の接続文字列は入れません")
     key_role, short, _, handling, _ = ROLES[role]
     lines = [
         f"# チーム {names.team} の AI Search と Foundry につなぐ設定（{short}）。team.py env が作成。Git に入らない。{handling}",
@@ -50,8 +62,15 @@ def env_text(names: Names, role: str, search_key: str, ai_key: str) -> str:
         f"AZURE_OPENAI_API_KEY={ai_key}",
         f"AZURE_OPENAI_EMBEDDING_DEPLOYMENT={EMBEDDING_DEPLOYMENT}",
         f"AZURE_OPENAI_CHAT_DEPLOYMENT={CHAT_DEPLOYMENT}",
+        f"AZURE_OPENAI_CHAT_MODEL={CHAT_MODEL}",
+        f"AZURE_OPENAI_REASONING_EFFORT={REASONING_EFFORT}",
         f"EMBEDDING_DIMENSIONS={EMBEDDING_DIMENSIONS}",
     ]
+    if role == "builder":
+        lines += [
+            f"AZURE_STORAGE_CONNECTION_STRING={storage_connection}",
+            f"AZURE_STORAGE_CONTAINER={STORAGE_CONTAINER}",
+        ]
     return "\n".join(lines) + "\n"
 
 
@@ -96,6 +115,13 @@ def _ai_key(az, names: Names) -> str:
     return _key(answer, "key1")
 
 
+def _storage_connection(az, names: Names) -> str:
+    """Storage の接続文字列（アカウントのキーを含む）。builder だけが読む。"""
+    answer = _reading(f"Storage {names.storage}",
+                      lambda: az.run("storage", "account", "show-connection-string", "-n", names.storage, "-g", names.resource_group))
+    return _key(answer, "connectionString")
+
+
 def _write_private(path: Path, text: str) -> None:
     """同じフォルダーの一時ファイル（持ち主だけが読める）に書いて、path に置き換える。失敗したら一時ファイルを消す。
 
@@ -128,7 +154,9 @@ def write_env(az, names: Names, role: str, path: Path = ENV_FILE) -> str:
     """
     if role not in ROLES:
         raise ValueError(f"role は builder か member です（今は {role!r}）")
-    text = env_text(names, role, _search_key(az, names, role), _ai_key(az, names))
+    search_key, ai_key = _search_key(az, names, role), _ai_key(az, names)
+    storage = _storage_connection(az, names) if role == "builder" else None   # member は Storage を読まない
+    text = env_text(names, role, search_key, ai_key, storage)
     path = Path(path)
     try:
         _write_private(path, text)

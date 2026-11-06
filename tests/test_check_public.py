@@ -155,7 +155,7 @@ class ScanTextTests(unittest.TestCase):
         self.assertEqual([f.line for f in findings], [2])
 
     def test_email_other_than_example_is_found(self):
-        text = "連絡先 someone@" + "corp.test まで"
+        text = "連絡先 someone@" + "corp.net まで"
         findings = scan_text("a.txt", text, [])
         self.assertEqual(kinds(findings), ["email"])
         self.assertNotIn("someone", findings[0].excerpt)
@@ -163,6 +163,30 @@ class ScanTextTests(unittest.TestCase):
     def test_example_emails_pass(self):
         text = "a@example.com と b@example.jp と C@EXAMPLE.COM"
         self.assertEqual(scan_text("a.txt", text, []), [])
+
+    def test_reserved_example_domains_are_allowed(self):
+        # 予約済みの例用のドメイン（.example .test .invalid .localhost と example.com .net .org）は、個人のメールではない
+        text = ("a@" + "sampletech.example と b@" + "x.test と c@" + "host.invalid と d@" + "app.localhost と "
+                "e@" + "example.net と F@" + "EXAMPLE.ORG と g@" + "deep.sub.test と h@" + "X.TEST")
+        self.assertEqual(scan_text("a.txt", text, []), [])
+        # 実在しそうなドメインは、予約名のアドレスが同じ行にあっても拾う
+        self.assertEqual(kinds(scan_text("a.txt", text + " と someone@" + "corp.net", [])), ["email"])
+
+    def test_real_looking_domains_are_still_found_next_to_reserved_ones(self):
+        # 実在しそうなドメインは拾う。予約名に似ているだけのドメイン（予約名で終わらないもの）も拾う
+        cases = {
+            "ふつうのドメイン": "someone@" + "corp.net",
+            "test を含むだけ": "a@" + "test.com",
+            "test で始まる": "a@" + "testing.org",
+            "example を含むだけ": "a@" + "myexample.com",
+            "example.net の後ろに続く": "a@" + "example.net.corp.net",
+            "test の後ろに続く": "a@" + "x.test.corp.net",
+            "invalid の後ろに続く": "a@" + "x.invalid.com",
+            "example の別の TLD": "a@" + "sampletech.company",
+        }
+        for label, text in cases.items():
+            with self.subTest(label):
+                self.assertEqual(kinds(scan_text("a.txt", text, [])), ["email"])
 
     def test_github_and_ai_noreply_emails_pass(self):
         # GitHub の noreply アドレスと、AI の共著者の noreply アドレスは、個人のメールではないので除く
@@ -176,7 +200,7 @@ class ScanTextTests(unittest.TestCase):
             "別のローカル部": "xnoreply@" + "anthropic.com",
             "別のドメイン": "noreply@" + "anthropic.co.jp",
             "noreply@github の別の形": "noreply@" + "mail.github.com",
-            "ドメインの後ろに続く": "someone@" + "users.noreply.github.com.corp.test",
+            "ドメインの後ろに続く": "someone@" + "users.noreply.github.com.corp.net",
             "別のサブドメイン": "someone@" + "x.users.noreply.github.com",
             "github.com の個人": "someone@" + "github.com",
         }
@@ -192,7 +216,7 @@ class ScanTextTests(unittest.TestCase):
         self.assertEqual(kinds(scan_text("a.txt", "アイウ 社", ["ｱｲｳ"])), ["banned"])
 
     def test_full_width_forms_of_other_kinds_are_found_too(self):
-        full = "".join(chr(ord(c) + 0xFEE0) if "!" <= c <= "~" else c for c in "someone@" + "corp.test")
+        full = "".join(chr(ord(c) + 0xFEE0) if "!" <= c <= "~" else c for c in "someone@" + "corp.net")
         self.assertEqual(kinds(scan_text("a.txt", full, [])), ["email"])
 
     def test_long_lines_are_scanned_in_linear_time(self):
@@ -652,7 +676,7 @@ class MainTests(unittest.TestCase):
     def test_history_checks_author_name_and_email(self):
         cases = {
             "作成者の名前": dict(name="Acme Person"),
-            "作成者のメール": dict(email="someone@" + "corp.test"),
+            "作成者のメール": dict(email="someone@" + "corp.net"),
         }
         for label, kwargs in cases.items():
             with self.subTest(label):
