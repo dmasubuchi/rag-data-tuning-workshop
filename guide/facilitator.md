@@ -51,8 +51,19 @@ Repo が非公開のときだけです。
 - [ ] Repo を clone し、`pip install -r basic/requirements.txt` を実行する
 - [ ] `workshop.config` を書く（チームごとの状態確認に使う）
 - [ ] az にサインインする：`az login --tenant <テナント>`、`az account show`
-- [ ] Foundry のモデルの枠を確かめる：チームの数だけ、埋め込み `text-embedding-3-small`（容量 50）と、チャット `gpt-5-mini`（容量 20）が、「グローバル標準（Global Standard）」で足りること
+- [ ] Foundry のモデルの枠を確かめる：チームの数（デモ用のチームを作るなら、それも数える）だけ、埋め込み `text-embedding-3-small`（容量 50）と、チャット `gpt-5-mini`（容量 20）が、「グローバル標準（Global Standard）」で足りること
 - [ ] 画面に映すもの（スライド）を開いておく：[ハンズオン資料](../site/lecture/intro/slides.html)
+
+### 進行役のデモ用のチーム
+
+パート3・4 のデモは、進行役が自分のデモ用のチーム（例 `demo`）の `.env.local` で動かします。始める前に、参加者と同じ手順で作っておきます。進行役が、そのチームの構築する人です。
+
+1. [ ] [Azure の準備](setup/azure-setup.md)：チームの名前を決め、ポータルでリソースを作る
+2. [ ] `python tools/team.py env --team <デモ用のチーム> --role builder`：進行役の `.env.local` を作る
+3. [ ] 基礎編 01〜03 を実行する（[武将](sengoku.md)）：インデックス `sengoku` とベクトルができる
+4. [ ] `python applied/tools/build_hr_index.py` と `python applied/tools/build_hr_kb.py` を実行する（[応用（人事）](hr.md)）：人事の文書と、知識ベースができる
+
+- デモ用のチームを作らないときは、どれかのチームの構築する人の画面を映して見せます。
 
 ## パート1 PC の設定
 
@@ -71,7 +82,7 @@ Repo が非公開のときだけです。
 - [ ] 各チームが、チームの名前を決める（例 `red`）。小文字の英字と数字だけ、3〜8文字、英字で始める、`shared` で始めない。チームどうしで同じにしない
 - [ ] 各チームが、`python tools/team.py check-names --team <team>` で確かめ、すべて「使える」になってから作り始める
 - [ ] チームごとに、`names` の表示どおりに作る：リソース グループ、Storage、AI Search（Basic）、Cosmos DB、Foundry とモデル2つ
-- [ ] 各チームの構築する人が、`.env.local` を作り、メンバー用の `member.local.env` をメンバーに渡す
+- [ ] 各チームの構築する人が、自分の `.env.local`（`python tools/team.py env --team <team> --role builder`）と、メンバー用の `member.local.env`（`--role member --out member.local.env`）を作り、`member.local.env` をチームの中だけでメンバーに渡す。メンバーは Repo 直下に `.env.local` という名前で置く
 - 確かめる（進行役の PC で、チームごとに）：`python tools/team.py health --team <team>`。8行がすべて「OK」で、`OK 8・まだ 0・NG 0`
   - 「NG」は理由を読んで直す。「まだ」は、まだ作っていないもの
   - Cosmos DB は `health` が調べないので、ポータルで見る
@@ -106,15 +117,15 @@ Repo が非公開のときだけです。
   - 確かめる：4つの方式の順位が並ぶ。方式を変えれば必ず良くなるわけではない
 - 05・06：測る、答えを作る
   - 映す：[p.42 NDCG と再現率](../site/lecture/part4-evaluation/slides.html#p42)、[p.48 RAG の基本の流れ](../site/lecture/part5-wrapup/slides.html#p48)、[p.50 ハルシネーション](../site/lecture/part5-wrapup/slides.html#p50)
-  - 確かめる：05 の60問の測定は、進行役が1回見せる（チームで何度も実行しない）。06 で検索ありの答えが正解、検索なしは外れる
+  - 確かめる：05 の60問の測定は、進行役が、デモ用のチームの `.env.local` で1回見せる（チームで何度も実行しない）。06 で検索ありの答えが正解、検索なしは外れる
 
 ## パート4 応用編：人事
 
 手順：[応用（人事）](hr.md)
 
 - [ ] 構築する人が、`hr-docs` を取り込んでおく（数分。パート3の途中で始めておくと、待たない）
-- [ ] 14〜20 を、進行役のデモで見せる（17 は構築する人の画面で）
-- [ ] [採用アシスタント](../applied/assistant/README.md)を見せる
+- [ ] 14〜20 を、進行役が、デモ用のチームの `.env.local`（構築する人の設定）で見せる（17 は本物の文書を直すので、進行役の画面だけで動かす）
+- [ ] [採用アシスタント](../applied/assistant/README.md)を見せる（デモ用のチームの `.env.local` で。手元だけで開きます）
 - 映す：[p.30 権限：誰に何を見せるか](../site/lecture/part2-ingestion/slides.html#p30)、[p.29 差分の更新と削除の検出](../site/lecture/part2-ingestion/slides.html#p29)、[p.31 文書同士の関係性を検索する](../site/lecture/part3-relations-agentic/slides.html#p31)、[p.32 エージェント型検索](../site/lecture/part3-relations-agentic/slides.html#p32)、[p.36 ナレッジソースとナレッジベース](../site/lecture/part3-relations-agentic/slides.html#p36)、[p.44 生成 AI による採点のぶれ](../site/lecture/part4-evaluation/slides.html#p44)
 - 短く見せるとき：[検索デモ](search-demo.md)（AI Search だけ。5段で、絞る・見せてよい人・並べ直す）
 
@@ -142,5 +153,5 @@ Repo が非公開のときだけです。
 - 画面の名前が違う：Azure の画面は変わる。メニューの名前を探し、見つからなければ、進行役が確かめて伝える
 - セマンティック ランカーの無料枠：チームの AI Search 全体で、月ごとに使う。05 の `measure_methods.py` は、1回の実行で質問の数（60回）使う
 - 17 は本物の文書を直す：動かしているあいだ、チームの検索の結果も変わる。メンバーが 15・16・18・19 を動かしていないときに、構築する人が実行する
-- キーが古くなった：構築する人が `python tools/team.py env --role builder` と `--role member --out member.local.env` を実行し直し、メンバーに渡し直す
+- キーが古くなった：構築する人が `python tools/team.py env --team <チーム> --role builder`（自分の `.env.local`）と `--role member --out member.local.env`（メンバー用）を実行し直し、`member.local.env` をメンバーに渡し直す
 - Azure OpenAI が「呼びすぎ（429）」と返す：自動で待って再試行する。続くときは、1分ほど待つ

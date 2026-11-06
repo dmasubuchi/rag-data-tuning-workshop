@@ -190,6 +190,50 @@ class RestoreTest(Base):
         self.assertEqual({e[1] for e in self.az.log if e[0] == "upload_blob"}, set(APP_FILES))
 
 
+class IsAsInDataTest(Base):
+    """docops.is_as_in_data：Storage の blob が、data/ の文書とメタデータのとおりか。分かれ目ごとに確かめる。"""
+
+    REL = "resumes/CV-APP-0471.docx"
+
+    def check(self, blob=True):
+        """いまの偽の入れ物の blob（blob=False なら None）を、data/ の文書と比べる。答えと、比べる間に中身を読んだかを返す。"""
+        entry = next(f for f in config.manifest_files() if f["path"] == self.REL)
+        with self.az.patched():
+            cc = clients.container_client()
+            existing = {b.name: b for b in cc.list_blobs(include=["metadata"])}
+            self.az.log.clear()
+            answer = docops.is_as_in_data(cc, existing.get(self.REL) if blob else None, docops.DATA_DIR / self.REL, entry)
+        return answer, ("download_blob", self.REL) in self.az.log
+
+    def test_same_blob_is_as_in_data_and_its_content_was_compared(self):
+        self.assertEqual(self.check(), (True, True))
+
+    def test_no_blob_is_not_as_in_data(self):
+        self.assertEqual(self.check(blob=False), (False, False))
+
+    def test_different_metadata_is_decided_without_reading_the_content(self):
+        self.az.blobs[self.REL]["metadata"]["doc_id"] = "CV-APP-9999"
+        self.assertEqual(self.check(), (False, False))
+
+    def test_same_metadata_and_size_but_different_content_is_not_as_in_data(self):
+        body = self.az.blobs[self.REL]["data"]
+        self.az.blobs[self.REL]["data"] = body[:-1] + bytes([body[-1] ^ 0xFF])      # 大きさは同じ、最後の1バイトだけ違う
+        self.assertEqual(len(self.az.blobs[self.REL]["data"]), len(body))
+        self.assertEqual(self.check(), (False, True))                                # 中身を読んで比べた
+
+    def test_same_metadata_but_different_size_is_decided_without_reading_the_content(self):
+        self.az.blobs[self.REL]["data"] += b"\x00"                                    # メタデータは同じ、大きさだけ違う
+        self.assertEqual(self.check(), (False, False))
+
+    def test_restore_puts_back_only_the_document_whose_content_differs(self):
+        body = self.az.blobs[self.REL]["data"]
+        self.az.blobs[self.REL]["data"] = body[:-1] + bytes([body[-1] ^ 0xFF])
+        with self.az.patched():
+            out = docops.restore(say=quiet)
+        self.assertEqual(out["put"], [self.REL])
+        self.assertEqual(self.az.snapshot(), self.base)
+
+
 class ScriptsTest(Base):
     def test_withdraw_script_removes_then_restores(self):
         out = run_script(self.az, "17-update-delete/withdraw_application.py")
@@ -291,7 +335,7 @@ class ScriptsTest(Base):
         with self.assertRaises(config.SetupError) as cm:
             run_script(self.az, "17-update-delete/cleanup.py")
         self.assertIn("AZURE_STORAGE_CONNECTION_STRING", str(cm.exception))
-        self.assertIn("python tools/team.py env --role builder", str(cm.exception))
+        self.assertIn("python tools/team.py env --team <チーム> --role builder", str(cm.exception))
         self.assertEqual(self.az.log, [])
 
 

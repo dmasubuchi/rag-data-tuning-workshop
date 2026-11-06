@@ -7,7 +7,7 @@
 
 ## 前提
 
-- Azure の接続先とキーは、Repo 直下の `.env.local` に入っています。Repo 直下で `python tools/team.py env --role builder`（メンバーは `--role member`）を実行すると作れます。ほかの人に渡しません（Git にも入りません）
+- Azure の接続先とキーは、Repo 直下の `.env.local` に入っています。構築する人は、Repo 直下で `python tools/team.py env --team <チーム> --role builder` を実行して作ります。メンバーは、構築する人から `member.local.env` を受け取り、Repo 直下に `.env.local` という名前で置きます。構築する人の `.env.local` は、だれにも渡しません（Git にも入りません）
 - 接続先とキーは、いつも `.env.local` の中身を使います（パソコンに残っている `AZURE_*` の環境変数は読みません）
 - Python 3.11 か 3.12。仮想環境に、Repo 直下で一度だけ：
 
@@ -15,7 +15,7 @@
 pip install -r applied/requirements.txt
 ```
 
-- 20（答えを評価する）の組み込みの評価器を使うときだけ、追加で `pip install -r applied/requirements-eval.txt`（約 150MB。入れなくても自前の採点は動く）
+- 20（答えを評価する）の組み込みの評価器を使うときだけ、Repo 直下で追加の `pip install -r applied/requirements-eval.txt`（約 150MB。入れなくても自前の採点は動く）
 - コマンドは PowerShell でも bash でも同じです。パスの区切りは `/` で書いてあります（PowerShell でも動きます）
 
 ## 構築する人とメンバー
@@ -29,11 +29,11 @@ pip install -r applied/requirements.txt
 
 役割ごとに、できることが違います。
 
-- 構築する人（`--role builder`）：AI Search の管理者キーと Storage の接続文字列を使います。次を動かせます
+- 構築する人（自分の `.env.local`。`--role builder`）：AI Search の管理者キーと Storage の接続文字列を使います。次を動かせます
   - `tools/build_hr_index.py`：Storage に文書を置き、インデックスなどを作り、取り込む
   - `tools/build_hr_kb.py`：知識ソースと知識ベースを作る
   - 17（更新と削除）の3本：チームの本物の文書を直して、最後に元に戻す。**動かしているあいだ、チームの検索の結果も変わります**
-- メンバー（`--role member`）：検索だけのキーを使います。Storage の接続文字列は持ちません。構築する人が作ったものを、検索して読みます（14・15・16・18・19・20）。17 は構築する人の画面で見ます
+- メンバー（構築する人から受け取った `member.local.env`。`--role member` で作る）：検索だけのキーを使います。Storage の接続文字列は持ちません。構築する人が作ったものを、検索して読みます（14・15・16・18・19・20）。17 は構築する人の画面で見ます
 - メンバーの設定で、作る・変える・文書を直す手順を実行すると、不透明なエラーになる前に「この手順は構築する人の設定（--role builder）で実行します」と止まります
 - Storage の項目が要るのは、`build_hr_index.py` と 17 だけです。ほかのスクリプトは、Storage の項目がなくても動きます
 
@@ -62,13 +62,13 @@ pip install -r applied/requirements.txt
 - `topics/19-agentic-retrieval/`：エージェント型検索のデモ（LLM を使う機能はプレビューの API）
   - `compare_search.py`：普通の検索＋LLM と、エージェント型検索＋LLM を並べる
   - `effort_levels.py`：考える量（minimal・low・medium・auto）の違い
-  - `make_answers.py`：（進行役）10問 × 2方式 × 3回の答えを作って保存する
+  - `make_answers.py`：（進行役。デモ用のチームの `.env.local` で）10問 × 2方式 × 3回の答えを作って保存する
 - `topics/20-answer-evaluation/`：答えを評価する
   - `score_one.py`：1つの答えを、自前の採点と組み込みの評価器で採点する
-  - `score_all.py`：（進行役）19 の答えをまとめて採点し、点のぶれを見る
+  - `score_all.py`：（進行役。デモ用のチームの `.env.local` で）19 の答えをまとめて採点し、点のぶれを見る
 
 - `assistant/`：採用アシスタント（Streamlit の画面。LLM が検索の道具を選んで、候補を段ごとに絞る。検索と LLM だけを使うので、メンバーの設定で動く。`assistant/README.md`）
-  - 動かす：Repo 直下で `pip install -r applied/assistant/requirements.txt` のあと `streamlit run applied/assistant/app.py`
+  - 動かす：Repo 直下で `pip install -r applied/assistant/requirements.txt` のあと `streamlit run applied/assistant/app.py`。この PC だけで開きます。人に見せるときは、`ASSISTANT_ACCESS_CODE` を設定します
 
 ## 中身
 
@@ -115,4 +115,4 @@ cd applied
 
 Windows（PowerShell）では `.venv\Scripts\python` を使います。Notebook の試験（`tests/test_layout.py` の最後の1本）は、jupytext が入っているときだけ動きます（`requirements-dev.txt`）。
 `azure-ai-evaluation`（`requirements-eval.txt`）が入っていないときは、1本が飛ばされます。
-採用アシスタントの画面の試験（`tests/test_assistant_app.py` の `ScreenTest`）は、streamlit が入っているときだけ動きます（`pip install -r applied/assistant/requirements.txt`）。入っていなければ飛ばされます。
+採用アシスタントの画面の試験（`tests/test_assistant_app.py` の `ScreenTest`）は、streamlit が入っているときだけ動きます（Repo 直下で `pip install -r applied/assistant/requirements.txt`）。入っていなければ飛ばされます。

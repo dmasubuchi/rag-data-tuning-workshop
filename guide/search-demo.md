@@ -57,4 +57,5 @@ python tools/search_demo.py --q "面接の評価"
 
 - 「.env.local が読めません」と出る：Repo の直下で実行しているか、`.env.local` があるかを確かめます。
 - 「インデックス hr-docs がありません」と出る：構築する人が、文書の取り込み（`python applied/tools/build_hr_index.py`）を終えているか確かめます。
-- 「キーが合いません」と出る：キーが古くなっています。構築する人が `python tools/team.py env --role member --out member.local.env` で書き出し直します。
+- 5 段目で「エラー 403」と出る：キーが合っていないか、セマンティック ランカーの無料枠（月ごと。チームの AI Search 全体で使う）を使い切っています。1〜4 段が動いているなら、無料枠です。
+- 「キーが合いません」と出る：キーが古くなっています。構築する人が `python tools/team.py env --team <チーム> --role member --out member.local.env` で作り直し、メンバーに渡し直します。

@@ -264,10 +264,11 @@ OK 8・まだ 0・NG 0
 </ul>
 <h2 id="4-接続の設定を作る">4. 接続の設定を作る</h2>
 <p><code>.env.local</code> は、チームの AI Search と Foundry の接続先とキーを書いたファイルです。すべてのスクリプトが、Repo 直下のこのファイルを読みます。キーが入るので、Git には入りません。</p>
+<p>Azure に招かれるのは構築する人だけです。構築する人が、自分の <code>.env.local</code> と、メンバー用のファイル（<code>member.local.env</code>）を作ります。</p>
 <h3 id="構築する人">構築する人</h3>
 <ol>
-<li class="task"><input type="checkbox"> Repo 直下で、構築する人用の設定を作る：<code>python tools/team.py env --role builder</code><ul>
-<li>AI Search の管理者キーと、Storage の接続文字列が入ります。人に渡しません</li>
+<li class="task"><input type="checkbox"> Repo 直下で、自分の <code>.env.local</code> を作る：<code>python tools/team.py env --team &lt;team&gt; --role builder</code>（<code>$env:WORKSHOP_TEAM</code> を設定してあれば <code>--team</code> は省けます）<ul>
+<li>AI Search の管理者キーと、Storage の接続文字列が入ります。この <code>.env.local</code> は、だれにも渡しません</li>
 <li>Storage を作ってから実行します（接続文字列を読むため）</li>
 </ul>
 </li>
@@ -276,20 +277,20 @@ OK 8・まだ 0・NG 0
 <li>ないとき：「追加」で作る</li>
 </ul>
 </li>
-<li class="task"><input type="checkbox"> メンバー用の設定を書き出す：<code>python tools/team.py env --role member --out member.local.env</code><ul>
+<li class="task"><input type="checkbox"> メンバー用のファイルを作る：<code>python tools/team.py env --team &lt;team&gt; --role member --out member.local.env</code><ul>
 <li>検索だけのキーが入ります。Storage の接続文字列は入りません</li>
 </ul>
 </li>
-<li class="task"><input type="checkbox"> <code>member.local.env</code> を、チームのメンバーに渡す（チームの外には渡しません）</li>
+<li class="task"><input type="checkbox"> <code>member.local.env</code> を、チームの中だけで、メンバーに渡す（チームの外には渡しません）</li>
 <li class="task"><input type="checkbox"> つながることを確かめる：<a href="guide-sengoku.html">武将</a>の 01 のフォルダー（<code>basic/topics/01-keyword-search</code>）で、<code>python create_index.py</code> を実行し、エラーが出ない</li>
 </ol>
 <h3 id="メンバー">メンバー</h3>
 <ol>
-<li class="task"><input type="checkbox"> 構築する人から受け取った <code>member.local.env</code> の名前を <code>.env.local</code> に変えて、Repo 直下に置く</li>
+<li class="task"><input type="checkbox"> 構築する人から受け取った <code>member.local.env</code> を、Repo 直下に <code>.env.local</code> という名前で置く</li>
 <li class="task"><input type="checkbox"> つながることを確かめる：構築する人が<a href="guide-sengoku.html">武将</a>の 01 の <code>upload.py</code> まで終えたあとで、<code>basic/topics/01-keyword-search</code> フォルダーで <code>python keyword_search.py</code> を実行し、エラーが出ない</li>
 </ol>
 <h3 id="古くなったとき">古くなったとき</h3>
-<p>キーを作り直したときや、AI Search・Foundry を作り直したときは、<code>team.py env</code> をもう一度実行します（構築する人）。メンバーには、書き出し直したファイルを渡します。</p>
+<p>キーを作り直したときや、AI Search・Foundry を作り直したときは、構築する人が <code>team.py env</code> をもう一度実行します（自分の <code>.env.local</code> と、メンバー用の <code>member.local.env</code>）。メンバーには、作り直した <code>member.local.env</code> を渡します。</p>
 <h2 id="5-補助az-で作る">5. 補助：az で作る</h2>
 <p>画面で作れないときや、作ったものを確かめるときに使います。PowerShell で実行します。名前は、組織の名前（<code>workshop.config</code> の <code>WORKSHOP_ORG</code>）と、チームの名前（環境変数 <code>WORKSHOP_TEAM</code>）から組み立てます。</p>
 <p>サインインと、名前の変数（PowerShell を開き直したら、もう一度）：</p>

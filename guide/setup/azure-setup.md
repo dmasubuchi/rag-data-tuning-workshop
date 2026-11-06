@@ -225,27 +225,29 @@ OK 8・まだ 0・NG 0
 
 `.env.local` は、チームの AI Search と Foundry の接続先とキーを書いたファイルです。すべてのスクリプトが、Repo 直下のこのファイルを読みます。キーが入るので、Git には入りません。
 
+Azure に招かれるのは構築する人だけです。構築する人が、自分の `.env.local` と、メンバー用のファイル（`member.local.env`）を作ります。
+
 ### 構築する人
 
-1. [ ] Repo 直下で、構築する人用の設定を作る：`python tools/team.py env --role builder`
-   - AI Search の管理者キーと、Storage の接続文字列が入ります。人に渡しません
+1. [ ] Repo 直下で、自分の `.env.local` を作る：`python tools/team.py env --team <team> --role builder`（`$env:WORKSHOP_TEAM` を設定してあれば `--team` は省けます）
+   - AI Search の管理者キーと、Storage の接続文字列が入ります。この `.env.local` は、だれにも渡しません
    - Storage を作ってから実行します（接続文字列を読むため）
 2. [ ] メンバーがいるとき：AI Search に、検索用のキー（クエリ キー）があることを確かめる
    - `srch-<org>-<team>` の「設定」の「キー」を開き、「クエリ キーの管理」にキーが1つ以上ある
    - ないとき：「追加」で作る
-3. [ ] メンバー用の設定を書き出す：`python tools/team.py env --role member --out member.local.env`
+3. [ ] メンバー用のファイルを作る：`python tools/team.py env --team <team> --role member --out member.local.env`
    - 検索だけのキーが入ります。Storage の接続文字列は入りません
-4. [ ] `member.local.env` を、チームのメンバーに渡す（チームの外には渡しません）
+4. [ ] `member.local.env` を、チームの中だけで、メンバーに渡す（チームの外には渡しません）
 5. [ ] つながることを確かめる：[武将](../sengoku.md)の 01 のフォルダー（`basic/topics/01-keyword-search`）で、`python create_index.py` を実行し、エラーが出ない
 
 ### メンバー
 
-1. [ ] 構築する人から受け取った `member.local.env` の名前を `.env.local` に変えて、Repo 直下に置く
+1. [ ] 構築する人から受け取った `member.local.env` を、Repo 直下に `.env.local` という名前で置く
 2. [ ] つながることを確かめる：構築する人が[武将](../sengoku.md)の 01 の `upload.py` まで終えたあとで、`basic/topics/01-keyword-search` フォルダーで `python keyword_search.py` を実行し、エラーが出ない
 
 ### 古くなったとき
 
-キーを作り直したときや、AI Search・Foundry を作り直したときは、`team.py env` をもう一度実行します（構築する人）。メンバーには、書き出し直したファイルを渡します。
+キーを作り直したときや、AI Search・Foundry を作り直したときは、構築する人が `team.py env` をもう一度実行します（自分の `.env.local` と、メンバー用の `member.local.env`）。メンバーには、作り直した `member.local.env` を渡します。
 
 ## 5. 補助：az で作る
 

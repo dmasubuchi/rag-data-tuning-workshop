@@ -18,8 +18,8 @@
 <ol>
 <li class="task"><input type="checkbox"> Repo 直下で、ライブラリを入れる：<code>pip install -r basic/requirements.txt</code>（Windows で <code>python</code> が見つからないときは <code>py</code>）</li>
 <li class="task"><input type="checkbox"> 接続の設定 <code>.env.local</code> を、Repo 直下に置く（<a href="guide-setup-azure-setup.html#4-接続の設定を作る">Azure の準備の 4</a>）<ul>
-<li>構築する人：<code>python tools/team.py env --role builder</code></li>
-<li>メンバー：構築する人から受け取った <code>member.local.env</code> の名前を、<code>.env.local</code> に変える</li>
+<li>構築する人：<code>python tools/team.py env --team &lt;チーム&gt; --role builder</code>（自分の <code>.env.local</code>。だれにも渡しません）</li>
+<li>メンバー：構築する人から受け取った <code>member.local.env</code> を、Repo 直下に <code>.env.local</code> という名前で置く</li>
 </ul>
 </li>
 <li class="task"><input type="checkbox"> 構築する人が、01 から順に進める。AI Search に、チームの武将のインデックス <code>sengoku</code> ができる（150件）</li>

@@ -84,7 +84,7 @@ def explain(e: BaseException) -> list:
         if _is_query_key():
             tips.append("いまの .env.local は、AI Search が検索だけのキー（メンバー用）です。作る・変える・調べる操作はできません。この手順は構築する人の設定（--role builder）で実行します。")
         tips.append("キーまたは権限の問題です。.env.local の AZURE_SEARCH_API_KEY（AI Search）または AZURE_OPENAI_API_KEY（Azure OpenAI）が、古くなっていないか確かめてください。")
-        tips.append("キーが古いときは、.env.local を作り直せます。Repo 直下で `python tools/team.py env --role builder`（メンバーは `--role member`）を実行します。")
+        tips.append("キーが古いときは、.env.local を作り直せます。構築する人は、Repo 直下で `python tools/team.py env --team <チーム> --role builder` を実行します。メンバーは、構築する人から member.local.env をもらい直して、.env.local という名前で置きます。")
         tips.append("直らないときは、エラーの表示をそのまま進行役に見せてください。")
         return tips
     if name == "NotFoundError":

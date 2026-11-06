@@ -25,7 +25,7 @@ INDEX = "hr-docs"
 API = "2024-07-01"
 SEMANTIC_CONFIG = "applied-semantic"
 KINDS = {"job_posting": "求人票", "resume": "職務経歴書", "interview_evaluations": "面接の評価", "mail": "メール", "scan": "スキャン"}
-ENV_HOWTO = "Repo 直下で `python tools/team.py env --role member`（構築する人は `--role builder`）を実行すると作れます。"
+ENV_HOWTO = "構築する人は、Repo 直下で `python tools/team.py env --team <チーム> --role builder` を実行すると作れます。メンバーは、構築する人から member.local.env を受け取り、.env.local という名前で Repo 直下に置きます。"
 
 
 def env_path() -> Path:

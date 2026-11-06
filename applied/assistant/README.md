@@ -16,22 +16,24 @@
 - `azure_io.py`：チームのインデックス `hr-docs` を、採用担当の役で検索する。LLM（`.env.local` のチャットのデプロイ）に 4 つの道具を渡し、どれを使うかを選ばせる。段は 6 まで。答えの出典の番号を確かめ（文に書いた人と、資料の人が合わない番号は外す）、1 から振り直す
 - `app.py`：画面（Streamlit）。`gate.py` が合言葉と 1 日の回数の上限を見る。`view.py` が表示の判断（考えている間に次の段の枠へ「考えています」を出す・段のカードの3行・段を描く間隔・出典の見出しに人を添える・質問のボタンの題）を受け持つ
 - `cli.py`：端末で 1 問だけ動かす（確かめ用）
-- `Dockerfile`：コンテナで動かすときのイメージ（任意。使い方は先頭のコメント）。Repo 直下の `.dockerignore` が `.env.local` などを除く
+- `Dockerfile`：コンテナで動かすときのイメージ（任意。使い方は先頭のコメント。手元だけで開く `127.0.0.1` に公開します）。Repo 直下の `.dockerignore` が `.env.local` などを除く
 
 ## 自分の PC で動かす
 
-前提：Repo 直下の `.env.local`（`python tools/team.py env --role member`）と、インデックス `hr-docs`（構築する人が作ったもの）。
+前提：Repo 直下の `.env.local`（メンバーは、構築する人から受け取った `member.local.env` をこの名前で置く。構築する人は、自分の `.env.local`）と、インデックス `hr-docs`（構築する人が作ったもの）。
 
 ```
 pip install -r applied/assistant/requirements.txt
 streamlit run applied/assistant/app.py --client.toolbarMode minimal --theme.primaryColor "#1864ab"
 ```
 
+画面は、この PC だけで開きます（Repo 直下の `.streamlit/config.toml` が、`localhost` に決めています）。Streamlit は、実行したときのフォルダーの `.streamlit/` を読むので、起動は Repo 直下で行います。人に見せるときは、`ASSISTANT_ACCESS_CODE` を設定します（下）。
+
 端末で 1 問だけ：`cd applied` のあと `python -m assistant.cli --id q10`
 
 ## 人に見せるときの設定（任意）
 
-環境変数で変えられます。なければ、合言葉なし・既定の値で動きます。
+環境変数で変えられます。なければ、合言葉なし・既定の値で動きます。手元だけで開くあいだは、合言葉はなくてかまいません。ほかの PC から開かせるときは、起動に `--server.address 0.0.0.0` を付け、`ASSISTANT_ACCESS_CODE` を設定します。
 
 - `ASSISTANT_ACCESS_CODE`：合言葉。決めると、画面を開くときに入力が要ります
 - `ASSISTANT_MAX_QUESTIONS`：1 日の質問の上限（既定 200）

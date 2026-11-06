@@ -13,7 +13,7 @@
       python applied/tools/build_hr_index.py --recreate  全部消してから作り直す
       python applied/tools/build_hr_index.py --delete    全部消す（Storage の入れ物の中の、manifest の文書も）
 
-必要なもの：構築する人の .env.local（`python tools/team.py env --role builder`。AI Search の管理者キーと Storage の接続文字列が入る）。
+必要なもの：構築する人の .env.local（`python tools/team.py env --team <チーム> --role builder`。AI Search の管理者キーと Storage の接続文字列が入る）。
 メンバーの設定では、始めに止まります。
 
 扱うのは hr-docs-* と、入れ物の中の manifest の文書だけです。同じ AI Search の、ほかのインデックスや、入れ物のほかのファイルには触りません。

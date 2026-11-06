@@ -69,7 +69,8 @@
 <ul>
 <li>「.env.local が読めません」と出る：Repo の直下で実行しているか、<code>.env.local</code> があるかを確かめます。</li>
 <li>「インデックス hr-docs がありません」と出る：構築する人が、文書の取り込み（<code>python applied/tools/build_hr_index.py</code>）を終えているか確かめます。</li>
-<li>「キーが合いません」と出る：キーが古くなっています。構築する人が <code>python tools/team.py env --role member --out member.local.env</code> で書き出し直します。</li>
+<li>5 段目で「エラー 403」と出る：キーが合っていないか、セマンティック ランカーの無料枠（月ごと。チームの AI Search 全体で使う）を使い切っています。1〜4 段が動いているなら、無料枠です。</li>
+<li>「キーが合いません」と出る：キーが古くなっています。構築する人が <code>python tools/team.py env --team &lt;チーム&gt; --role member --out member.local.env</code> で作り直し、メンバーに渡し直します。</li>
 </ul>
 </article>
 </main>

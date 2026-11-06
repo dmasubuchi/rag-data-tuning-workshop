@@ -25,13 +25,13 @@
 
 <p>架空の会社「サンプルテック」の採用の文書（求人票、職務経歴書、面接の評価、連絡メール、スキャンした書類）を使います。データはすべて研修用の架空データです。スクリプトとデータは <a href="applied-README.html"><code>applied/</code></a> にあります。</p>
 <p>仕組みの説明は、<a href="docs-lecture-md-part2-ingestion.html">ハンズオン資料の第2部</a>、<a href="docs-lecture-md-part3-relations-agentic.html">第3部</a>、<a href="docs-lecture-md-part4-evaluation.html">評価</a>です。</p>
-<p>進行役がデモで見せることも、チームで動かすこともできます。</p>
+<p>進行役がデモで見せることも、チームで動かすこともできます。デモは、進行役のデモ用のチームの <code>.env.local</code> で動かします（<a href="guide-facilitator.html#進行役のデモ用のチーム">進行役の手引き</a>）。</p>
 <h2 id="最初に1回">最初に1回</h2>
 <h3 id="構築する人">構築する人</h3>
 <p>人事の文書は、構築する人が1回だけ取り込みます。メンバーは、取り込みが終わってから始めます。</p>
 <ol>
 <li class="task"><input type="checkbox"> Repo 直下で、ライブラリを入れる：<code>pip install -r applied/requirements.txt</code></li>
-<li class="task"><input type="checkbox"> 接続の設定 <code>.env.local</code> を、構築する人用で作る：<code>python tools/team.py env --role builder</code>（<a href="guide-setup-azure-setup.html#4-接続の設定を作る">Azure の準備の 4</a>）</li>
+<li class="task"><input type="checkbox"> 接続の設定 <code>.env.local</code> を、構築する人用で作る：<code>python tools/team.py env --team &lt;チーム&gt; --role builder</code>（<a href="guide-setup-azure-setup.html#4-接続の設定を作る">Azure の準備の 4</a>）</li>
 <li class="task"><input type="checkbox"> 文書を取り込む：<code>python applied/tools/build_hr_index.py</code>（OCR を含むので、数分かかります）<ul>
 <li>Storage の入れ物 <code>hr-docs</code> がなければ、この道具が作ります（非公開）</li>
 </ul>
@@ -42,7 +42,7 @@
 <h3 id="メンバー">メンバー</h3>
 <ol>
 <li class="task"><input type="checkbox"> Repo 直下で、ライブラリを入れる：<code>pip install -r applied/requirements.txt</code></li>
-<li class="task"><input type="checkbox"> 構築する人から受け取った <code>member.local.env</code> の名前を、<code>.env.local</code> に変えて、Repo 直下に置く</li>
+<li class="task"><input type="checkbox"> 構築する人から受け取った <code>member.local.env</code> を、Repo 直下に <code>.env.local</code> という名前で置く</li>
 <li class="task"><input type="checkbox"> 構築する人が、手順3（文書の取り込み）を終えている</li>
 </ol>
 <p>構築する人とメンバーで、できることが違います。詳しくは <a href="applied-README.html#構築する人とメンバー">応用編 README の「構築する人とメンバー」</a>です。</p>
@@ -61,14 +61,17 @@
 <li>
 <p>17 は、動かしているあいだ、チームの検索の結果も変わります。ほかのメンバーが動かしていないときに、構築する人が実行します</p>
 </li>
-<li>19 の <code>make_answers.py</code> と、20 の <code>score_all.py</code> は、進行役が見せます</li>
+<li>19 の <code>make_answers.py</code> と、20 の <code>score_all.py</code> は、進行役が、デモ用のチームの <code>.env.local</code>（進行役が構築する人。<a href="guide-facilitator.html">進行役の手引き</a>）で見せます</li>
 <li>20 の組み込みの評価器を使うときだけ、追加で <code>pip install -r applied/requirements-eval.txt</code>（約 150MB）</li>
 </ul>
 <h2 id="採用アシスタントデモ">採用アシスタント（デモ）</h2>
 <p>採用の文書に、検索のやり方を変えながら候補を絞り込んで答える画面です。メンバーの設定で動きます。</p>
 <ol>
 <li class="task"><input type="checkbox"> Repo 直下で、ライブラリを入れる：<code>pip install -r applied/assistant/requirements.txt</code></li>
-<li class="task"><input type="checkbox"> 画面を開く：<code>streamlit run applied/assistant/app.py</code></li>
+<li class="task"><input type="checkbox"> Repo 直下で、画面を開く：<code>streamlit run applied/assistant/app.py</code><ul>
+<li>この PC だけで開きます。人に見せるときは、<code>ASSISTANT_ACCESS_CODE</code> を設定します（<a href="applied-assistant-README.html#人に見せるときの設定任意">採用アシスタントの README</a>）</li>
+</ul>
+</li>
 </ol>
 <p>動かし方と仕組みは <a href="applied-assistant-README.html">採用アシスタントの README</a> です。</p>
 <h2 id="次の手順">次の手順</h2>

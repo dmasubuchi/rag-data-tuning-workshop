@@ -67,13 +67,13 @@
 
 - AI Search の管理者キーを使う
 - インデックスと同義語マップを作り、データを入れる
-- `--role builder` で設定を作る
+- `--role builder` で、自分の .env.local を作る
 
 #### メンバー
 
 - 検索だけのキーを使う
 - 構築する人が作ったインデックスを、検索して読む
-- `--role member` で設定を作る
+- 構築する人から、member.local.env を受け取る
 
 > チームごとに AI Search と Foundry を持つ。役ごとに、できることが決まっている
 
@@ -83,7 +83,7 @@
 言いたいこと：チームは自分たちの AI Search と Foundry を持ち、構築する人とメンバーに役を分けて進める。
 
 - 構築する人：AI Search の管理者キーで、インデックスと同義語マップを作り、データを登録する（基礎 01 の create_index.py・upload.py、03 の embed.py など）。
-- メンバー：検索だけのキーで、構築する人が作ったインデックスを検索して、結果を読む。
+- メンバー：検索だけのキーで、構築する人が作ったインデックスを検索して、結果を読む。設定のファイルは、構築する人が `--role member --out member.local.env` で作って、チームの中だけで渡す。メンバーは、Repo の直下に .env.local という名前で置く。
 - メンバーの設定で、作る・変える手順を実行すると、不透明なエラーになる前に「この手順は構築する人の設定で実行します」と止まる。その手順は、構築する人に実行してもらう。
 
 </details>
@@ -96,8 +96,8 @@
    - `git clone <Repo の URL>`
 2. **ライブラリを入れる**：基礎編のフォルダの requirements.txt
    - `pip install -r basic/requirements.txt`
-3. **接続の設定 .env.local を作る**：Repo の直下で。構築する人は builder、メンバーは member
-   - `python tools/team.py env --role builder`
+3. **接続の設定 .env.local を作る**：構築する人が作る。メンバーは member.local.env を置く
+   - `python tools/team.py env --team <チーム> --role builder`
 4. **トピックのフォルダで実行する**：例：基礎 01 キーワード検索
    - `python load.py`
 
@@ -107,6 +107,7 @@
 言いたいこと：接続先やキーをコピーしたり書き換えたりする手順はない。clone して、ライブラリを入れて、team.py で .env.local を作れば動く。
 
 - チームの名前は、--team か環境変数 WORKSHOP_TEAM で渡す。
+- メンバー用のファイルは、構築する人が `--role member --out member.local.env` で作って渡す。メンバーは、Repo の直下に .env.local という名前で置く。構築する人の .env.local は、だれにも渡さない。
 - スクリプトはトピックのフォルダで実行する。
 
 注意：Windows では python が見つからないとき py に置き換える。
@@ -123,9 +124,9 @@
 
 #### 気をつけること
 
-- キーが入るので、人に渡さない（Git にも入らない）
+- キーが入る。構築する人の .env.local は、だれにも渡さない（Git にも入らない）
 - 端末の環境変数 `AZURE_*` ではなく、このファイルを読む
-- 古くなったら、`team.py env` で作り直す
+- 古くなったら、構築する人が `team.py env` で作り直し、member.local.env を渡し直す
 
 > 全部のスクリプトと Notebook が、Repo の直下の .env.local を読む
 
@@ -134,10 +135,11 @@
 
 言いたいこと：接続先とキーは Repo の直下の .env.local にまとめてあり、全部のスクリプトがここから読む。
 
-- キーが入るので、Repo の外に写さない、人に渡さない。Git にも入らない。
+- キーが入るので、Repo の外に写さない。構築する人の .env.local は、だれにも渡さない。Git にも入らない。
+- メンバーには、構築する人が作った member.local.env を、チームの中だけで渡す。
 - 端末に別の Azure の設定が残っていても、.env.local の値を使う。
 - メンバーの .env.local には、AI Search の管理者キーと Storage の接続文字列は入らない。
-- キーが古くなったときは、team.py env で作り直せる。
+- キーが古くなったときは、構築する人が team.py env で作り直し、member.local.env を渡し直す。
 
 </details>
 

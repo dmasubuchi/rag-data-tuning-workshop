@@ -6,8 +6,8 @@
 
 - 進行役：研修を進める人。組織の設定の値を渡し、Azure の権限を付ける
 - 参加者：研修に出る人。チームで進める
-- 構築する人：チームで1人。Azure のリソースを作り、データを入れる。`.env.local` は `--role builder` で作る
-- メンバー：チームのほかの人。検索と読み取りをする。`.env.local` は `--role member` で作る
+- 構築する人：チームで1人。Azure のリソースを作り、データを入れる。自分の `.env.local` を `--role builder` で作り、メンバー用のファイル `member.local.env` を `--role member --out member.local.env` で作って渡す
+- メンバー：チームのほかの人。検索と読み取りをする。構築する人から `member.local.env` を受け取り、Repo 直下に `.env.local` という名前で置く
 
 ## 順番
 
@@ -24,6 +24,6 @@
 - `python tools/team.py names`：チームの名前から、リソースの名前を表示する
 - `python tools/team.py check-names`：作る前に、名前が使えるかを確かめる（何も作らない）
 - `python tools/team.py health`：作ったものの状態を見る（読み取りだけ）
-- `python tools/team.py env --role builder`（メンバーは `--role member`）：接続の設定 `.env.local` を作る
+- `python tools/team.py env --team <チーム> --role builder`：構築する人の `.env.local` を作る。`--role member --out member.local.env` で、メンバー用のファイルも作る
 - `python tools/search_demo.py`：条件を変えると結果が変わるのを見る（[検索デモ](search-demo.md)）
 - `python tools/hotel_vectors.py`：ホテルのデータにベクトルを足す（[ホテル](hotel.md)の 4 章）

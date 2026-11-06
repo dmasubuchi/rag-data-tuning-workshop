@@ -94,13 +94,13 @@
 <ul>
 <li>AI Search の管理者キーを使う</li>
 <li>インデックスと同義語マップを作り、データを入れる</li>
-<li><code>--role builder</code> で設定を作る</li>
+<li><code>--role builder</code> で、自分の .env.local を作る</li>
 </ul>
 <h4 id="メンバー">メンバー</h4>
 <ul>
 <li>検索だけのキーを使う</li>
 <li>構築する人が作ったインデックスを、検索して読む</li>
-<li><code>--role member</code> で設定を作る</li>
+<li>構築する人から、member.local.env を受け取る</li>
 </ul>
 <blockquote>
 <p>チームごとに AI Search と Foundry を持つ。役ごとに、できることが決まっている</p>
@@ -110,7 +110,7 @@
 <p>言いたいこと：チームは自分たちの AI Search と Foundry を持ち、構築する人とメンバーに役を分けて進める。</p>
 <ul>
 <li>構築する人：AI Search の管理者キーで、インデックスと同義語マップを作り、データを登録する（基礎 01 の create_index.py・upload.py、03 の embed.py など）。</li>
-<li>メンバー：検索だけのキーで、構築する人が作ったインデックスを検索して、結果を読む。</li>
+<li>メンバー：検索だけのキーで、構築する人が作ったインデックスを検索して、結果を読む。設定のファイルは、構築する人が <code>--role member --out member.local.env</code> で作って、チームの中だけで渡す。メンバーは、Repo の直下に .env.local という名前で置く。</li>
 <li>メンバーの設定で、作る・変える手順を実行すると、不透明なエラーになる前に「この手順は構築する人の設定で実行します」と止まる。その手順は、構築する人に実行してもらう。</li>
 </ul>
 </details>
@@ -125,8 +125,8 @@
 <li><code>pip install -r basic/requirements.txt</code></li>
 </ul>
 </li>
-<li><strong>接続の設定 .env.local を作る</strong>：Repo の直下で。構築する人は builder、メンバーは member<ul>
-<li><code>python tools/team.py env --role builder</code></li>
+<li><strong>接続の設定 .env.local を作る</strong>：構築する人が作る。メンバーは member.local.env を置く<ul>
+<li><code>python tools/team.py env --team &lt;チーム&gt; --role builder</code></li>
 </ul>
 </li>
 <li><strong>トピックのフォルダで実行する</strong>：例：基礎 01 キーワード検索<ul>
@@ -139,6 +139,7 @@
 <p>言いたいこと：接続先やキーをコピーしたり書き換えたりする手順はない。clone して、ライブラリを入れて、team.py で .env.local を作れば動く。</p>
 <ul>
 <li>チームの名前は、--team か環境変数 WORKSHOP_TEAM で渡す。</li>
+<li>メンバー用のファイルは、構築する人が <code>--role member --out member.local.env</code> で作って渡す。メンバーは、Repo の直下に .env.local という名前で置く。構築する人の .env.local は、だれにも渡さない。</li>
 <li>スクリプトはトピックのフォルダで実行する。</li>
 </ul>
 <p>注意：Windows では python が見つからないとき py に置き換える。</p>
@@ -152,9 +153,9 @@
 </ul>
 <h4 id="気をつけること">気をつけること</h4>
 <ul>
-<li>キーが入るので、人に渡さない（Git にも入らない）</li>
+<li>キーが入る。構築する人の .env.local は、だれにも渡さない（Git にも入らない）</li>
 <li>端末の環境変数 <code>AZURE_*</code> ではなく、このファイルを読む</li>
-<li>古くなったら、<code>team.py env</code> で作り直す</li>
+<li>古くなったら、構築する人が <code>team.py env</code> で作り直し、member.local.env を渡し直す</li>
 </ul>
 <blockquote>
 <p>全部のスクリプトと Notebook が、Repo の直下の .env.local を読む</p>
@@ -163,10 +164,11 @@
 <summary>ノート</summary>
 <p>言いたいこと：接続先とキーは Repo の直下の .env.local にまとめてあり、全部のスクリプトがここから読む。</p>
 <ul>
-<li>キーが入るので、Repo の外に写さない、人に渡さない。Git にも入らない。</li>
+<li>キーが入るので、Repo の外に写さない。構築する人の .env.local は、だれにも渡さない。Git にも入らない。</li>
+<li>メンバーには、構築する人が作った member.local.env を、チームの中だけで渡す。</li>
 <li>端末に別の Azure の設定が残っていても、.env.local の値を使う。</li>
 <li>メンバーの .env.local には、AI Search の管理者キーと Storage の接続文字列は入らない。</li>
-<li>キーが古くなったときは、team.py env で作り直せる。</li>
+<li>キーが古くなったときは、構築する人が team.py env で作り直し、member.local.env を渡し直す。</li>
 </ul>
 </details>
 <h3 id="スクリプトと-notebook-は同じ中身">スクリプトと Notebook は同じ中身</h3>

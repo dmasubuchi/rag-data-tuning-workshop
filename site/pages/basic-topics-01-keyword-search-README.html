@@ -31,7 +31,7 @@
 </ul>
 <h2 id="前提">前提</h2>
 <ul>
-<li>なし（最初のトピック）。Repo 直下に <code>.env.local</code> があること（なければ、Repo 直下で <code>python tools/team.py env --role builder</code>、メンバーは <code>--role member</code> で作る）</li>
+<li>なし（最初のトピック）。Repo 直下に <code>.env.local</code> があること（なければ、構築する人は Repo 直下で <code>python tools/team.py env --team &lt;チーム&gt; --role builder</code> で作る。メンバーは、構築する人から受け取った <code>member.local.env</code> を <code>.env.local</code> という名前で置く）</li>
 <li><code>create_index.py</code> と <code>upload.py</code> は、AI Search の管理者キーが要るので、構築する人の設定（<code>--role builder</code>）で実行する。<code>analyze.py</code>（Analyze API）も管理者キーが要る。メンバーの設定（検索だけのキー）では、「構築する人の設定で実行します」と止まる。検索（<code>keyword_search.py</code>、<code>search_paraphrase.py</code>）は、メンバーの設定でもできる</li>
 </ul>
 <h2 id="実行するコマンドこのフォルダで">実行するコマンド（このフォルダで）</h2>

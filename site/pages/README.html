@@ -53,11 +53,12 @@ Everything is in Japanese: slides, step-by-step guides, scripts and sample data.
 <p>2 の Azure の準備は、次の流れです。</p>
 <ol>
 <li><code>config/workshop.example.config</code> を <code>workshop.config</code> にコピーし、進行役から受け取った値を書く</li>
-<li><code>python tools/team.py names --team &lt;team&gt;</code>：チームの名前から、リソースの名前を表示する</li>
-<li><code>python tools/team.py check-names</code>：作る前に、名前が使えるかを確かめる</li>
-<li>Azure のポータルで、表示された名前のとおりにリソースを作る</li>
-<li><code>python tools/team.py health</code>：作ったものの状態を見る</li>
-<li><code>python tools/team.py env --role builder</code>（メンバーは <code>--role member</code>）：接続の設定 <code>.env.local</code> を作る</li>
+<li><code>python tools/team.py names --team &lt;team&gt;</code>：チームの名前から、リソースの名前を表示する。ここに出る <code>$env:WORKSHOP_TEAM = "&lt;team&gt;"</code> の行を PowerShell に貼ると、このあとの <code>--team</code> を省けます</li>
+<li><code>python tools/team.py check-names --team &lt;team&gt;</code>：作る前に、名前が使えるかを確かめる</li>
+<li>Azure のポータルで、表示された名前のとおりにリソースを作る（構築する人）</li>
+<li><code>python tools/team.py health --team &lt;team&gt;</code>：作ったものの状態を見る</li>
+<li>構築する人が、<code>python tools/team.py env --team &lt;team&gt; --role builder</code> で、自分の <code>.env.local</code> を作る。メンバーがいるときは、続けて <code>python tools/team.py env --team &lt;team&gt; --role member --out member.local.env</code> で、メンバー用のファイルを作る</li>
+<li>メンバーは、構築する人から <code>member.local.env</code> を受け取り、Repo 直下に <code>.env.local</code> という名前で置く（チームの中だけで渡します。構築する人の <code>.env.local</code> は、だれにも渡しません）</li>
 </ol>
 <h2 id="構成">構成</h2>
 <ul>
@@ -67,7 +68,7 @@ Everything is in Japanese: slides, step-by-step guides, scripts and sample data.
 <li><code>docs/lecture/</code>：ハンズオン資料（スライド）の原稿と、作る道具。読む形の Markdown は <code>docs/lecture/md/</code></li>
 <li><code>site/</code>：スライド（<code>site/lecture/</code>）と、読む形のページ（<code>site/pages/</code>）。入口は <code>site/index.html</code></li>
 <li><code>tools/</code>：チームの設定（<code>team.py</code>）、検索デモ、ページを作る道具、公開前の検査</li>
-<li><code>config/</code>：接続の設定のひな形</li>
+<li><code>config/</code>：接続の設定（<code>env.example</code>）と組織の設定（<code>workshop.example.config</code>）のひな形</li>
 </ul>
 <p>トピックの番号は、基礎編が 01〜06、応用編が 14〜20 です。07〜13 はありません。</p>
 <h2 id="ポータル">ポータル</h2>
@@ -89,7 +90,7 @@ cd applied &amp;&amp; ../.venv/bin/python -m unittest discover -s tests
 <ul>
 <li>コード：MIT License（<a href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/LICENSE">LICENSE</a>）</li>
 <li>文書とこの Repo のために作ったデータ：CC BY 4.0（<a href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/LICENSE-docs.md">LICENSE-docs.md</a>）</li>
-<li>第三者のデータ：<a href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/NOTICE.md">NOTICE.md</a></li>
+<li>出どころとライセンスの注意：<a href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/NOTICE.md">NOTICE.md</a></li>
 </ul>
 </article>
 </main>

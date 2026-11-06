@@ -48,7 +48,7 @@ python3 docs/lecture/tools/check.py --out <静止画の置き場>
 - 原稿（`keywords.md`・`decks.json`・`diagrams/`）を直したら、`site/lecture/` と `docs/lecture/md/` を作り直して、いっしょにコミットする（試験が、作り直したものと同じかを確かめる）
 - できたものは `site/lecture/index.html` をブラウザで開きます（目次 → カードを選ぶ。→ キーで進む、N でノート、H で目次）
 - `check.py` は、`site/lecture/` を調べます。静止画の一覧（`contact.png`）は ffmpeg があるときだけ作ります
-- 試験（通信なし）：`python3 -m unittest discover -s tests`
+- 試験（通信なし）：Repo 直下で `.venv/bin/python -m unittest discover -s tests`（仮想環境の作り方は、Repo 直下の README の「教材を直す人へ」）
 
 ## 公開の出力に出さないもの
 

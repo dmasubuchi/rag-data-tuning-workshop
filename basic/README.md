@@ -11,7 +11,7 @@ LangChain は使いません。使うのは `azure-search-documents`、`openai`�
 
 - Python 3.11 か 3.12。`python` が見つからないときは `py` に置き換えます（Windows）
 - ライブラリ（最初に1回）：`pip install -r basic/requirements.txt`
-- Azure の接続先とキーは、Repo 直下の `.env.local` に入っています。Repo 直下で `python tools/team.py env --role builder`（メンバーは `--role member`）を実行すると作れます。ほかの人に渡しません（Git にも入りません）
+- Azure の接続先とキーは、Repo 直下の `.env.local` に入っています。構築する人は、Repo 直下で `python tools/team.py env --team <チーム> --role builder` を実行して作ります。メンバーは、構築する人から `member.local.env` を受け取り、Repo 直下に `.env.local` という名前で置きます。構築する人の `.env.local` は、だれにも渡しません（Git にも入りません）
 - 接続先とキーは、いつも `.env.local` の中身を使います（パソコンに残っている `AZURE_*` の環境変数は読みません）
 - コマンドは PowerShell でも bash でも同じです。パスの区切りは `/` で書いてあります（PowerShell でも動きます）
 
@@ -19,8 +19,8 @@ LangChain は使いません。使うのは `azure-search-documents`、`openai`�
 
 チームは、自分たちの AI Search と Foundry を持ちます。インデックスの名前は固定です（武将は `sengoku`、同義語マップは `sengoku-synonyms`）。
 
-- 構築する人（`--role builder`）：AI Search の管理者キーを使います。インデックスと同義語マップを作り、武将を登録します（01 の `create_index.py`・`upload.py`・`analyze.py`、02、03 の `embed.py`、`tools/reset.py`）
-- メンバー（`--role member`）：検索だけのキーを使います。構築する人が作ったインデックスを検索できます（01 の `keyword_search.py`・`search_paraphrase.py`、03 の `vector_search.py`、04、05、06）
+- 構築する人（自分の `.env.local`。`--role builder`）：AI Search の管理者キーを使います。インデックスと同義語マップを作り、武将を登録します（01 の `create_index.py`・`upload.py`・`analyze.py`、02、03 の `embed.py`、`tools/reset.py`）
+- メンバー（構築する人から受け取った `member.local.env`。`--role member` で作る）：検索だけのキーを使います。構築する人が作ったインデックスを検索できます（01 の `keyword_search.py`・`search_paraphrase.py`、03 の `vector_search.py`、04、05、06）
 - メンバーの設定で、作る・変える・調べる手順を実行すると、不透明なエラーになる前に「この手順は構築する人の設定（--role builder）で実行します」と止まります
 
 ## スクリプトと Notebook
@@ -71,7 +71,7 @@ python basic/tools/reset.py --to 04
 
 エラーが出たときは、画面の `確かめること:` を読みます。表示ではキーを `***` に伏せています。よくある原因：
 
-- 「設定ファイルが見つかりません」「次の項目がありません」：Repo 直下で `python tools/team.py env --role builder`（メンバーは `--role member`）を実行したか
+- 「設定ファイルが見つかりません」「次の項目がありません」：構築する人は、Repo 直下で `python tools/team.py env --team <チーム> --role builder` を実行したか。メンバーは、`member.local.env` を `.env.local` という名前で Repo 直下に置いたか
 - 「この手順は構築する人の設定で実行します」：いまの `.env.local` が検索だけのキー（メンバー用）です。構築する人が実行するか、構築する人の `.env.local` で実行します
 - 「キーまたは権限」：`.env.local` のキーが古くなっていないか。作り直せます
 - 「インデックスがありません」：前のトピックのスクリプトを実行したか。構築する人は `reset.py` で作り直せる

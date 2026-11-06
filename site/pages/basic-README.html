@@ -35,15 +35,15 @@
 <ul>
 <li>Python 3.11 か 3.12。<code>python</code> が見つからないときは <code>py</code> に置き換えます（Windows）</li>
 <li>ライブラリ（最初に1回）：<code>pip install -r basic/requirements.txt</code></li>
-<li>Azure の接続先とキーは、Repo 直下の <code>.env.local</code> に入っています。Repo 直下で <code>python tools/team.py env --role builder</code>（メンバーは <code>--role member</code>）を実行すると作れます。ほかの人に渡しません（Git にも入りません）</li>
+<li>Azure の接続先とキーは、Repo 直下の <code>.env.local</code> に入っています。構築する人は、Repo 直下で <code>python tools/team.py env --team &lt;チーム&gt; --role builder</code> を実行して作ります。メンバーは、構築する人から <code>member.local.env</code> を受け取り、Repo 直下に <code>.env.local</code> という名前で置きます。構築する人の <code>.env.local</code> は、だれにも渡しません（Git にも入りません）</li>
 <li>接続先とキーは、いつも <code>.env.local</code> の中身を使います（パソコンに残っている <code>AZURE_*</code> の環境変数は読みません）</li>
 <li>コマンドは PowerShell でも bash でも同じです。パスの区切りは <code>/</code> で書いてあります（PowerShell でも動きます）</li>
 </ul>
 <h2 id="構築する人とメンバー">構築する人とメンバー</h2>
 <p>チームは、自分たちの AI Search と Foundry を持ちます。インデックスの名前は固定です（武将は <code>sengoku</code>、同義語マップは <code>sengoku-synonyms</code>）。</p>
 <ul>
-<li>構築する人（<code>--role builder</code>）：AI Search の管理者キーを使います。インデックスと同義語マップを作り、武将を登録します（01 の <code>create_index.py</code>・<code>upload.py</code>・<code>analyze.py</code>、02、03 の <code>embed.py</code>、<code>tools/reset.py</code>）</li>
-<li>メンバー（<code>--role member</code>）：検索だけのキーを使います。構築する人が作ったインデックスを検索できます（01 の <code>keyword_search.py</code>・<code>search_paraphrase.py</code>、03 の <code>vector_search.py</code>、04、05、06）</li>
+<li>構築する人（自分の <code>.env.local</code>。<code>--role builder</code>）：AI Search の管理者キーを使います。インデックスと同義語マップを作り、武将を登録します（01 の <code>create_index.py</code>・<code>upload.py</code>・<code>analyze.py</code>、02、03 の <code>embed.py</code>、<code>tools/reset.py</code>）</li>
+<li>メンバー（構築する人から受け取った <code>member.local.env</code>。<code>--role member</code> で作る）：検索だけのキーを使います。構築する人が作ったインデックスを検索できます（01 の <code>keyword_search.py</code>・<code>search_paraphrase.py</code>、03 の <code>vector_search.py</code>、04、05、06）</li>
 <li>メンバーの設定で、作る・変える・調べる手順を実行すると、不透明なエラーになる前に「この手順は構築する人の設定（--role builder）で実行します」と止まります</li>
 </ul>
 <h2 id="スクリプトと-notebook">スクリプトと Notebook</h2>
@@ -87,7 +87,7 @@
 </ol>
 <p>エラーが出たときは、画面の <code>確かめること:</code> を読みます。表示ではキーを <code>***</code> に伏せています。よくある原因：</p>
 <ul>
-<li>「設定ファイルが見つかりません」「次の項目がありません」：Repo 直下で <code>python tools/team.py env --role builder</code>（メンバーは <code>--role member</code>）を実行したか</li>
+<li>「設定ファイルが見つかりません」「次の項目がありません」：構築する人は、Repo 直下で <code>python tools/team.py env --team &lt;チーム&gt; --role builder</code> を実行したか。メンバーは、<code>member.local.env</code> を <code>.env.local</code> という名前で Repo 直下に置いたか</li>
 <li>「この手順は構築する人の設定で実行します」：いまの <code>.env.local</code> が検索だけのキー（メンバー用）です。構築する人が実行するか、構築する人の <code>.env.local</code> で実行します</li>
 <li>「キーまたは権限」：<code>.env.local</code> のキーが古くなっていないか。作り直せます</li>
 <li>「インデックスがありません」：前のトピックのスクリプトを実行したか。構築する人は <code>reset.py</code> で作り直せる</li>

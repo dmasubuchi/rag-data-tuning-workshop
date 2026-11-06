@@ -65,7 +65,7 @@ python3 docs/lecture/tools/check.py --out &lt;静止画の置き場&gt;
 <li>原稿（<code>keywords.md</code>・<code>decks.json</code>・<code>diagrams/</code>）を直したら、<code>site/lecture/</code> と <code>docs/lecture/md/</code> を作り直して、いっしょにコミットする（試験が、作り直したものと同じかを確かめる）</li>
 <li>できたものは <code>site/lecture/index.html</code> をブラウザで開きます（目次 → カードを選ぶ。→ キーで進む、N でノート、H で目次）</li>
 <li><code>check.py</code> は、<code>site/lecture/</code> を調べます。静止画の一覧（<code>contact.png</code>）は ffmpeg があるときだけ作ります</li>
-<li>試験（通信なし）：<code>python3 -m unittest discover -s tests</code></li>
+<li>試験（通信なし）：Repo 直下で <code>.venv/bin/python -m unittest discover -s tests</code>（仮想環境の作り方は、Repo 直下の README の「教材を直す人へ」）</li>
 </ul>
 <h2 id="公開の出力に出さないもの">公開の出力に出さないもの</h2>
 <p><code>site/lecture/</code> と <code>docs/lecture/md/</code> は参加者に公開します。次のものは <code>keywords.md</code>・<code>decks.json</code>・<code>diagrams/</code> に書きません（<code>build.py</code> も出しません）。</p>

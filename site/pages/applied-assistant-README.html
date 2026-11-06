@@ -27,16 +27,17 @@
 <li><code>azure_io.py</code>：チームのインデックス <code>hr-docs</code> を、採用担当の役で検索する。LLM（<code>.env.local</code> のチャットのデプロイ）に 4 つの道具を渡し、どれを使うかを選ばせる。段は 6 まで。答えの出典の番号を確かめ（文に書いた人と、資料の人が合わない番号は外す）、1 から振り直す</li>
 <li><code>app.py</code>：画面（Streamlit）。<code>gate.py</code> が合言葉と 1 日の回数の上限を見る。<code>view.py</code> が表示の判断（考えている間に次の段の枠へ「考えています」を出す・段のカードの3行・段を描く間隔・出典の見出しに人を添える・質問のボタンの題）を受け持つ</li>
 <li><code>cli.py</code>：端末で 1 問だけ動かす（確かめ用）</li>
-<li><code>Dockerfile</code>：コンテナで動かすときのイメージ（任意。使い方は先頭のコメント）。Repo 直下の <code>.dockerignore</code> が <code>.env.local</code> などを除く</li>
+<li><code>Dockerfile</code>：コンテナで動かすときのイメージ（任意。使い方は先頭のコメント。手元だけで開く <code>127.0.0.1</code> に公開します）。Repo 直下の <code>.dockerignore</code> が <code>.env.local</code> などを除く</li>
 </ul>
 <h2 id="自分の-pc-で動かす">自分の PC で動かす</h2>
-<p>前提：Repo 直下の <code>.env.local</code>（<code>python tools/team.py env --role member</code>）と、インデックス <code>hr-docs</code>（構築する人が作ったもの）。</p>
+<p>前提：Repo 直下の <code>.env.local</code>（メンバーは、構築する人から受け取った <code>member.local.env</code> をこの名前で置く。構築する人は、自分の <code>.env.local</code>）と、インデックス <code>hr-docs</code>（構築する人が作ったもの）。</p>
 <pre><code>pip install -r applied/assistant/requirements.txt
 streamlit run applied/assistant/app.py --client.toolbarMode minimal --theme.primaryColor "#1864ab"
 </code></pre>
+<p>画面は、この PC だけで開きます（Repo 直下の <code>.streamlit/config.toml</code> が、<code>localhost</code> に決めています）。Streamlit は、実行したときのフォルダーの <code>.streamlit/</code> を読むので、起動は Repo 直下で行います。人に見せるときは、<code>ASSISTANT_ACCESS_CODE</code> を設定します（下）。</p>
 <p>端末で 1 問だけ：<code>cd applied</code> のあと <code>python -m assistant.cli --id q10</code></p>
 <h2 id="人に見せるときの設定任意">人に見せるときの設定（任意）</h2>
-<p>環境変数で変えられます。なければ、合言葉なし・既定の値で動きます。</p>
+<p>環境変数で変えられます。なければ、合言葉なし・既定の値で動きます。手元だけで開くあいだは、合言葉はなくてかまいません。ほかの PC から開かせるときは、起動に <code>--server.address 0.0.0.0</code> を付け、<code>ASSISTANT_ACCESS_CODE</code> を設定します。</p>
 <ul>
 <li><code>ASSISTANT_ACCESS_CODE</code>：合言葉。決めると、画面を開くときに入力が要ります</li>
 <li><code>ASSISTANT_MAX_QUESTIONS</code>：1 日の質問の上限（既定 200）</li>

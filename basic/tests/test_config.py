@@ -78,8 +78,8 @@ class EnvLocalTest(Base):
         with self.assertRaises(SetupError) as cm:
             config.get_settings()
         msg = str(cm.exception)
-        self.assertIn("python tools/team.py env --role builder", msg)
-        self.assertIn("--role member", msg)
+        self.assertIn("python tools/team.py env --team <チーム> --role builder", msg)
+        self.assertIn("member.local.env", msg)
 
     def test_missing_item_points_to_team_env(self):
         self.write_env(ENV.replace("AZURE_OPENAI_API_KEY=FAKE-OAI-a1b2c3\n", ""))
@@ -87,8 +87,8 @@ class EnvLocalTest(Base):
             config.get_settings()
         msg = str(cm.exception)
         self.assertIn("AZURE_OPENAI_API_KEY", msg)
-        self.assertIn("python tools/team.py env --role builder", msg)
-        self.assertIn("--role member", msg)
+        self.assertIn("python tools/team.py env --team <チーム> --role builder", msg)
+        self.assertIn("member.local.env", msg)
 
     def test_placeholder_values_are_refused(self):
         self.write_env(ENV.replace("https://a.search.windows.net", "https://<チームの名前>.search.windows.net"))
@@ -174,7 +174,7 @@ class KeyRoleTest(Base):
             config.require_admin_key()
         msg = str(cm.exception)
         self.assertIn("この手順は構築する人の設定（--role builder）で実行します", msg)
-        self.assertIn("python tools/team.py env --role builder", msg)
+        self.assertIn("python tools/team.py env --team <チーム> --role builder", msg)
         self.assertNotIn("403", msg)
 
 

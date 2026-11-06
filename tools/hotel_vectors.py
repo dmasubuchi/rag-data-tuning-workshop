@@ -35,7 +35,7 @@ HOTELS_FILE = "HotelsData_toAzureBlobs_ja.json"   # ダウンロードしたホ�
 BATCH = 25                      # 1回の呼び出しで埋め込む文の数
 RETRY_LIMIT = 4                 # 「呼びすぎ（429）」と言われたときに、待って再試行する回数
 MAX_BYTES = 1_900_000           # Cosmos DB の「Upload Items」は、1回の全ファイル合計が 2MB 未満
-ENV_HOWTO = "Repo 直下で `python tools/team.py env --role builder`（メンバーは `--role member`）を実行すると作れます。"
+ENV_HOWTO = "構築する人は、Repo 直下で `python tools/team.py env --team <チーム> --role builder` を実行すると作れます。メンバーは、構築する人から member.local.env を受け取り、.env.local という名前で Repo 直下に置きます。"
 REQUIRED = ("AZURE_OPENAI_ENDPOINT", "AZURE_OPENAI_API_KEY", "AZURE_OPENAI_EMBEDDING_DEPLOYMENT", "EMBEDDING_DIMENSIONS")
 
 

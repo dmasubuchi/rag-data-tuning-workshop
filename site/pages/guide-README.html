@@ -18,8 +18,8 @@
 <ul>
 <li>進行役：研修を進める人。組織の設定の値を渡し、Azure の権限を付ける</li>
 <li>参加者：研修に出る人。チームで進める</li>
-<li>構築する人：チームで1人。Azure のリソースを作り、データを入れる。<code>.env.local</code> は <code>--role builder</code> で作る</li>
-<li>メンバー：チームのほかの人。検索と読み取りをする。<code>.env.local</code> は <code>--role member</code> で作る</li>
+<li>構築する人：チームで1人。Azure のリソースを作り、データを入れる。自分の <code>.env.local</code> を <code>--role builder</code> で作り、メンバー用のファイル <code>member.local.env</code> を <code>--role member --out member.local.env</code> で作って渡す</li>
+<li>メンバー：チームのほかの人。検索と読み取りをする。構築する人から <code>member.local.env</code> を受け取り、Repo 直下に <code>.env.local</code> という名前で置く</li>
 </ul>
 <h2 id="順番">順番</h2>
 <ol>
@@ -36,7 +36,7 @@
 <li><code>python tools/team.py names</code>：チームの名前から、リソースの名前を表示する</li>
 <li><code>python tools/team.py check-names</code>：作る前に、名前が使えるかを確かめる（何も作らない）</li>
 <li><code>python tools/team.py health</code>：作ったものの状態を見る（読み取りだけ）</li>
-<li><code>python tools/team.py env --role builder</code>（メンバーは <code>--role member</code>）：接続の設定 <code>.env.local</code> を作る</li>
+<li><code>python tools/team.py env --team &lt;チーム&gt; --role builder</code>：構築する人の <code>.env.local</code> を作る。<code>--role member --out member.local.env</code> で、メンバー用のファイルも作る</li>
 <li><code>python tools/search_demo.py</code>：条件を変えると結果が変わるのを見る（<a href="guide-search-demo.html">検索デモ</a>）</li>
 <li><code>python tools/hotel_vectors.py</code>：ホテルのデータにベクトルを足す（<a href="guide-hotel.html">ホテル</a>の 4 章）</li>
 </ul>

@@ -1,0 +1,4 @@
+# 採用アシスタントは、既定では手元（localhost）だけで開く。人に見せるときは ASSISTANT_ACCESS_CODE を設定する。
+# Streamlit は、実行したときの今のフォルダーの .streamlit/ を読む。Repo 直下で実行する。
+[server]
+address = "localhost"

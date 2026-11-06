@@ -6,8 +6,8 @@
 
 1. [ ] Repo 直下で、ライブラリを入れる：`pip install -r basic/requirements.txt`（Windows で `python` が見つからないときは `py`）
 2. [ ] 接続の設定 `.env.local` を、Repo 直下に置く（[Azure の準備の 4](setup/azure-setup.md#4-接続の設定を作る)）
-   - 構築する人：`python tools/team.py env --role builder`
-   - メンバー：構築する人から受け取った `member.local.env` の名前を、`.env.local` に変える
+   - 構築する人：`python tools/team.py env --team <チーム> --role builder`（自分の `.env.local`。だれにも渡しません）
+   - メンバー：構築する人から受け取った `member.local.env` を、Repo 直下に `.env.local` という名前で置く
 3. [ ] 構築する人が、01 から順に進める。AI Search に、チームの武将のインデックス `sengoku` ができる（150件）
 
 構築する人とメンバーで、できることが違います。

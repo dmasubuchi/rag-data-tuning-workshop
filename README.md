@@ -34,11 +34,12 @@ Everything is in Japanese: slides, step-by-step guides, scripts and sample data.
 2 の Azure の準備は、次の流れです。
 
 1. `config/workshop.example.config` を `workshop.config` にコピーし、進行役から受け取った値を書く
-2. `python tools/team.py names --team <team>`：チームの名前から、リソースの名前を表示する
-3. `python tools/team.py check-names`：作る前に、名前が使えるかを確かめる
-4. Azure のポータルで、表示された名前のとおりにリソースを作る
-5. `python tools/team.py health`：作ったものの状態を見る
-6. `python tools/team.py env --role builder`（メンバーは `--role member`）：接続の設定 `.env.local` を作る
+2. `python tools/team.py names --team <team>`：チームの名前から、リソースの名前を表示する。ここに出る `$env:WORKSHOP_TEAM = "<team>"` の行を PowerShell に貼ると、このあとの `--team` を省けます
+3. `python tools/team.py check-names --team <team>`：作る前に、名前が使えるかを確かめる
+4. Azure のポータルで、表示された名前のとおりにリソースを作る（構築する人）
+5. `python tools/team.py health --team <team>`：作ったものの状態を見る
+6. 構築する人が、`python tools/team.py env --team <team> --role builder` で、自分の `.env.local` を作る。メンバーがいるときは、続けて `python tools/team.py env --team <team> --role member --out member.local.env` で、メンバー用のファイルを作る
+7. メンバーは、構築する人から `member.local.env` を受け取り、Repo 直下に `.env.local` という名前で置く（チームの中だけで渡します。構築する人の `.env.local` は、だれにも渡しません）
 
 ## 構成
 
@@ -48,7 +49,7 @@ Everything is in Japanese: slides, step-by-step guides, scripts and sample data.
 - `docs/lecture/`：ハンズオン資料（スライド）の原稿と、作る道具。読む形の Markdown は `docs/lecture/md/`
 - `site/`：スライド（`site/lecture/`）と、読む形のページ（`site/pages/`）。入口は `site/index.html`
 - `tools/`：チームの設定（`team.py`）、検索デモ、ページを作る道具、公開前の検査
-- `config/`：接続の設定のひな形
+- `config/`：接続の設定（`env.example`）と組織の設定（`workshop.example.config`）のひな形
 
 トピックの番号は、基礎編が 01〜06、応用編が 14〜20 です。07〜13 はありません。
 
@@ -77,4 +78,4 @@ cd applied && ../.venv/bin/python -m unittest discover -s tests
 
 - コード：MIT License（[LICENSE](LICENSE)）
 - 文書とこの Repo のために作ったデータ：CC BY 4.0（[LICENSE-docs.md](LICENSE-docs.md)）
-- 第三者のデータ：[NOTICE.md](NOTICE.md)
+- 出どころとライセンスの注意：[NOTICE.md](NOTICE.md)

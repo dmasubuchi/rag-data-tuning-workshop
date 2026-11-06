@@ -1,6 +1,6 @@
 """設定（.env.local）、データの場所、人事のインデックスの名前。
 
-設定は Repo 直下の .env.local だけ。構築する人が `python tools/team.py env --role builder`、メンバーが `--role member` で作る（Git には入らない）。
+設定は Repo 直下の .env.local だけ。構築する人が `python tools/team.py env --team <チーム> --role builder` で作り、メンバーは構築する人から member.local.env を受け取って .env.local という名前で置く（Git には入らない）。
   AZURE_SEARCH_ENDPOINT・AZURE_SEARCH_API_KEY    チームの AI Search の接続先とキー
   AZURE_SEARCH_KEY_ROLE                          admin（構築する人。作る・登録する）か query（メンバー。検索だけ）
   AZURE_OPENAI_ENDPOINT・AZURE_OPENAI_API_KEY    チームの Foundry（Azure OpenAI）の接続先とキー
@@ -88,8 +88,8 @@ def display_path(path) -> str:
 
 # ------------------------------------------------------------------ .env.local
 
-ENV_LOCAL_HOWTO = ("Repo 直下で `python tools/team.py env --role builder`（メンバーは `--role member`）を実行すると、"
-                   ".env.local を作れます（構築する人は builder、ほかのメンバーは member）。")
+ENV_LOCAL_HOWTO = ("構築する人は、Repo 直下で `python tools/team.py env --team <チーム> --role builder` を実行すると .env.local を作れます。"
+                   "メンバーは、構築する人から member.local.env を受け取り、Repo 直下に .env.local という名前で置きます。")
 
 
 @dataclass(frozen=True)
@@ -104,7 +104,7 @@ class Settings:
     dimensions: int
     env_file: str
     chat_model: str = DEFAULT_CHAT_MODEL    # AZURE_OPENAI_CHAT_MODEL（モデル名。デプロイ名とは限らない）
-    reasoning_effort: str = ""  # 空なら渡さない（AZURE_OPENAI_REASONING_EFFORT）
+    reasoning_effort: str = ""  # AZURE_OPENAI_REASONING_EFFORT。空なら、16・19 は渡さない。採用アシスタントは low にする（assistant/azure_io.py）
     key_role: str = ""          # AZURE_SEARCH_KEY_ROLE：admin（構築する人）か query（メンバー）。書いてなければ空
     storage_connection_string: str = field(default="", repr=False)    # 構築する人だけ。メンバーは空
     storage_container: str = ""
@@ -197,7 +197,7 @@ ADMIN_ONLY_MESSAGE = (
     "この手順は構築する人の設定（--role builder）で実行します。\n"
     "  いまの .env.local は検索だけのキー（メンバー用）なので、インデックス・インデクサー・知識ベースなどを作る・変える・調べる、"
     "文書を登録する・直すことはできません。\n"
-    "  構築する人が実行するか、構築する人の .env.local（`python tools/team.py env --role builder`）で実行してください。"
+    "  構築する人が実行するか、構築する人の .env.local（`python tools/team.py env --team <チーム> --role builder`）で実行してください。"
 )
 
 

@@ -20,6 +20,7 @@
 <li class="l3"><a href="#azure招待と所有者の割り当て">Azure：招待と所有者の割り当て</a></li>
 <li class="l3"><a href="#githubrepo-の招待">GitHub：Repo の招待</a></li>
 <li class="l3"><a href="#進行役の-pc">進行役の PC</a></li>
+<li class="l3"><a href="#進行役のデモ用のチーム">進行役のデモ用のチーム</a></li>
 <li class="l2"><a href="#パート1-pc-の設定">パート1 PC の設定</a></li>
 <li class="l2"><a href="#パート2-azure-の接続とリソース作成">パート2 Azure の接続とリソース作成</a></li>
 <li class="l2"><a href="#パート3-基礎編ホテルと武将">パート3 基礎編：ホテルと武将</a></li>
@@ -78,8 +79,19 @@
 <li class="task"><input type="checkbox"> Repo を clone し、<code>pip install -r basic/requirements.txt</code> を実行する</li>
 <li class="task"><input type="checkbox"> <code>workshop.config</code> を書く（チームごとの状態確認に使う）</li>
 <li class="task"><input type="checkbox"> az にサインインする：<code>az login --tenant &lt;テナント&gt;</code>、<code>az account show</code></li>
-<li class="task"><input type="checkbox"> Foundry のモデルの枠を確かめる：チームの数だけ、埋め込み <code>text-embedding-3-small</code>（容量 50）と、チャット <code>gpt-5-mini</code>（容量 20）が、「グローバル標準（Global Standard）」で足りること</li>
+<li class="task"><input type="checkbox"> Foundry のモデルの枠を確かめる：チームの数（デモ用のチームを作るなら、それも数える）だけ、埋め込み <code>text-embedding-3-small</code>（容量 50）と、チャット <code>gpt-5-mini</code>（容量 20）が、「グローバル標準（Global Standard）」で足りること</li>
 <li class="task"><input type="checkbox"> 画面に映すもの（スライド）を開いておく：<a href="../lecture/intro/slides.html">ハンズオン資料</a></li>
+</ul>
+<h3 id="進行役のデモ用のチーム">進行役のデモ用のチーム</h3>
+<p>パート3・4 のデモは、進行役が自分のデモ用のチーム（例 <code>demo</code>）の <code>.env.local</code> で動かします。始める前に、参加者と同じ手順で作っておきます。進行役が、そのチームの構築する人です。</p>
+<ol>
+<li class="task"><input type="checkbox"> <a href="guide-setup-azure-setup.html">Azure の準備</a>：チームの名前を決め、ポータルでリソースを作る</li>
+<li class="task"><input type="checkbox"> <code>python tools/team.py env --team &lt;デモ用のチーム&gt; --role builder</code>：進行役の <code>.env.local</code> を作る</li>
+<li class="task"><input type="checkbox"> 基礎編 01〜03 を実行する（<a href="guide-sengoku.html">武将</a>）：インデックス <code>sengoku</code> とベクトルができる</li>
+<li class="task"><input type="checkbox"> <code>python applied/tools/build_hr_index.py</code> と <code>python applied/tools/build_hr_kb.py</code> を実行する（<a href="guide-hr.html">応用（人事）</a>）：人事の文書と、知識ベースができる</li>
+</ol>
+<ul>
+<li>デモ用のチームを作らないときは、どれかのチームの構築する人の画面を映して見せます。</li>
 </ul>
 <h2 id="パート1-pc-の設定">パート1 PC の設定</h2>
 <p>手順：<a href="guide-setup-windows-pc.html">Windows PC の設定</a></p>
@@ -96,7 +108,7 @@
 <li class="task"><input type="checkbox"> 各チームが、チームの名前を決める（例 <code>red</code>）。小文字の英字と数字だけ、3〜8文字、英字で始める、<code>shared</code> で始めない。チームどうしで同じにしない</li>
 <li class="task"><input type="checkbox"> 各チームが、<code>python tools/team.py check-names --team &lt;team&gt;</code> で確かめ、すべて「使える」になってから作り始める</li>
 <li class="task"><input type="checkbox"> チームごとに、<code>names</code> の表示どおりに作る：リソース グループ、Storage、AI Search（Basic）、Cosmos DB、Foundry とモデル2つ</li>
-<li class="task"><input type="checkbox"> 各チームの構築する人が、<code>.env.local</code> を作り、メンバー用の <code>member.local.env</code> をメンバーに渡す</li>
+<li class="task"><input type="checkbox"> 各チームの構築する人が、自分の <code>.env.local</code>（<code>python tools/team.py env --team &lt;team&gt; --role builder</code>）と、メンバー用の <code>member.local.env</code>（<code>--role member --out member.local.env</code>）を作り、<code>member.local.env</code> をチームの中だけでメンバーに渡す。メンバーは Repo 直下に <code>.env.local</code> という名前で置く</li>
 <li>確かめる（進行役の PC で、チームごとに）：<code>python tools/team.py health --team &lt;team&gt;</code>。8行がすべて「OK」で、<code>OK 8・まだ 0・NG 0</code><ul>
 <li>「NG」は理由を読んで直す。「まだ」は、まだ作っていないもの</li>
 <li>Cosmos DB は <code>health</code> が調べないので、ポータルで見る</li>
@@ -136,7 +148,7 @@
 </li>
 <li>05・06：測る、答えを作る<ul>
 <li>映す：<a href="../lecture/part4-evaluation/slides.html#p42">p.42 NDCG と再現率</a>、<a href="../lecture/part5-wrapup/slides.html#p48">p.48 RAG の基本の流れ</a>、<a href="../lecture/part5-wrapup/slides.html#p50">p.50 ハルシネーション</a></li>
-<li>確かめる：05 の60問の測定は、進行役が1回見せる（チームで何度も実行しない）。06 で検索ありの答えが正解、検索なしは外れる</li>
+<li>確かめる：05 の60問の測定は、進行役が、デモ用のチームの <code>.env.local</code> で1回見せる（チームで何度も実行しない）。06 で検索ありの答えが正解、検索なしは外れる</li>
 </ul>
 </li>
 </ul>
@@ -144,8 +156,8 @@
 <p>手順：<a href="guide-hr.html">応用（人事）</a></p>
 <ul>
 <li class="task"><input type="checkbox"> 構築する人が、<code>hr-docs</code> を取り込んでおく（数分。パート3の途中で始めておくと、待たない）</li>
-<li class="task"><input type="checkbox"> 14〜20 を、進行役のデモで見せる（17 は構築する人の画面で）</li>
-<li class="task"><input type="checkbox"> <a href="applied-assistant-README.html">採用アシスタント</a>を見せる</li>
+<li class="task"><input type="checkbox"> 14〜20 を、進行役が、デモ用のチームの <code>.env.local</code>（構築する人の設定）で見せる（17 は本物の文書を直すので、進行役の画面だけで動かす）</li>
+<li class="task"><input type="checkbox"> <a href="applied-assistant-README.html">採用アシスタント</a>を見せる（デモ用のチームの <code>.env.local</code> で。手元だけで開きます）</li>
 <li>映す：<a href="../lecture/part2-ingestion/slides.html#p30">p.30 権限：誰に何を見せるか</a>、<a href="../lecture/part2-ingestion/slides.html#p29">p.29 差分の更新と削除の検出</a>、<a href="../lecture/part3-relations-agentic/slides.html#p31">p.31 文書同士の関係性を検索する</a>、<a href="../lecture/part3-relations-agentic/slides.html#p32">p.32 エージェント型検索</a>、<a href="../lecture/part3-relations-agentic/slides.html#p36">p.36 ナレッジソースとナレッジベース</a>、<a href="../lecture/part4-evaluation/slides.html#p44">p.44 生成 AI による採点のぶれ</a></li>
 <li>短く見せるとき：<a href="guide-search-demo.html">検索デモ</a>（AI Search だけ。5段で、絞る・見せてよい人・並べ直す）</li>
 </ul>
@@ -177,7 +189,7 @@
 <li>画面の名前が違う：Azure の画面は変わる。メニューの名前を探し、見つからなければ、進行役が確かめて伝える</li>
 <li>セマンティック ランカーの無料枠：チームの AI Search 全体で、月ごとに使う。05 の <code>measure_methods.py</code> は、1回の実行で質問の数（60回）使う</li>
 <li>17 は本物の文書を直す：動かしているあいだ、チームの検索の結果も変わる。メンバーが 15・16・18・19 を動かしていないときに、構築する人が実行する</li>
-<li>キーが古くなった：構築する人が <code>python tools/team.py env --role builder</code> と <code>--role member --out member.local.env</code> を実行し直し、メンバーに渡し直す</li>
+<li>キーが古くなった：構築する人が <code>python tools/team.py env --team &lt;チーム&gt; --role builder</code>（自分の <code>.env.local</code>）と <code>--role member --out member.local.env</code>（メンバー用）を実行し直し、<code>member.local.env</code> をメンバーに渡し直す</li>
 <li>Azure OpenAI が「呼びすぎ（429）」と返す：自動で待って再試行する。続くときは、1分ほど待つ</li>
 </ul>
 </article>

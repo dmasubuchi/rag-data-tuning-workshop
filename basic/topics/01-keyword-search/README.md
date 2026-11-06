@@ -8,7 +8,7 @@
 
 ## 前提
 
-- なし（最初のトピック）。Repo 直下に `.env.local` があること（なければ、Repo 直下で `python tools/team.py env --role builder`、メンバーは `--role member` で作る）
+- なし（最初のトピック）。Repo 直下に `.env.local` があること（なければ、構築する人は Repo 直下で `python tools/team.py env --team <チーム> --role builder` で作る。メンバーは、構築する人から受け取った `member.local.env` を `.env.local` という名前で置く）
 - `create_index.py` と `upload.py` は、AI Search の管理者キーが要るので、構築する人の設定（`--role builder`）で実行する。`analyze.py`（Analyze API）も管理者キーが要る。メンバーの設定（検索だけのキー）では、「構築する人の設定で実行します」と止まる。検索（`keyword_search.py`、`search_paraphrase.py`）は、メンバーの設定でもできる
 
 ## 実行するコマンド（このフォルダで）

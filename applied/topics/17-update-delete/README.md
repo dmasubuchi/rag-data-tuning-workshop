@@ -33,7 +33,7 @@ Storage のファイルを変えたとき、検索の索引はどうなるか、
 ## 前提
 
 - `pip install -r applied/requirements.txt`（Repo 直下で、仮想環境の中で）
-- 構築する人の設定（`python tools/team.py env --role builder`）：AI Search の管理者キーと、Storage の接続文字列が要ります。メンバーの設定では、始めに「この手順は構築する人の設定（--role builder）で実行します」と止まります
+- 構築する人の設定（`python tools/team.py env --team <チーム> --role builder`）：AI Search の管理者キーと、Storage の接続文字列が要ります。メンバーの設定では、始めに「この手順は構築する人の設定（--role builder）で実行します」と止まります
 - 構築する人が `applied/tools/build_hr_index.py` でインデックス `hr-docs` を作ってあること。データソースは、入れ物の全体を読む設定になっていること（`show_pipeline.py` の 1 で見える）
 - v1 の求人票は `applied/data/updates/JOB-REQ042-v1.pdf`（17 だけで使う。`build_hr_index.py` は Storage に置かない）
 

@@ -4,7 +4,7 @@
 
 仕組みの説明は、[ハンズオン資料の第2部](../docs/lecture/md/part2-ingestion.md)、[第3部](../docs/lecture/md/part3-relations-agentic.md)、[評価](../docs/lecture/md/part4-evaluation.md)です。
 
-進行役がデモで見せることも、チームで動かすこともできます。
+進行役がデモで見せることも、チームで動かすこともできます。デモは、進行役のデモ用のチームの `.env.local` で動かします（[進行役の手引き](facilitator.md#進行役のデモ用のチーム)）。
 
 ## 最初に1回
 
@@ -13,7 +13,7 @@
 人事の文書は、構築する人が1回だけ取り込みます。メンバーは、取り込みが終わってから始めます。
 
 1. [ ] Repo 直下で、ライブラリを入れる：`pip install -r applied/requirements.txt`
-2. [ ] 接続の設定 `.env.local` を、構築する人用で作る：`python tools/team.py env --role builder`（[Azure の準備の 4](setup/azure-setup.md#4-接続の設定を作る)）
+2. [ ] 接続の設定 `.env.local` を、構築する人用で作る：`python tools/team.py env --team <チーム> --role builder`（[Azure の準備の 4](setup/azure-setup.md#4-接続の設定を作る)）
 3. [ ] 文書を取り込む：`python applied/tools/build_hr_index.py`（OCR を含むので、数分かかります）
    - Storage の入れ物 `hr-docs` がなければ、この道具が作ります（非公開）
 4. [ ] 状態を確かめる：`python applied/tools/build_hr_index.py --status`
@@ -22,7 +22,7 @@
 ### メンバー
 
 1. [ ] Repo 直下で、ライブラリを入れる：`pip install -r applied/requirements.txt`
-2. [ ] 構築する人から受け取った `member.local.env` の名前を、`.env.local` に変えて、Repo 直下に置く
+2. [ ] 構築する人から受け取った `member.local.env` を、Repo 直下に `.env.local` という名前で置く
 3. [ ] 構築する人が、手順3（文書の取り込み）を終えている
 
 構築する人とメンバーで、できることが違います。詳しくは [応用編 README の「構築する人とメンバー」](../applied/README.md#構築する人とメンバー)です。
@@ -40,7 +40,7 @@
 - [20 答えを評価する](../applied/topics/20-answer-evaluation/README.md)：自前の採点と組み込みの評価器
 
 - 17 は、動かしているあいだ、チームの検索の結果も変わります。ほかのメンバーが動かしていないときに、構築する人が実行します
-- 19 の `make_answers.py` と、20 の `score_all.py` は、進行役が見せます
+- 19 の `make_answers.py` と、20 の `score_all.py` は、進行役が、デモ用のチームの `.env.local`（進行役が構築する人。[進行役の手引き](facilitator.md)）で見せます
 - 20 の組み込みの評価器を使うときだけ、追加で `pip install -r applied/requirements-eval.txt`（約 150MB）
 
 ## 採用アシスタント（デモ）
@@ -48,7 +48,8 @@
 採用の文書に、検索のやり方を変えながら候補を絞り込んで答える画面です。メンバーの設定で動きます。
 
 1. [ ] Repo 直下で、ライブラリを入れる：`pip install -r applied/assistant/requirements.txt`
-2. [ ] 画面を開く：`streamlit run applied/assistant/app.py`
+2. [ ] Repo 直下で、画面を開く：`streamlit run applied/assistant/app.py`
+   - この PC だけで開きます。人に見せるときは、`ASSISTANT_ACCESS_CODE` を設定します（[採用アシスタントの README](../applied/assistant/README.md#人に見せるときの設定任意)）
 
 動かし方と仕組みは [採用アシスタントの README](../applied/assistant/README.md) です。
 
