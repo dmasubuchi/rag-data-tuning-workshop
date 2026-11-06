@@ -86,7 +86,7 @@
 <p>パート3・4 のデモは、進行役が自分のデモ用のチーム（例 <code>demo</code>）の <code>.env.local</code> で動かします。始める前に、参加者と同じ手順で作っておきます。進行役が、そのチームの構築する人です。</p>
 <ol>
 <li class="task"><input type="checkbox"> <a href="guide-setup-azure-setup.html">Azure の準備</a>：チームの名前を決め、ポータルでリソースを作る</li>
-<li class="task"><input type="checkbox"> <code>python tools/team.py env --team &lt;デモ用のチーム&gt; --role builder</code>：進行役の <code>.env.local</code> を作る</li>
+<li class="task"><input type="checkbox"> <code>python tools/team.py env --team &lt;デモ用のチーム&gt; --role builder</code>：進行役の <code>.env.local</code> を作る。<code>pip install -r applied/requirements.txt -r applied/assistant/requirements.txt</code> も入れておく</li>
 <li class="task"><input type="checkbox"> 基礎編 01〜03 を実行する（<a href="guide-sengoku.html">武将</a>）：インデックス <code>sengoku</code> とベクトルができる</li>
 <li class="task"><input type="checkbox"> <code>python applied/tools/build_hr_index.py</code> と <code>python applied/tools/build_hr_kb.py</code> を実行する（<a href="guide-hr.html">応用（人事）</a>）：人事の文書と、知識ベースができる</li>
 </ol>

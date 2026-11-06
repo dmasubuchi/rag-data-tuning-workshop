@@ -24,16 +24,16 @@
 
 ```
 pip install -r applied/assistant/requirements.txt
-streamlit run applied/assistant/app.py --client.toolbarMode minimal --theme.primaryColor "#1864ab"
+streamlit run applied/assistant/app.py --server.address localhost --client.toolbarMode minimal --theme.primaryColor "#1864ab"
 ```
 
-画面は、この PC だけで開きます（Repo 直下の `.streamlit/config.toml` が、`localhost` に決めています）。Streamlit は、実行したときのフォルダーの `.streamlit/` を読むので、起動は Repo 直下で行います。人に見せるときは、`ASSISTANT_ACCESS_CODE` を設定します（下）。
+画面は、この PC だけで開きます（`--server.address localhost`。Repo 直下で起動すれば、`.streamlit/config.toml` も同じ設定です）。人に見せるときは、`ASSISTANT_ACCESS_CODE` を設定します（下）。
 
 端末で 1 問だけ：`cd applied` のあと `python -m assistant.cli --id q10`
 
 ## 人に見せるときの設定（任意）
 
-環境変数で変えられます。なければ、合言葉なし・既定の値で動きます。手元だけで開くあいだは、合言葉はなくてかまいません。ほかの PC から開かせるときは、起動に `--server.address 0.0.0.0` を付け、`ASSISTANT_ACCESS_CODE` を設定します。
+環境変数で変えられます。なければ、合言葉なし・既定の値で動きます。手元だけで開くあいだは、合言葉はなくてかまいません。ほかの PC から開かせるときは、起動の `--server.address localhost` を `--server.address 0.0.0.0` に替え、`ASSISTANT_ACCESS_CODE` を設定します。
 
 - `ASSISTANT_ACCESS_CODE`：合言葉。決めると、画面を開くときに入力が要ります
 - `ASSISTANT_MAX_QUESTIONS`：1 日の質問の上限（既定 200）

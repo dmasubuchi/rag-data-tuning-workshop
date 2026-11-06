@@ -48,7 +48,7 @@
 採用の文書に、検索のやり方を変えながら候補を絞り込んで答える画面です。メンバーの設定で動きます。
 
 1. [ ] Repo 直下で、ライブラリを入れる：`pip install -r applied/assistant/requirements.txt`
-2. [ ] Repo 直下で、画面を開く：`streamlit run applied/assistant/app.py`
+2. [ ] Repo 直下で、画面を開く：`streamlit run applied/assistant/app.py --server.address localhost`
    - この PC だけで開きます。人に見せるときは、`ASSISTANT_ACCESS_CODE` を設定します（[採用アシスタントの README](../applied/assistant/README.md#人に見せるときの設定任意)）
 
 動かし方と仕組みは [採用アシスタントの README](../applied/assistant/README.md) です。

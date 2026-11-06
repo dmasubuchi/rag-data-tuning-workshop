@@ -68,7 +68,7 @@ pip install -r applied/requirements.txt
   - `score_all.py`：（進行役。デモ用のチームの `.env.local` で）19 の答えをまとめて採点し、点のぶれを見る
 
 - `assistant/`：採用アシスタント（Streamlit の画面。LLM が検索の道具を選んで、候補を段ごとに絞る。検索と LLM だけを使うので、メンバーの設定で動く。`assistant/README.md`）
-  - 動かす：Repo 直下で `pip install -r applied/assistant/requirements.txt` のあと `streamlit run applied/assistant/app.py`。この PC だけで開きます。人に見せるときは、`ASSISTANT_ACCESS_CODE` を設定します
+  - 動かす：Repo 直下で `pip install -r applied/assistant/requirements.txt` のあと `streamlit run applied/assistant/app.py --server.address localhost`。この PC だけで開きます。人に見せるときは、`ASSISTANT_ACCESS_CODE` を設定します
 
 ## 中身
 

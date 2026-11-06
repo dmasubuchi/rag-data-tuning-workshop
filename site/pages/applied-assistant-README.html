@@ -32,12 +32,12 @@
 <h2 id="自分の-pc-で動かす">自分の PC で動かす</h2>
 <p>前提：Repo 直下の <code>.env.local</code>（メンバーは、構築する人から受け取った <code>member.local.env</code> をこの名前で置く。構築する人は、自分の <code>.env.local</code>）と、インデックス <code>hr-docs</code>（構築する人が作ったもの）。</p>
 <pre><code>pip install -r applied/assistant/requirements.txt
-streamlit run applied/assistant/app.py --client.toolbarMode minimal --theme.primaryColor "#1864ab"
+streamlit run applied/assistant/app.py --server.address localhost --client.toolbarMode minimal --theme.primaryColor "#1864ab"
 </code></pre>
-<p>画面は、この PC だけで開きます（Repo 直下の <code>.streamlit/config.toml</code> が、<code>localhost</code> に決めています）。Streamlit は、実行したときのフォルダーの <code>.streamlit/</code> を読むので、起動は Repo 直下で行います。人に見せるときは、<code>ASSISTANT_ACCESS_CODE</code> を設定します（下）。</p>
+<p>画面は、この PC だけで開きます（<code>--server.address localhost</code>。Repo 直下で起動すれば、<code>.streamlit/config.toml</code> も同じ設定です）。人に見せるときは、<code>ASSISTANT_ACCESS_CODE</code> を設定します（下）。</p>
 <p>端末で 1 問だけ：<code>cd applied</code> のあと <code>python -m assistant.cli --id q10</code></p>
 <h2 id="人に見せるときの設定任意">人に見せるときの設定（任意）</h2>
-<p>環境変数で変えられます。なければ、合言葉なし・既定の値で動きます。手元だけで開くあいだは、合言葉はなくてかまいません。ほかの PC から開かせるときは、起動に <code>--server.address 0.0.0.0</code> を付け、<code>ASSISTANT_ACCESS_CODE</code> を設定します。</p>
+<p>環境変数で変えられます。なければ、合言葉なし・既定の値で動きます。手元だけで開くあいだは、合言葉はなくてかまいません。ほかの PC から開かせるときは、起動の <code>--server.address localhost</code> を <code>--server.address 0.0.0.0</code> に替え、<code>ASSISTANT_ACCESS_CODE</code> を設定します。</p>
 <ul>
 <li><code>ASSISTANT_ACCESS_CODE</code>：合言葉。決めると、画面を開くときに入力が要ります</li>
 <li><code>ASSISTANT_MAX_QUESTIONS</code>：1 日の質問の上限（既定 200）</li>

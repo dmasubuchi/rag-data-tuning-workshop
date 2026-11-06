@@ -59,7 +59,7 @@ Repo が非公開のときだけです。
 パート3・4 のデモは、進行役が自分のデモ用のチーム（例 `demo`）の `.env.local` で動かします。始める前に、参加者と同じ手順で作っておきます。進行役が、そのチームの構築する人です。
 
 1. [ ] [Azure の準備](setup/azure-setup.md)：チームの名前を決め、ポータルでリソースを作る
-2. [ ] `python tools/team.py env --team <デモ用のチーム> --role builder`：進行役の `.env.local` を作る
+2. [ ] `python tools/team.py env --team <デモ用のチーム> --role builder`：進行役の `.env.local` を作る。`pip install -r applied/requirements.txt -r applied/assistant/requirements.txt` も入れておく
 3. [ ] 基礎編 01〜03 を実行する（[武将](sengoku.md)）：インデックス `sengoku` とベクトルができる
 4. [ ] `python applied/tools/build_hr_index.py` と `python applied/tools/build_hr_kb.py` を実行する（[応用（人事）](hr.md)）：人事の文書と、知識ベースができる
 

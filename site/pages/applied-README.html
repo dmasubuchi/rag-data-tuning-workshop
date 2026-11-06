@@ -105,7 +105,7 @@
 <li>
 <p><code>assistant/</code>：採用アシスタント（Streamlit の画面。LLM が検索の道具を選んで、候補を段ごとに絞る。検索と LLM だけを使うので、メンバーの設定で動く。<code>assistant/README.md</code>）</p>
 <ul>
-<li>動かす：Repo 直下で <code>pip install -r applied/assistant/requirements.txt</code> のあと <code>streamlit run applied/assistant/app.py</code>。この PC だけで開きます。人に見せるときは、<code>ASSISTANT_ACCESS_CODE</code> を設定します</li>
+<li>動かす：Repo 直下で <code>pip install -r applied/assistant/requirements.txt</code> のあと <code>streamlit run applied/assistant/app.py --server.address localhost</code>。この PC だけで開きます。人に見せるときは、<code>ASSISTANT_ACCESS_CODE</code> を設定します</li>
 </ul>
 </li>
 </ul>
