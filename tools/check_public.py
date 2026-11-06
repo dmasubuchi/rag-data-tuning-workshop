@@ -44,6 +44,10 @@ from typing import Iterator, NamedTuple
 BANNED_ENV = "PUBLIC_CHECK_BANNED"
 NO_BANNED_GIVEN = f"禁止語のリストの場所を --banned か {BANNED_ENV} で渡す"
 EXAMPLE_DOMAINS = {"example.com", "example.jp"}
+# 個人のメールではない noreply のアドレス。GitHub の noreply（<数字>+<名前>@users.noreply.github.com など）と、
+# 共著者（Co-Authored-By）に書く AI のアドレス。ドメイン全体・アドレス全体が一致するものだけ除く。
+NOREPLY_DOMAINS = {"users.noreply.github.com"}
+NOREPLY_ADDRESSES = {"noreply@anthropic.com", "noreply@github.com"}
 
 # 秘密らしい文字列の型。このファイル自身に引っかからないよう、リテラルの "=" は [=] と書く。
 # 名前の規則（最後の型）は、AZURE_SEARCH_ADMIN_KEY、"primaryKey"、"key1"、Ocp-Apim-Subscription-Key のように、
@@ -141,6 +145,12 @@ def _compile_banned(banned: list[str]) -> list[re.Pattern]:
     return [re.compile(re.escape(_nfkc(term)), re.IGNORECASE) for term in banned if term.strip()]
 
 
+def _is_allowed_email(address: str, domain: str) -> bool:
+    """検査から除くメールか（example のドメイン、GitHub と AI の noreply）。"""
+    domain = domain.lower()
+    return domain in EXAMPLE_DOMAINS or domain in NOREPLY_DOMAINS or address.lower() in NOREPLY_ADDRESSES
+
+
 def _line_matches(line: str, banned_patterns: list[re.Pattern]) -> list[tuple[str, int, int]]:
     """NFKC でそろえた1行から、(種類, 開始, 終了) を全部。"""
     hits: list[tuple[str, int, int]] = []
@@ -157,7 +167,7 @@ def _line_matches(line: str, banned_patterns: list[re.Pattern]) -> list[tuple[st
     for m in ABS_PATH_PATTERN.finditer(line):
         hits.append(("abs-path", m.start(), m.end()))
     for m in EMAIL_PATTERN.finditer(line):
-        if m.group(1).lower() not in EXAMPLE_DOMAINS:
+        if not _is_allowed_email(m.group(), m.group(1)):
             hits.append(("email", m.start(), m.end()))
     for pattern in banned_patterns:
         for m in pattern.finditer(line):

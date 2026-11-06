@@ -164,6 +164,26 @@ class ScanTextTests(unittest.TestCase):
         text = "a@example.com と b@example.jp と C@EXAMPLE.COM"
         self.assertEqual(scan_text("a.txt", text, []), [])
 
+    def test_github_and_ai_noreply_emails_pass(self):
+        # GitHub の noreply アドレスと、AI の共著者の noreply アドレスは、個人のメールではないので除く
+        text = ("3191973+someone@" + "users.noreply.github.com と " + "noreply@" + "anthropic.com と "
+                + "NoReply@" + "GitHub.com と " + "Co-Authored-By: Claude Sonnet 5.5 <noreply@" + "anthropic.com>")
+        self.assertEqual(scan_text("a.txt", text, []), [])
+
+    def test_lookalike_noreply_emails_are_still_found(self):
+        # 似た形のアドレスは除かない（アドレス全体・ドメイン全体が一致するものだけ除く）
+        cases = {
+            "別のローカル部": "xnoreply@" + "anthropic.com",
+            "別のドメイン": "noreply@" + "anthropic.co.jp",
+            "noreply@github の別の形": "noreply@" + "mail.github.com",
+            "ドメインの後ろに続く": "someone@" + "users.noreply.github.com.corp.test",
+            "別のサブドメイン": "someone@" + "x.users.noreply.github.com",
+            "github.com の個人": "someone@" + "github.com",
+        }
+        for label, text in cases.items():
+            with self.subTest(label):
+                self.assertEqual(kinds(scan_text("a.txt", text, [])), ["email"])
+
     def test_full_width_and_half_width_forms_match_banned_terms(self):
         # 全角の英字・半角のカナも、禁止語に当てる（NFKC でそろえる）
         self.assertEqual(kinds(scan_text("a.txt", "ＡＣＭＥ 社", ["acme"])), ["banned"])
@@ -643,6 +663,27 @@ class MainTests(unittest.TestCase):
                 self.assertEqual(code, 1, out)
                 self.assertNotIn("Acme", self.scrub(out))
                 self.assertNotIn("someone", self.scrub(out))
+
+    @unittest.skipUnless(HAS_GIT, "git がない環境")
+    def test_history_ignores_noreply_emails_in_author_committer_tagger_and_message(self):
+        # 作成者・コミッター・タグの作成者のメールが noreply でも、メッセージに共著者の noreply があっても 0 件
+        email = "3191973+someone@" + "users.noreply.github.com"
+        message = "追加\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@" + "anthropic.com>"
+        self.history_repo(email=email, message=message, tag="v1", tag_message="最初の版\n\nnoreply@" + "github.com")
+        code, _, out = self.history_codes()
+        self.assertEqual(code, 0, out)
+
+    @unittest.skipUnless(HAS_GIT, "git がない環境")
+    def test_history_still_finds_lookalike_noreply_in_message(self):
+        self.history_repo(message="追加\n\nCo-Authored-By: Someone <xnoreply@" + "anthropic.com>")
+        code, _, out = self.history_codes()
+        self.assertEqual(code, 1, out)
+        self.assertIn("email", out)
+
+    def test_noreply_email_in_file_path_and_text_passes(self):
+        self.write("noreply@" + "anthropic.com", "連絡先 3191973+someone@" + "users.noreply.github.com\n")
+        code, out, _ = self.run_main("--banned", str(self.banned), str(self.target))
+        self.assertEqual(code, 0, out)
 
     @unittest.skipUnless(HAS_GIT, "git がない環境")
     def test_history_checks_committer_name_and_email(self):
