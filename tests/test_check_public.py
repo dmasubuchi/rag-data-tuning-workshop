@@ -30,19 +30,19 @@ GITHUB_TOKEN = "gh" + "p_" + "a" * 36
 OPENAI_KEY = "sk" + "-" + "a" * 32
 ACCOUNT_KEY = "Account" + "Key=" + "A" * 24
 SAS_URL = "https://x.test/f?" + "sig=" + "A" * 24
-API_KEY_LINE = "api" + "_key: " + "b" * 24
+API_KEY_LINE = "api" + "_key: " + "1" + "b" * 23
 PRIVATE_KEY_HEAD = "-----BEGIN " + "RSA PRIVATE KEY-----"
 SAS_WORD = "SharedAccess" + "Signature=x"
 HOME_PATH = "/Us" + "ers/" + "someone" + "/docs"
 
 # Azure のキーの形の見本（名前と値を、つないで作る）
-ADMIN_KEY_LINE = "AZURE_SEARCH_ADMIN" + "_KEY=" + "c" * 32
-OPENAI_KEY_LINE = "AZURE_OPENAI" + "_KEY=" + "d" * 32
-ADMIN_KEY_QUOTED = "ADMIN" + "_KEY = " + '"' + "e" * 32 + '"'
-PRIMARY_KEY_JSON = '"primary' + 'Key": "' + "f" * 32 + '"'
-KEY1_JSON = '"key' + '1": "' + "g" * 32 + '"'
-CONNECTION_LINE = "connection" + "_string = " + "j" * 30
-APIM_HEADER = "Ocp-Apim-Subscription" + "-Key: " + "h" * 32
+ADMIN_KEY_LINE = "AZURE_SEARCH_ADMIN" + "_KEY=" + "1" + "c" * 31
+OPENAI_KEY_LINE = "AZURE_OPENAI" + "_KEY=" + "2" + "d" * 31
+ADMIN_KEY_QUOTED = "ADMIN" + "_KEY = " + '"' + "3" + "e" * 31 + '"'
+PRIMARY_KEY_JSON = '"primary' + 'Key": "' + "4" + "f" * 31 + '"'
+KEY1_JSON = '"key' + '1": "' + "5" + "g" * 31 + '"'
+CONNECTION_LINE = "connection" + "_string = " + "6" + "j" * 29
+APIM_HEADER = "Ocp-Apim-Subscription" + "-Key: " + "7" + "h" * 31
 BEARER_HEADER = "Authorization: " + "Bear" + "er " + "i" * 40
 # GUID（テナント・サブスクリプションの ID の形）の見本
 GUID = "0123abcd" + "-4567-" + "89ab-cdef-" + "0123456789ab"
@@ -55,7 +55,7 @@ def kinds(findings):
 
 class ScanTextTests(unittest.TestCase):
     def test_secret_is_found_and_redacted(self):
-        secret = "A" * 52
+        secret = "1" + "A" * 51
         findings = scan_text("a.txt", "AZURE_SEARCH_API_KEY=" + secret, [])
         self.assertEqual(kinds(findings), ["secret"])
         self.assertIsInstance(findings[0], Finding)
@@ -101,7 +101,7 @@ class ScanTextTests(unittest.TestCase):
 
     def test_short_values_are_not_secrets(self):
         # 20 文字に満たない値は、キーの代入として扱わない
-        self.assertEqual(scan_text("a.txt", "api_key: " + "b" * 19, []), [])
+        self.assertEqual(scan_text("a.txt", "api_key: " + "1" + "b" * 18, []), [])
         self.assertEqual(scan_text("a.txt", ADMIN_KEY_LINE[:-13], []), [])
         self.assertEqual(scan_text("a.txt", "Authorization: Bearer " + "i" * 19, []), [])
 
@@ -109,7 +109,7 @@ class ScanTextTests(unittest.TestCase):
         for name in ("admin_key", "ADMIN_KEY", "AdminKey", "client_secret", "access_token", "db_password",
                      "storage_connectionstring", "myPasswd"):
             with self.subTest(name=name):
-                findings = scan_text("a.txt", name + ' = "' + "k" * 24 + '"', [])
+                findings = scan_text("a.txt", name + ' = "' + "1" + "k" * 23 + '"', [])
                 self.assertEqual(kinds(findings), ["secret"])
 
     def test_empty_placeholder_and_code_lines_are_not_secrets(self):
@@ -126,6 +126,19 @@ class ScanTextTests(unittest.TestCase):
         for text in clean:
             with self.subTest(text=text):
                 self.assertEqual(scan_text("a.txt", text, []), [])
+
+    def test_code_without_digits_is_not_a_secret(self):
+        # 値に数字がない（x = a.b.c のような）コードは、キーの代入として扱わない
+        for text in ("          const key = window.localStorage.key(i);",
+                     "token = response.headers.authorization_value"):
+            with self.subTest(text=text):
+                self.assertEqual(scan_text("a.js", text, []), [])
+
+    def test_name_rule_still_finds_values_with_digits(self):
+        line = "AZURE_SEARCH_API" + "_KEY=" + "Abc1defghijklmnopqrstuvwxyz0123"
+        findings = scan_text("a.txt", line, [])
+        self.assertEqual(kinds(findings), ["secret"])
+        self.assertNotIn("defghijklmnopqrstuvwxyz", findings[0].excerpt)
 
     def test_all_zero_guid_is_not_reported(self):
         zero = "00000000-0000-0000-0000-000000000000"
@@ -349,7 +362,7 @@ class MainTests(unittest.TestCase):
         self.assertIn("OK", out)
 
     def test_finding_returns_1_and_output_is_redacted(self):
-        secret = "A" * 52
+        secret = "1" + "A" * 51
         self.write("sub/a.md", "1行目\nAZURE_SEARCH_API_KEY=" + secret + "\n")
         code, out, _ = self.run_main("--banned", str(self.banned), str(self.target))
         self.assertEqual(code, 1)
@@ -622,7 +635,7 @@ class MainTests(unittest.TestCase):
     @unittest.skipUnless(HAS_GIT, "git がない環境")
     def test_history_finds_a_secret_that_was_removed(self):
         self.git("init", "-q")
-        self.write("a.md", "AZURE_SEARCH_API_KEY=" + "A" * 52 + "\n")
+        self.write("a.md", "AZURE_SEARCH_API_KEY=" + "1" + "A" * 51 + "\n")
         self.git("add", "-A")
         self.git("commit", "-q", "-m", "add")
         self.write("a.md", "消した\n")
@@ -635,7 +648,7 @@ class MainTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("a.md", out)
         self.assertIn("secret", out)
-        self.assertNotIn("A" * 52, out)
+        self.assertNotIn("1" + "A" * 51, out)
 
     @unittest.skipUnless(HAS_GIT, "git がない環境")
     def test_history_of_clean_repo_returns_0(self):

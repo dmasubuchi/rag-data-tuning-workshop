@@ -55,6 +55,7 @@ NOREPLY_ADDRESSES = {"noreply@anthropic.com", "noreply@github.com"}
 # 秘密らしい文字列の型。このファイル自身に引っかからないよう、リテラルの "=" は [=] と書く。
 # 名前の規則（最後の型）は、AZURE_SEARCH_ADMIN_KEY、"primaryKey"、"key1"、Ocp-Apim-Subscription-Key のように、
 # 名前に key・secret・token・password・connection string を含み、そのあとに 20 文字以上の値が続くものを拾う。
+# 値には数字を 1 つ以上含むものだけ拾う（コードの x = a.b.c に当たらないように。本物のキーはほぼ必ず数字を含む）。
 # \w{0,40}+ は、長い行で正規表現が遅くならないための「戻らない」繰り返し（Python 3.11 以上）。
 SECRET_PATTERNS = [
     re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"),
@@ -65,7 +66,7 @@ SECRET_PATTERNS = [
     re.compile(r"SharedAccessSignature[=]|[?&]sig=[A-Za-z0-9%+/=]{20,}"),
     re.compile(r"""Authorization["']?\s*[:=]\s*["']?Bearer\s+[A-Za-z0-9+/_.=-]{20,}""", re.IGNORECASE),
     re.compile(
-        r"""(?:key|secret|token|password|passwd|connection_?string)\w{0,40}+["']?\s*[:=]\s*["']?[A-Za-z0-9+/_.-]{20,}""",
+        r"""(?:key|secret|token|password|passwd|connection_?string)\w{0,40}+["']?\s*[:=]\s*["']?(?=[A-Za-z+/_.-]*[0-9])[A-Za-z0-9+/_.-]{20,}""",
         re.IGNORECASE,
     ),
 ]
