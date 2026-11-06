@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>06 検索結果から答えを作る | データに着目した RAG の研修</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="bar"><a class="home" href="../index.html">← 入口に戻る</a><a class="source" href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/basic/topics/06-answer-from-results/README.md">元の Markdown（GitHub）</a></header>
+<main>
+<article class="doc">
+<h1 id="06-検索結果から答えを作る">06 検索結果から答えを作る</h1>
+<nav class="toc"><details><summary>このページの目次</summary>
+<ul>
+<li class="l2"><a href="#学ぶこと">学ぶこと</a></li>
+<li class="l2"><a href="#前提">前提</a></li>
+<li class="l2"><a href="#実行するコマンドこのフォルダで">実行するコマンド（このフォルダで）</a></li>
+<li class="l2"><a href="#何を見ればよいか">何を見ればよいか</a></li>
+<li class="l2"><a href="#次のトピック">次のトピック</a></li>
+</ul>
+</details></nav>
+
+<h2 id="学ぶこと">学ぶこと</h2>
+<ul>
+<li>検索で見つけた上位3件を、プロンプトに貼り付けて、LLM に答えさせる（RAG の最小の形）</li>
+<li>手でコピーして貼る（手動 RAG）のと、コードで送る（自動の RAG）のは、同じことをしている</li>
+<li>RAG が効くのは、LLM が知らない情報を渡すとき。有名な武将は、検索なしでも答えられることがある</li>
+</ul>
+<h2 id="前提">前提</h2>
+<ul>
+<li><code>../04-hybrid-ranker</code> が終わっていること（武将にベクトルとセマンティックの設定が入っていること。04 のスクリプト自体は何も残さない）</li>
+<li>足りないときは、<code>python ../../tools/reset.py --to 06</code>（スクリプトの先頭の <code>REBUILD = True</code>、スクリプトでは <code>--rebuild</code> でも作り直せる。Notebook では、作り直したら <code>REBUILD = False</code> に戻す。<code>True</code> のままだと、実行のたびに作り直す）</li>
+</ul>
+<h2 id="実行するコマンドこのフォルダで">実行するコマンド（このフォルダで）</h2>
+<p>必須（この順に）</p>
+<ul>
+<li><code>python build_prompt.py</code>　上位3件でプロンプトを組んで表示する（枠の中をコピーして使える。ランカーを 1 回使う）</li>
+<li><code>python generate_answer.py</code>　同じプロンプトを Azure OpenAI に送って答えさせる（ランカーを 1 回使う）</li>
+<li><code>python compare_no_search.py</code>　検索なしで聞いた答えと並べる（<code>generate_answer.py</code> が保存した答えを使えるとき、つまり質問・検索の方式・件数が同じときは、ランカーを使わない。違うとき、<code>REBUILD = True</code>（<code>--rebuild</code>）のあとは、検索し直すのでランカーを 1 回使う）</li>
+</ul>
+<p>質問は、<code>QUESTION = None</code> のとき山場の質問（q53）。自分の質問は <code>--q "…"</code>。</p>
+<p>Notebook でも、同じファイルを上から順にセルで実行できます。<code>--q</code> などの引数に当たるものは、先頭の「変えてよい値」のセルの変数（<code>QUESTION</code> など）で指定します。
+検索の方式 <code>METHOD</code> と件数 <code>TOP_N</code> は、3つのスクリプトそれぞれの先頭にある。<code>compare_no_search.py</code> は、<code>generate_answer.py</code> と同じ値のときだけ、その答えを使う。</p>
+<h2 id="何を見ればよいか">何を見ればよいか</h2>
+<ul>
+<li><code>build_prompt.py</code>：「【資料1】… 【質問】…」の形。正解の武将がプロンプトに入ったか</li>
+<li><code>generate_answer.py</code>：答えと、正解の武将</li>
+<li><code>compare_no_search.py</code>：2つの答えを、正解と見比べる。検索なしでも当たるとは限らない</li>
+</ul>
+<h2 id="次のトピック">次のトピック</h2>
+<ul>
+<li>応用編 <code>applied/</code>（社内文書を取り込んで検索する）</li>
+</ul>
+</article>
+</main>
+<footer class="bar"><a class="home" href="../index.html">← 入口に戻る</a><a class="source" href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/basic/topics/06-answer-from-results/README.md">元の Markdown（GitHub）</a></footer>
+</body>
+</html>

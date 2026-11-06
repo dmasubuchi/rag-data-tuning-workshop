@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>武将：検索の方式を動かす（基礎編 01〜06） | データに着目した RAG の研修</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="bar"><a class="home" href="../index.html">← 入口に戻る</a><a class="source" href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/guide/sengoku.md">元の Markdown（GitHub）</a></header>
+<main>
+<article class="doc">
+<h1 id="武将検索の方式を動かす基礎編-0106">武将：検索の方式を動かす（基礎編 01〜06）</h1>
+
+<p>戦国武将のデータで、キーワード検索、ベクトル検索、ハイブリッド、答えの生成までを動かします。スクリプトとデータは <a href="basic-README.html"><code>basic/</code></a> にあります。仕組みの説明は <a href="docs-lecture-md-part1-search.html">ハンズオン資料 第1部</a> です。</p>
+<h2 id="最初に1回">最初に1回</h2>
+<ol>
+<li class="task"><input type="checkbox"> Repo 直下で、ライブラリを入れる：<code>pip install -r basic/requirements.txt</code>（Windows で <code>python</code> が見つからないときは <code>py</code>）</li>
+<li class="task"><input type="checkbox"> 接続の設定 <code>.env.local</code> を、Repo 直下に置く（<a href="guide-setup-azure-setup.html#4-接続の設定を作る">Azure の準備の 4</a>）<ul>
+<li>構築する人：<code>python tools/team.py env --role builder</code></li>
+<li>メンバー：構築する人から受け取った <code>member.local.env</code> の名前を、<code>.env.local</code> に変える</li>
+</ul>
+</li>
+<li class="task"><input type="checkbox"> 構築する人が、01 から順に進める。AI Search に、チームの武将のインデックス <code>sengoku</code> ができる（150件）</li>
+</ol>
+<p>構築する人とメンバーで、できることが違います。</p>
+<ul>
+<li>構築する人：インデックスと同義語マップを作り、武将を登録する（01 の <code>create_index.py</code>・<code>upload.py</code>・<code>analyze.py</code>、02、03 の <code>embed.py</code>、<code>basic/tools/reset.py</code>）</li>
+<li>メンバー：検索だけをする（01 の <code>keyword_search.py</code>・<code>search_paraphrase.py</code>、03 の <code>vector_search.py</code>、04、05、06）。構築する人が、そのトピックの登録などを先に終えてから始める</li>
+<li>詳しくは <a href="basic-README.html#構築する人とメンバー">基礎編 README の「構築する人とメンバー」</a></li>
+</ul>
+<h2 id="進め方">進め方</h2>
+<ul>
+<li>各トピックのフォルダで <code>python xxx.py</code>。VS Code では <code># %%</code> の「Run Cell」で、1セルずつ動かせます</li>
+<li>同じ名前の Notebook（<code>.ipynb</code>）でも、同じ中身です</li>
+<li>質問は、先頭近くの「変えてよい値」のセルで変えます</li>
+<li>前のトピックが終わっていないと、最初のセルで止まります。構築する人は、<code>REBUILD = True</code> にして実行し直し、終わったら <code>False</code> に戻します</li>
+<li>途中から始めるときは、構築する人が <code>python basic/tools/reset.py --to 04</code> のように、トピックの開始の状態を作り直します</li>
+</ul>
+<h2 id="トピック">トピック</h2>
+<p>各トピックの README に、実行するコマンドと見るところが書いてあります。</p>
+<ol>
+<li class="task"><input type="checkbox"> <a href="basic-topics-01-keyword-search-README.html">01 キーワード検索</a>：武将を読み込み、インデックスを作り、登録して、検索する</li>
+<li class="task"><input type="checkbox"> <a href="basic-topics-02-analyzers-synonyms-README.html">02 言い換えと日本語の分かれ方</a>：Analyze API で分かれ方を見て、同義語マップに1行足す</li>
+<li class="task"><input type="checkbox"> <a href="basic-topics-03-vector-search-README.html">03 ベクトル検索</a>：言い換えの質問で、キーワード検索が外れ、ベクトル検索が当たるのを見る</li>
+<li class="task"><input type="checkbox"> <a href="basic-topics-04-hybrid-ranker-README.html">04 ハイブリッドとランカー</a>：4つの方式の順位を並べる</li>
+<li class="task"><input type="checkbox"> <a href="basic-topics-05-measure-search-README.html">05 検索の良し悪しを数字で測る</a>：60問×4方式の nDCG@10・再現率@10・1位の割合</li>
+<li class="task"><input type="checkbox"> <a href="basic-topics-06-answer-from-results-README.html">06 検索結果から答えを作る</a>：プロンプトを組み、LLM に答えさせる</li>
+</ol>
+<ul>
+<li>04・05・06 は、セマンティック ランカーを使います。月の無料枠は、チームの AI Search 全体で使います。05 の <code>measure_methods.py</code> は、質問の数（60回）だけ使うので、進行役が1回見せるだけにします（<a href="basic-README.html#セマンティックランカーの使いすぎに注意">基礎編 README</a>）</li>
+</ul>
+<h2 id="次の手順">次の手順</h2>
+<p><a href="guide-hr.html">応用（人事）</a>：採用の文書で、業務の検索を見る</p>
+</article>
+</main>
+<footer class="bar"><a class="home" href="../index.html">← 入口に戻る</a><a class="source" href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/guide/sengoku.md">元の Markdown（GitHub）</a></footer>
+</body>
+</html>

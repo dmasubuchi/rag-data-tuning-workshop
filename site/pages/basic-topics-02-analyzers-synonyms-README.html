@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>02 言い換えと日本語の分かれ方 | データに着目した RAG の研修</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="bar"><a class="home" href="../index.html">← 入口に戻る</a><a class="source" href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/basic/topics/02-analyzers-synonyms/README.md">元の Markdown（GitHub）</a></header>
+<main>
+<article class="doc">
+<h1 id="02-言い換えと日本語の分かれ方">02 言い換えと日本語の分かれ方</h1>
+<nav class="toc"><details><summary>このページの目次</summary>
+<ul>
+<li class="l2"><a href="#何を学ぶか">何を学ぶか</a></li>
+<li class="l2"><a href="#前提">前提</a></li>
+<li class="l2"><a href="#実行するコマンドこのフォルダで">実行するコマンド（このフォルダで）</a></li>
+<li class="l2"><a href="#何を見るか">何を見るか</a></li>
+<li class="l2"><a href="#辞書について">辞書について</a></li>
+</ul>
+</details></nav>
+
+<h2 id="何を学ぶか">何を学ぶか</h2>
+<ul>
+<li>キーワード検索は、質問と本文を「語」に分けて、同じ語を持つ文書を探す。言い換えた質問は、本文と同じ語を持たないので外れる。</li>
+<li>語の分け方（アナライザー）によって、同じ言葉の分かれ方が変わる。ただし、別の言葉（「北海道」と「蝦夷地」）は、どのアナライザーでも同じ語にならない。</li>
+<li>辞書（同義語マップ）を作ってつなぐと、言い換えの外れを直せる。ただし言い換えは質問ごとに違うので、先回りして全部を書くのは手間がかかる。辞書なしで意味の近さで当てるのが、次の 03（ベクトル検索）。</li>
+</ul>
+<h2 id="前提">前提</h2>
+<ul>
+<li>01-keyword-search を終えている（武将のインデックスがある）。
+    なければ、各スクリプトが「どうすればよいか」を出して止まる。先頭の <code>REBUILD = True</code> にすると作り直す。</li>
+<li>このトピックは、AI Search の管理者キーが要る（Analyze API、辞書の作成）。チームでは構築する人の設定（<code>--role builder</code>）で実行する。メンバーの設定（検索だけのキー）では、「構築する人の設定で実行します」と止まる。</li>
+</ul>
+<h2 id="実行するコマンドこのフォルダで">実行するコマンド（このフォルダで）</h2>
+<pre><code>python compare_analyzers.py
+python synonym_map.py
+python synonym_map.py --rule "眼球, 目玉"
+</code></pre>
+<p>発展：</p>
+<pre><code>python tuning.py
+</code></pre>
+<p>Notebook でも、同じファイルを上から順にセルを実行すれば動く。</p>
+<h2 id="何を見るか">何を見るか</h2>
+<ul>
+<li><code>compare_analyzers.py</code>：アナライザー3つ（ja.microsoft、ja.lucene、standard.lucene）の分かれ方の違い。言い換えの質問3つ（q21、q23、q28）と正解の本文に、共通の語がほとんどないこと。</li>
+<li><code>synonym_map.py</code>：用意したルール「北海道, 蝦夷地」で q28（榎本武揚）が上がること。<ul>
+<li>自分でルールを1行足して試す（例 <code>--rule "眼球, 目玉"</code> で q23 の夏侯惇が上がる）。</li>
+<li>q21（柴田勝家）は1行では上がりきらない（「器」と「水瓶」、「立てこもった」と「籠城」、「壊して」と「割って」の3行が要る）。</li>
+</ul>
+</li>
+<li><code>tuning.py</code>（発展）：検索の順位を人が調整する仕組み。<ul>
+<li>語の重み：<code>上杉^3</code> で上げる、<code>武田^0.2</code> で下げる（重みは正の数の倍率。1 より小さい重みで、このデータでは下がった）。</li>
+<li>項目の重み：名前の項目で当たった武将を重くする（スコアリングプロファイル）。</li>
+<li>除外の落とし穴：<code>小早川 -隆景</code> は、既定の searchMode=any では隆景が外れず、一致が 7件から 149件に増える。all にすると、プロフィールに「隆景」とある秀秋まで消える。確実に外すならフィルター。</li>
+<li>一方向の置き換え：データにない呼び名（「第六天魔王」「関白」）を武将に結ぶ。</li>
+<li>設定には、検索の要求に付けるもの（語の重み、searchMode、フィルター、使うプロファイルの名前）と、インデックスに持つもの（プロファイルの定義、項目への辞書の割り当て）がある。辞書は項目に割り当てると、検索のたびに指定しなくても効く。</li>
+</ul>
+</li>
+</ul>
+<h2 id="辞書について">辞書について</h2>
+<ul>
+<li>辞書の名前は <code>sengoku-synonyms</code>（固定）。同義語マップは AI Search 全体で3つまで（Basic）。ほかの用途で上限まで使っていて作れないときは、案内が出るので、使っていない辞書を消す。</li>
+<li>辞書を作る・変えるには、AI Search の管理者キーが要る。チームでは構築する人の設定（<code>python tools/team.py env --role builder</code>）で実行する。メンバーの設定（検索だけのキー）では、始めに「構築する人の設定で実行します」と止まる。</li>
+<li>ルールを入れ替えた直後は、しばらく古いルールで検索されることがある。スクリプトは確認用の1行（<code>kakunin…</code> で始まる行）を一緒に入れ、効き始めるまで待つ。</li>
+<li>インデックス・辞書の名前は固定で、スクリプトの始めに1回だけ決める。別の名前を渡すと、辞書やインデックスを変える前に止まる（同じ AI Search の、ほかの辞書やインデックスは変えない）。</li>
+<li>後片付け（<code>RESTORE = True</code>）。スクリプトのときは、途中で止まったときも行う。Notebook では、途中で止まったときも最後の「後片付け」のセルを実行する。<ul>
+<li><code>synonym_map.py</code>：辞書を項目から外す。辞書のルールは、このスクリプトで入れたものが残る。つないだままにすると、このあとのトピックのキーワード検索の順位も変わる。</li>
+<li><code>tuning.py</code>：実行前の状態に戻す。使った名前のプロファイルは消す（同じ名前のものが前からあれば、その定義に戻す）。辞書は実行前のルールに戻し（なかったときは消す）、項目へのつなぎも実行前のとおりにする。</li>
+</ul>
+</li>
+</ul>
+</article>
+</main>
+<footer class="bar"><a class="home" href="../index.html">← 入口に戻る</a><a class="source" href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/basic/topics/02-analyzers-synonyms/README.md">元の Markdown（GitHub）</a></footer>
+</body>
+</html>

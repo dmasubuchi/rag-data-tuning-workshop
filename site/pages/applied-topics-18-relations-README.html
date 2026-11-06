@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>18 関係で探す（紹介） | データに着目した RAG の研修</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="bar"><a class="home" href="../index.html">← 入口に戻る</a><a class="source" href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/applied/topics/18-relations/README.md">元の Markdown（GitHub）</a></header>
+<main>
+<article class="doc">
+<h1 id="18-関係で探す紹介">18 関係で探す（紹介）</h1>
+<nav class="toc"><details><summary>このページの目次</summary>
+<ul>
+<li class="l2"><a href="#何を学ぶか">何を学ぶか</a></li>
+<li class="l2"><a href="#前提">前提</a></li>
+<li class="l2"><a href="#実行">実行</a></li>
+<li class="l2"><a href="#見るところ">見るところ</a></li>
+<li class="l2"><a href="#発展graphragオントロジー紹介だけ実装しない">発展：GraphRAG・オントロジー（紹介だけ。実装しない）</a></li>
+</ul>
+</details></nav>
+
+<p>「REQ-043 に応募した人の、面接の評価の推奨は？」のような質問は、書類をまたいで、関係をたどらないと答えられません。
+求人 → 応募した人 → その人の職務経歴書・面接の評価、です。このトピックは紹介です。
+番号（ID）で2〜3段たどる方法と、1回の検索で試す方法を比べます。</p>
+<h2 id="何を学ぶか">何を学ぶか</h2>
+<ul>
+<li>採用の文書には、つなぎの番号がある<ul>
+<li>求人番号 <code>req_id</code>（REQ-043）：求人票・経歴書・メール・スキャン</li>
+<li>応募番号 <code>application_ids</code>（APP-0386）：経歴書・メール・スキャン、面接の評価の本文</li>
+<li>人物キー <code>person_keys</code>（C-115）：同じ人の別の応募をつなぐ番号</li>
+</ul>
+</li>
+<li>番号を欄で絞って、1段ずつたどる<ol>
+<li>求人票：<code>kind eq 'job_posting' and req_id eq 'REQ-043'</code></li>
+<li>応募：<code>req_id eq 'REQ-043'</code> の、求人票以外の文書にある <code>application_ids</code> を集める</li>
+<li>経歴書：<code>kind eq 'resume' and search.ismatch('APP-0386', 'application_ids', 'simple', 'any')</code></li>
+<li>面接の評価：評価の Excel のチャンクのうち、本文に <code>APP-0386</code> が出てくるものから、評価の行（評価番号・段階・推奨）を読む</li>
+</ol>
+</li>
+<li>1回のハイブリッド検索は、意味が近い文を集めるだけ。「この求人に応募した人」という関係を知らないので、足りない評価と、余計な評価が出る</li>
+<li>絞り込みは、16 の採用担当の立場（<code>allowed/any(a: search.in(a, 'role:recruiter'))</code>）。応募を横断して比べるので、採用担当の立場で実行する（面接官は、担当する応募の評価だけ見える。16）</li>
+</ul>
+<h2 id="前提">前提</h2>
+<ul>
+<li><code>pip install -r applied/requirements.txt</code>（Repo 直下で、仮想環境の中で）</li>
+<li>構築する人がインデックス <code>hr-docs</code> を作り、見てよい人（<code>allowed</code>）を付けてあること（なければ構築する人に聞く）</li>
+<li>メンバーの設定（検索だけのキー、Storage なし）で動きます</li>
+</ul>
+<h2 id="実行">実行</h2>
+<pre><code>python trace_relations.py                  # REQ-043（応募 1 件、評価 3 行）
+python trace_relations.py --req REQ-042    # 応募 5 件、評価 7 行
+python trace_relations.py --req REQ-047    # 応募 1 件、評価 2 行
+</code></pre>
+<h2 id="見るところ">見るところ</h2>
+<ul>
+<li>「0. 目録」：<code>manifest.json</code> が、応募ごとの書類と評価番号を持っている。実際の業務では、採用管理システムのデータベースにあたる</li>
+<li>「1. たどる」の表：段ごとに、絞った欄（filter の式）と、見つかったもの。前の段で見つけた番号が、次の段の式に入る。検索は 4 回（応募が何件あっても同じ）</li>
+<li>「たどった結果」：応募ごとに、評価番号・段階・推奨が決まって出る。最後に、目録の評価番号と同じかを確かめている</li>
+<li>「2. 1回の検索」：上位 5 件のチャンクに、欲しい評価の行が全部は出ず（REQ-043 では 3 行のうち 1 行）、別の求人の応募のチャンクが混ざる。表の「方法」の比べで、答えが決まるのはたどる方法だけ</li>
+<li>REQ-042 は、応募 APP-0439 が、経歴書もメールもなく、面接の評価の Excel にだけ出てくる。「目録にだけある応募」と出て、評価は下書き（未提出）。欄だけでは見つからず、本文の番号で見つかる</li>
+<li>評価の Excel は、応募番号が文書ぜんたいの欄に、6 件分まとめて入っている。このため、欄では絞れず、本文の応募番号で探している。欄の付け方で、たどり方が変わる</li>
+</ul>
+<h2 id="発展graphragオントロジー紹介だけ実装しない">発展：GraphRAG・オントロジー（紹介だけ。実装しない）</h2>
+<p>ID をたどる方法は、たどる段数・関係の種類が少ないうちは、これで足ります。関係が多く、深くなると、たどる処理を自分で書くのが大変になります。そのときの考え方が2つあります。</p>
+<ul>
+<li>GraphRAG：文書から、人・求人・組織・出来事などの「もの」と、その「関係」を LLM で取り出して、グラフ（点と線）にする。質問に答えるときに、グラフで関係をたどり、関係のまとまりの要約も使う。ID が欄に付いていない文書（メールの文面など）から関係を取り出せる反面、取り出しに LLM を使うので費用と時間がかかり、取り出し方を確かめる必要がある</li>
+<li>オントロジー：「求人」「応募」「面接の評価」などの種類と、その間の関係（応募は1つの求人に属する、評価は1つの応募に属する、など）を、先に決めておく。データをその決まりに合わせて持つので、たどる質問を、決まった形で書ける。決まりを作る手間がかかる</li>
+<li>目安：この教材のように、関係を示す番号がデータに付いていて、たどる段数が少ないなら、欄で絞る方法がまず手軽。番号がなく、文書の中の関係を探したいなら GraphRAG。関係の種類が多く、業務の決まりが固まっているなら、オントロジー</li>
+<li>18 は、ここまでの紹介です。コードで試すのは、番号をたどる方法だけです</li>
+</ul>
+</article>
+</main>
+<footer class="bar"><a class="home" href="../index.html">← 入口に戻る</a><a class="source" href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/applied/topics/18-relations/README.md">元の Markdown（GitHub）</a></footer>
+</body>
+</html>

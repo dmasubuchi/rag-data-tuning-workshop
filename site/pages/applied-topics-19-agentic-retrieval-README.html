@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>19 エージェント型検索 | データに着目した RAG の研修</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="bar"><a class="home" href="../index.html">← 入口に戻る</a><a class="source" href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/applied/topics/19-agentic-retrieval/README.md">元の Markdown（GitHub）</a></header>
+<main>
+<article class="doc">
+<h1 id="19-エージェント型検索">19 エージェント型検索</h1>
+<nav class="toc"><details><summary>このページの目次</summary>
+<ul>
+<li class="l2"><a href="#何を学ぶか">何を学ぶか</a></li>
+<li class="l2"><a href="#前提">前提</a></li>
+<li class="l2"><a href="#実行">実行</a></li>
+<li class="l2"><a href="#見るところ">見るところ</a></li>
+<li class="l2"><a href="#実際の数字の例">実際の数字の例</a></li>
+<li class="l2"><a href="#用意した質問10問">用意した質問（10問）</a></li>
+<li class="l2"><a href="#呼び出しの数1問あたり">呼び出しの数（1問あたり）</a></li>
+<li class="l2"><a href="#仕組み要求の形">仕組み（要求の形）</a></li>
+<li class="l2"><a href="#ファイル">ファイル</a></li>
+<li class="l2"><a href="#構築する人用">構築する人用</a></li>
+<li class="l2"><a href="#公式資料">公式資料</a></li>
+</ul>
+</details></nav>
+
+<p>同じ質問を、<strong>普通の検索（1回）</strong> と <strong>エージェント型検索（LLM が質問を分解して、複数回探す）</strong> で並べます。
+どちらも同じ絞り込み・同じ件数の資料を、同じプロンプトで LLM に渡して答えさせます。違うのは「資料の選ばれ方」だけです。</p>
+<blockquote>
+<p><strong>プレビューの API です。</strong> LLM を使う機能（質問の分解、考える量 low・medium・auto）はプレビューの API です。<code>low</code>・<code>medium</code> はそれより前のプレビューにもあり、
+<code>2026-08-01-preview</code> で足されたのが <code>auto</code> です。この教材は <code>auto</code> がある <code>2026-08-01-preview</code> を使います。
+仕様が変わることがあります。GA の API 版（<code>2026-04-01</code>）で使えるのは、LLM を使わない minimal だけです。
+API 版の文字列は <code>lib/agentic.py</code> の <code>API_VERSION</code> の 1 か所だけです。</p>
+</blockquote>
+<h2 id="何を学ぶか">何を学ぶか</h2>
+<ul>
+<li>知識ベース（knowledge base）は、<strong>知識ソース</strong>（検索対象のインデックス）と<strong>LLM</strong>（質問を分解するモデル）をまとめた AI Search の部品<ul>
+<li>知識ソース <code>hr-docs-ks</code>：インデックス <code>hr-docs</code> を指す</li>
+<li>知識ベース <code>hr-docs-kb</code>：知識ソースと LLM をまとめたもの（LLM は Azure OpenAI のキーで呼ぶ）。モデル名は <code>.env.local</code> の <code>AZURE_OPENAI_CHAT_MODEL</code>（既定 <code>gpt-5-mini</code>）、デプロイ名は <code>AZURE_OPENAI_CHAT_DEPLOYMENT</code> から読む</li>
+</ul>
+</li>
+<li>質問を渡すと、LLM が検索文に<strong>分解</strong>し、複数回探して、結果をまとめて返す。返事には3つが入る<ul>
+<li><code>response</code>：根拠の断片（この Repo では、断片を取り出すだけの <code>extractiveData</code>。答えは別に LLM に作らせる）</li>
+<li><code>activity</code>：検索の記録。<code>modelQueryPlanning</code>（分解に使ったトークンと時間）、<code>searchIndex</code>（検索1回ごとの記録。検索文が入る）</li>
+<li><code>references</code>：出典。<code>docKey</code> が索引のチャンクのキー、<code>activitySource</code> がその出典を見つけた検索の記録の番号</li>
+</ul>
+</li>
+<li>分解された検索文は、<code>activity</code> の <code>searchIndex</code> の記録の <code>searchIndexArguments.search</code> にある。<strong>検索の回数は、この記録の数</strong>（回数そのものの欄はない）</li>
+<li>考える量（<code>retrievalReasoningEffort</code>）で、どれだけ考えてから探すかが変わる<ul>
+<li><code>minimal</code>：LLM を使わない。質問をそのまま検索文にする（<code>messages</code> でなく <code>intents</code> で渡す）</li>
+<li><code>low</code>：LLM が質問を分解する（何も指定しないときの既定）</li>
+<li><code>medium</code>：<code>low</code> のあと、結果を見て足りなければ、見直した計画でもう1回やり直す</li>
+<li><code>auto</code>：まず軽く探し、足りなければ <code>medium</code> まで上げる（<code>2026-08-01-preview</code> で足された。LLM を呼ぶ回数は質問ごとに変わる）</li>
+</ul>
+</li>
+<li>情報が欠けた人の扱い：データに書類がない人（たとえば面接の評価がない応募者）について、答えが「資料にありません」と書けるか</li>
+</ul>
+<h2 id="前提">前提</h2>
+<ul>
+<li><code>pip install -r applied/requirements.txt</code>（Repo 直下で、仮想環境の中で）</li>
+<li>構築する人がインデックス <code>hr-docs</code> と、知識ベース <code>hr-docs-kb</code> を作ってあること（なければ構築する人に聞く）。メンバーは読むだけで、何も作りません</li>
+<li>メンバーの設定（検索だけのキー、Storage なし）で動きます。ただし、知識ベースの retrieve が検索だけのキーで通るかは、実機で確かめていません（通らないときは、構築する人の設定で動かします）</li>
+</ul>
+<h2 id="実行">実行</h2>
+<pre><code>python compare_search.py                       ① と ② を並べる（既定の質問 q01）
+python compare_search.py --id q07              用意した質問の別の1問
+python compare_search.py --question "市川さんの二次面接はいつでしたか"     自分の質問
+python compare_search.py --effort medium       ② の考える量を変える
+python effort_levels.py                        考える量を変えて比べる（答えは作らない）
+python effort_levels.py --id q02 --efforts minimal low
+python make_answers.py                         （進行役）10問 × 2方式 × 3回の答えを作って保存する
+</code></pre>
+<h2 id="見るところ">見るところ</h2>
+<ul>
+<li><code>compare_search.py</code><ul>
+<li>② の「質問の分解」の表：元の質問に対して、LLM がどんな検索文に分けたか。検索の回数（<code>low</code> では3つ前後に分けることが多い）</li>
+<li>② の「出典」の表：答えに渡した資料と、「見つけた検索文」（どの検索文がどの資料を見つけたか）</li>
+<li>「方式の比べ」：検索の回数・分解（LLM）・時間・トークン。② は分解の分だけ増える</li>
+<li>「誰の資料が入ったか」：データにある書類（左）に対して、① ② の資料にその人の書類が入っているか。<strong>書類がない人（評価の行が 0 など）は、入りようがない。答えが「資料にありません」と書けているかを、答えの文で確かめる</strong></li>
+<li>① と ② の答えを読み比べる。<strong>② が必ず良いとは限らない</strong>（資料の選ばれ方が変わるだけで、LLM の答え方のぶれもある）</li>
+</ul>
+</li>
+<li><code>effort_levels.py</code><ul>
+<li>「考える量ごとの比べ」：検索文の数・検索の回数・LLM の呼び出し・時間・トークン<ul>
+<li><code>minimal</code> は LLM の呼び出し 0 回・検索 1 回。<code>low</code> は LLM 1 回・検索 3 回前後。<code>medium</code> は結果を見てやり直すと、LLM 2 回・検索 6 回前後に増え、時間も長くなる（やり直さないこともある）</li>
+<li>「検索側のトークン」は AI Search が数えるトークン（<code>reasoningTokens</code>。LLM のトークンとは別）</li>
+</ul>
+</li>
+<li>「同じ資料が選ばれたか」：考える量を上げると、選ばれる資料が変わる。変わっても答えが良くなるとは限らない（20 で点数にして確かめる）</li>
+<li>最後に GA の API（<code>2026-04-01</code>）で <code>minimal</code> を呼ぶ。LLM は 0 回</li>
+<li>分解は実行するたびに少しずつ変わる（LLM の出力だから）</li>
+</ul>
+</li>
+<li><code>make_answers.py</code>（進行役用）：方式ごとの平均（検索の回数・時間・トークン）と、質問ごとの分解</li>
+</ul>
+<h2 id="実際の数字の例">実際の数字の例</h2>
+<p>教材を作ったときの測定（答えに渡す資料 10 件）。<strong>実行のたびに少し変わります</strong>（分解は LLM の出力だから）。モデルが違えば、数字も変わります。</p>
+<ul>
+<li>10 問 × 3 回（30 件ずつ）の平均（1件あたり）<ul>
+<li>① 普通の検索：検索 1 回、2.2 秒、LLM のトークン 入力 2,596 / 出力 281（答えの生成だけ）</li>
+<li>② エージェント型検索：検索 3 回（質問の分解は 1 回）、3.3 秒、入力 3,509 / 出力 337（分解 約 960 / 60 ＋ 答えの生成）</li>
+<li><code>low</code> では、どの質問も検索文は 3 つに分かれた。「REQ-042 大西 明日香 一次面接 評価」「REQ-042 大西 明日香 職務経歴書」「大西 明日香」のように、質問の中の「聞きたいこと」ごとに分かれる</li>
+</ul>
+</li>
+<li>
+<p><code>effort_levels.py</code>（q10 の例）</p>
+<ul>
+<li><code>minimal</code>：検索 1 回、LLM 0 回、0.3 秒</li>
+<li><code>low</code>：検索 3 回、LLM 1 回（入力 963 / 出力 64）、1.4 秒</li>
+<li><code>medium</code>：検索 6 回、LLM 2 回（入力 4,404 / 出力 249。2 回目は 1 回目の結果を読むので入力が増える）、3.8 秒</li>
+<li><code>auto</code>：検索 4 回、LLM 1 回、1.9 秒（最初に質問そのままで探し、そのあと分解した）</li>
+<li>GA の API で <code>minimal</code>：検索 1 回、LLM 0 回。件数の上限がないので資料が 19 件返った</li>
+</ul>
+</li>
+<li>
+<p>答えの良し悪しは、② が必ず良いわけではない。20 で採点すると、質問ごとに勝ち負けが入れ替わる（q03 は ②、q07 は ① が良い）</p>
+</li>
+</ul>
+<h2 id="用意した質問10問">用意した質問（10問）</h2>
+<p><code>questions.json</code> に、質問と「答えに入っているべき要点」（<code>expect</code>）があります。要点は教材を作るときに資料から作ったもので、20 の採点に使います。
+複数の文書をまたぐ質問を中心にしています。</p>
+<ul>
+<li>q01 REQ-043 の最終面接に進んだ人の評価と、内定の連絡の日付は？（評価の Excel・選考履歴・連絡メール）</li>
+<li>q02 REQ-042 の応募者のうち、面接の評価がまだない人はいますか。いれば、今の段階も教えてください。（情報が欠けた人）</li>
+<li>q03 REQ-042 の大西 明日香さんの一次面接の評価と、職務経歴書の内容を教えてください。（評価は下書き、経歴書はない）</li>
+<li>q04 REQ-042 の二次面接を受けた人のうち、評価が高かった人と見送りになった人で、評価の中身はどう違いましたか。</li>
+<li>q05 市川 浩二さんは、REQ-042 の必須条件と歓迎条件を満たしていますか。経歴書と面接の評価から教えてください。</li>
+<li>q06 岩崎 俊介さん（APP-0417）は、REQ-042 の必須条件のうち、面接でまだ確認できていないものはありますか。</li>
+<li>q07 REQ-042 に応募している岩崎さんは2人います。それぞれ今どの段階で、次に何がありますか。（名前が似た2人）</li>
+<li>q08 石田 裕太さんの入社予定日と、内定承諾書の日付、承諾書の提出期限を教えてください。（スキャンの OCR とメール）</li>
+<li>q09 中島 美和さんの最終面接の候補日と、二次面接の評価を教えてください。</li>
+<li>q10 REQ-042 の応募者のうち、夜間の障害対応の経験がある人はだれですか。根拠になった書類も教えてください。（4種類の書類を人ごとに集める）</li>
+</ul>
+<p>自分の質問は <code>--question "…"</code>（または各スクリプトの先頭の <code>QUESTION</code>）で試せます。質問に求人番号（REQ-042）や応募番号、人の名前を入れると探しやすくなります。</p>
+<h2 id="呼び出しの数1問あたり">呼び出しの数（1問あたり）</h2>
+<p>メンバーが同時に動かしても困らない数にしてあります（Azure OpenAI の呼び出しは、<code>compare_search.py</code> で 3 回、<code>effort_levels.py</code> で 4 回）。
+混み合って断られた（429）ときは、自動で少し待ってやり直します。</p>
+<ul>
+<li><code>compare_search.py</code> 1回<ul>
+<li>AI Search：普通の検索 1 回、知識ベース 1 回（知識ベースの中で検索が 3 回前後）</li>
+<li>Azure OpenAI：質問の分解 1 回（約 1,000 トークン）、答えの生成 2 回（約 2,700 トークンずつ）。合計 3 回、約 7,000 トークン</li>
+</ul>
+</li>
+<li><code>effort_levels.py</code> 1回（4つの考える量）<ul>
+<li>AI Search：知識ベース 4 回＋ GA の API で 1 回</li>
+<li>Azure OpenAI：質問の分解だけ。<code>low</code> は 1 回、<code>medium</code> と <code>auto</code> は結果を見て続けるので回数が変わる（実測では <code>medium</code> 2 回、<code>auto</code> 1 回で、合計 4 回、約 7,000 トークン）。答えの生成はしない</li>
+</ul>
+</li>
+<li><code>make_answers.py</code>（進行役。10 問 × 3 回）<ul>
+<li>Azure OpenAI：答えの生成 60 回＋質問の分解 30 回。約 18 万入力 / 1.9 万出力トークン</li>
+<li>AI Search：普通の検索 30 回、知識ベース 30 回</li>
+<li>参加者が動かすときは、<code>--only q01 q03</code>（質問を絞る）か <code>--runs 1</code> にする</li>
+</ul>
+</li>
+</ul>
+<h2 id="仕組み要求の形">仕組み（要求の形）</h2>
+<p>知識ベースの retrieve は REST で呼びます（<code>lib/agentic.py</code>。ヘッダーは <code>api-key</code>）。</p>
+<pre><code>POST {検索サービス}/knowledgebases/hr-docs-kb/retrieve?api-version=2026-08-01-preview
+{
+  "messages": [{"role": "user", "content": [{"type": "text", "text": "質問"}]}],   ← minimal のときは "intents": [{"type": "semantic", "search": "質問"}]
+  "retrievalReasoningEffort": {"kind": "low"},
+  "outputMode": "extractiveData",
+  "includeActivity": true,
+  "maxOutputDocuments": 10,
+  "knowledgeSourceParams": [{
+    "kind": "searchIndex", "knowledgeSourceName": "hr-docs-ks",
+    "filterAddOn": "allowed/any(a: search.in(a, 'role:recruiter'))",
+    "includeReferences": true, "includeReferenceSourceData": true
+  }]
+}
+</code></pre>
+<ul>
+<li><code>filterAddOn</code>：普通の検索の <code>filter</code> と同じ絞り込みを、知識ベースにも掛ける（16 で学んだ「見てよい人」の絞り込み）</li>
+<li><code>maxOutputDocuments</code>：返す資料の件数。普通の検索の <code>top</code> とそろえる</li>
+<li>GA の API（<code>2026-04-01</code>）の retrieve は <code>intents</code> と <code>knowledgeSourceParams</code> と <code>includeActivity</code> だけ。<code>retrievalReasoningEffort</code>・<code>outputMode</code>・<code>maxOutputDocuments</code> を付けると 400 になる</li>
+</ul>
+<h2 id="ファイル">ファイル</h2>
+<ul>
+<li><code>compare_search.py</code>：同じ質問を ① 普通の検索と ② エージェント型検索で並べる（メンバーも動かす）</li>
+<li><code>effort_levels.py</code>：考える量を変えて比べる（メンバーも動かす）</li>
+<li><code>make_answers.py</code>：10問の答えを作って保存する（進行役）</li>
+<li><code>questions.json</code>：用意した質問 10 問と、答えに入っているべき要点</li>
+<li><code>../../lib/agentic.py</code>：知識ベースの定義、retrieve の要求と結果の読み取り、普通の検索、答えの生成、答えの保存</li>
+<li><code>../../tools/build_hr_kb.py</code>：知識ソース・知識ベースを作る（構築する人）</li>
+<li>保存：<code>applied/_work/19_answers.json</code>（質問・方式・回・答え・渡した資料。Git には入りません）</li>
+</ul>
+<h2 id="構築する人用">構築する人用</h2>
+<p>Repo 直下で、構築する人の <code>.env.local</code> で実行します。</p>
+<pre><code>python applied/tools/build_hr_kb.py             知識ソースと知識ベースを作る（あれば更新）。最後に動作確認（LLM 1 回）
+python applied/tools/build_hr_kb.py --status    いまの状態を見る（何も変えない）
+python applied/tools/build_hr_kb.py --recreate  消してから作り直す
+python applied/tools/build_hr_kb.py --delete    消す
+</code></pre>
+<ul>
+<li>知識ベースの LLM は、<code>.env.local</code> の Azure OpenAI のキーを知識ベースに登録して呼びます（<code>azureOpenAIParameters.apiKey</code>）。マネージド ID やロールの割り当ては使いません</li>
+<li>モデル名（<code>modelName</code>）は <code>AZURE_OPENAI_CHAT_MODEL</code>、デプロイ名（<code>deploymentId</code>）は <code>AZURE_OPENAI_CHAT_DEPLOYMENT</code> から読みます。このモデルで知識ベースが動くかは、実機で確かめてください</li>
+<li>扱うのは <code>hr-docs-ks</code> と <code>hr-docs-kb</code> だけです。インデックス・インデクサー・Storage には触りません</li>
+<li>知識ソースの数・知識ベースの数は、AI Search 全体で各 15 まで（Basic）。この教材は 1 つずつ使います</li>
+<li>前提：<code>hr-docs</code> の各チャンクに <code>allowed</code>（見てよい人）が付いていること。付いていないと、絞り込みで 1 件も返りません</li>
+</ul>
+<h2 id="公式資料">公式資料</h2>
+<ul>
+<li>エージェント型検索の概要：<a href="https://learn.microsoft.com/en-us/azure/search/agentic-retrieval-overview">https://learn.microsoft.com/en-us/azure/search/agentic-retrieval-overview</a></li>
+<li>知識ベースを作る：<a href="https://learn.microsoft.com/en-us/azure/search/agentic-retrieval-how-to-create-knowledge-base">https://learn.microsoft.com/en-us/azure/search/agentic-retrieval-how-to-create-knowledge-base</a></li>
+<li>知識ベースに質問する（retrieve）：<a href="https://learn.microsoft.com/en-us/azure/search/agentic-retrieval-how-to-retrieve">https://learn.microsoft.com/en-us/azure/search/agentic-retrieval-how-to-retrieve</a></li>
+<li>考える量：<a href="https://learn.microsoft.com/en-us/azure/search/agentic-retrieval-how-to-set-retrieval-reasoning-effort">https://learn.microsoft.com/en-us/azure/search/agentic-retrieval-how-to-set-retrieval-reasoning-effort</a></li>
+</ul>
+</article>
+</main>
+<footer class="bar"><a class="home" href="../index.html">← 入口に戻る</a><a class="source" href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/applied/topics/19-agentic-retrieval/README.md">元の Markdown（GitHub）</a></footer>
+</body>
+</html>

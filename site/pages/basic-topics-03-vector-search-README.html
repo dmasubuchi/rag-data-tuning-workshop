@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>03 ベクトル検索 | データに着目した RAG の研修</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="bar"><a class="home" href="../index.html">← 入口に戻る</a><a class="source" href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/basic/topics/03-vector-search/README.md">元の Markdown（GitHub）</a></header>
+<main>
+<article class="doc">
+<h1 id="03-ベクトル検索">03 ベクトル検索</h1>
+<nav class="toc"><details><summary>このページの目次</summary>
+<ul>
+<li class="l2"><a href="#学ぶこと">学ぶこと</a></li>
+<li class="l2"><a href="#前提">前提</a></li>
+<li class="l2"><a href="#実行するコマンドこのフォルダで">実行するコマンド（このフォルダで）</a></li>
+<li class="l2"><a href="#何を見ればよいか">何を見ればよいか</a></li>
+<li class="l2"><a href="#演習">演習</a></li>
+<li class="l2"><a href="#次のトピック">次のトピック</a></li>
+</ul>
+</details></nav>
+
+<h2 id="学ぶこと">学ぶこと</h2>
+<ul>
+<li>文を埋め込み（数の並び）にして、意味が近い文書を探す</li>
+<li>質問と本文の言葉が違っても、意味が近ければ見つかる（キーワード検索が外れた質問で確かめる）</li>
+<li>ベクトル検索も万能ではない。スコアは方式のあいだで比べない</li>
+</ul>
+<h2 id="前提">前提</h2>
+<ul>
+<li><code>../01-keyword-search</code> が終わっていること（武将のインデックスと、登録した武将）</li>
+<li><code>embed.py</code> は、AI Search の管理者キーが要るので、構築する人の設定（<code>--role builder</code>）で実行する。メンバーの設定（検索だけのキー）では、「構築する人の設定で実行します」と止まる。<code>vector_search.py</code> は、メンバーの設定でもできる</li>
+<li>足りないときは、<code>python ../../tools/reset.py --to 03</code>（スクリプトの先頭の <code>REBUILD = True</code>、スクリプトでは <code>--rebuild</code> でも作り直せる。Notebook では、作り直したら <code>REBUILD = False</code> に戻す。<code>True</code> のままだと、実行のたびに作り直す）</li>
+</ul>
+<h2 id="実行するコマンドこのフォルダで">実行するコマンド（このフォルダで）</h2>
+<p>必須（この順に）</p>
+<ul>
+<li><code>python embed.py</code>　ベクトルの項目を足し、武将を埋め込んで登録する（Azure OpenAI で埋め込む）<ul>
+<li>時間が足りないときは <code>python embed.py --use-file</code>（同梱の埋め込み済みファイルを使う）</li>
+<li>登録のあと、ベクトルが検索に出てくるまで待つ（反映に少しかかる。30秒で揃わなければ止まるので、少し待ってもう一度実行する）</li>
+</ul>
+</li>
+<li><code>python vector_search.py</code>　01 の <code>search_paraphrase.py</code> と同じ質問を、ベクトル検索で実行する</li>
+</ul>
+<p>発展</p>
+<ul>
+<li><code>python peek_vector.py</code>　埋め込んだ数の並びの最初の 10 個と、質問との近さ（コサイン類似度）</li>
+</ul>
+<p>Notebook でも、同じファイルを上から順にセルで実行できます。<code>--q</code> などの引数に当たるものは、先頭の「変えてよい値」のセルの変数（<code>QUESTION</code>、<code>USE_FILE = True</code> など）で指定します。</p>
+<h2 id="何を見ればよいか">何を見ればよいか</h2>
+<ul>
+<li><code>embed.py</code>：インデックスにベクトルの項目（<code>profile_vector</code>、1536 次元）が足される。セマンティックランカー用の設定も、ここで足す（04 で使う）</li>
+<li><code>vector_search.py</code>：同じ質問で、正解の武将の順位がキーワード検索と比べてどう変わるか</li>
+<li><code>peek_vector.py</code>：数の一つひとつに意味はなく、向きの近さだけが意味の近さの目安</li>
+</ul>
+<h2 id="演習">演習</h2>
+<ul>
+<li><code>vector_search.py --q "自分で考えた言い換え"</code> で、キーワードとベクトルを比べる</li>
+</ul>
+<h2 id="次のトピック">次のトピック</h2>
+<ul>
+<li><code>../04-hybrid-ranker</code></li>
+</ul>
+</article>
+</main>
+<footer class="bar"><a class="home" href="../index.html">← 入口に戻る</a><a class="source" href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/basic/topics/03-vector-search/README.md">元の Markdown（GitHub）</a></footer>
+</body>
+</html>

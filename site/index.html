@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>データに着目した RAG の研修</title>
+<link rel="stylesheet" href="pages/style.css">
+</head>
+<body class="portal">
+<main>
+<header class="hero">
+<h1>データに着目した RAG の研修</h1>
+<p class="lead">検索の基盤の上にある、データの加工・運営・評価を、手を動かして学びます。</p>
+</header>
+
+<section>
+<h2>この研修について</h2>
+<dl>
+<dt>何を学ぶか</dt>
+<dd>基盤（Azure AI Search）を作るだけでは、よい検索になりません。データに合わせて検索を組み、結果を数字で測り、直します。この繰り返しを、ホテル・戦国武将・採用の文書で体験します。</dd>
+<dt>RAG の R</dt>
+<dd>R は Retrieve、取ってくるの R です。集める、順位を付ける、段階的に探す。この考え方が土台です。</dd>
+<dt>だれ向けか</dt>
+<dd>Azure の SI パートナー（とくにインフラ寄りの人）、企業の情報システム部門・DX 推進、データ・IR・BI・分析の担当。</dd>
+</dl>
+</section>
+
+<section>
+<h2>始め方</h2>
+<p>手順書を、番号の順に進めます。チームで進め、1人が構築する人、ほかの人はメンバーになります。</p>
+<ol class="links">
+<li><a href="pages/guide-setup-windows-pc.html">Windows PC の設定</a><span class="note">Git・Python・az・VS Code を確かめる</span></li>
+<li><a href="pages/guide-setup-azure-setup.html">Azure の準備</a><span class="note">チームの名前を決め、ポータルでリソースを作り、接続の設定 <code>.env.local</code> を作る</span></li>
+<li><a href="pages/guide-hotel.html">ホテル</a><span class="note">ホテルのデータで、Azure AI Search をポータルで作って試す。Cosmos DB のベクトル検索も</span></li>
+<li><a href="pages/guide-sengoku.html">武将</a><span class="note">基礎編（01〜06）。キーワード検索からベクトル検索、ハイブリッド、答えの生成まで</span></li>
+<li><a href="pages/guide-hr.html">応用（人事）</a><span class="note">応用編（14〜20）と採用アシスタント。採用の文書で、業務の検索を見る</span></li>
+<li><a href="pages/guide-search-demo.html">検索デモ</a><span class="note">条件を変えると結果が変わるのを、AI Search だけで見る</span></li>
+<li><a href="pages/guide-facilitator.html">進行役の手引き</a><span class="note">開始前の準備、パートの順、各パートで見せるもの、つまずきやすい所</span></li>
+</ol>
+<p class="more"><a href="pages/guide-README.html">手順書の一覧</a></p>
+</section>
+
+<section>
+<h2>スライド</h2>
+<p>仕組みはスライドで見て、各ページの下の「確かめる」が指すトピックで、手元で確かめます。</p>
+<p><a class="button" href="lecture/index.html">HTML のスライドを開く</a></p>
+<p class="more"><a href="pages/docs-lecture-README.html">スライドの原稿と作り方</a></p>
+<h3>読む形のスライド</h3>
+<p>同じ内容を、文章と図のページにしたものです。</p>
+<ul class="links">
+<li><a href="pages/docs-lecture-md-index.html">目次</a></li>
+<li><a href="pages/docs-lecture-md-intro.html">はじめに：研修の進め方</a><span class="note">チームの役割、clone から動かすまで、スクリプトと Notebook、部とトピックの対応</span></li>
+<li><a href="pages/docs-lecture-md-part1-search.html">第1部 検索方法</a><span class="note">キーワード検索、ベクトル検索、ハイブリッド、ランカーと、その中の仕組み</span></li>
+<li><a href="pages/docs-lecture-md-part2-ingestion.html">第2部 取り込み</a><span class="note">読む、ばらす、切る、出典、索引の順番と、Azure の取り込みの仕組み</span></li>
+<li><a href="pages/docs-lecture-md-part3-relations-agentic.html">第3部 関係とエージェント型検索</a><span class="note">文書どうしの関係をたどる検索と、質問を分解して何度も検索するエージェント型検索</span></li>
+<li><a href="pages/docs-lecture-md-part4-evaluation.html">評価</a><span class="note">検索の評価と回答の評価を分けて測る</span></li>
+<li><a href="pages/docs-lecture-md-part5-wrapup.html">比較と締め</a><span class="note">作り方の比較、RAG の流れと出典、うまくいかない場面、プレビューと料金</span></li>
+</ul>
+</section>
+
+<section>
+<h2>基礎編・応用編</h2>
+<p>トピックの番号は、基礎編が 01〜06、応用編が 14〜20 です。06 の次は 14 で、07〜13 はありません。</p>
+<ul class="links">
+<li><a href="pages/basic-README.html">基礎編：検索と RAG を自分の手で動かす</a></li>
+<li><a href="pages/applied-README.html">応用編：採用の文書で、業務の検索を体験する</a></li>
+<li><a href="pages/applied-assistant-README.html">採用アシスタント</a></li>
+<li><a href="pages/applied-data-README.html">応用編で使う採用の文書</a></li>
+</ul>
+<div class="cols">
+<div>
+<h3>基礎編のトピック</h3>
+<ul class="links">
+<li><a href="pages/basic-topics-01-keyword-search-README.html">01 キーワード検索</a></li>
+<li><a href="pages/basic-topics-02-analyzers-synonyms-README.html">02 言い換えと日本語の分かれ方</a></li>
+<li><a href="pages/basic-topics-03-vector-search-README.html">03 ベクトル検索</a></li>
+<li><a href="pages/basic-topics-04-hybrid-ranker-README.html">04 ハイブリッド検索とセマンティックランカー</a></li>
+<li><a href="pages/basic-topics-05-measure-search-README.html">05 検索の良し悪しを数字で測る</a></li>
+<li><a href="pages/basic-topics-06-answer-from-results-README.html">06 検索結果から答えを作る</a></li>
+</ul>
+</div>
+<div>
+<h3>応用編のトピック</h3>
+<ul class="links">
+<li><a href="pages/applied-topics-14-mixed-documents-README.html">14 種類の違う文書をまとめて取り込む</a></li>
+<li><a href="pages/applied-topics-15-azure-indexer-README.html">15 Azure の仕組みに置き換える</a></li>
+<li><a href="pages/applied-topics-16-security-filter-README.html">16 見せてよい人で絞る</a></li>
+<li><a href="pages/applied-topics-17-update-delete-README.html">17 更新と削除</a></li>
+<li><a href="pages/applied-topics-18-relations-README.html">18 関係で探す（紹介）</a></li>
+<li><a href="pages/applied-topics-19-agentic-retrieval-README.html">19 エージェント型検索</a></li>
+<li><a href="pages/applied-topics-20-answer-evaluation-README.html">20 答えを評価する</a></li>
+</ul>
+</div>
+</div>
+</section>
+
+<section>
+<h2>ソース</h2>
+<p>ここのページは、すべて Repo の Markdown から作っています。元のファイルは GitHub にあります。</p>
+<ul class="links">
+<li><a href="https://github.com/dmasubuchi/rag-data-tuning-workshop">github.com/dmasubuchi/rag-data-tuning-workshop</a><span class="note">Repo のトップ</span></li>
+<li><a href="pages/README.html">README</a><span class="note">Repo の README</span></li>
+<li><a href="https://github.com/dmasubuchi/rag-data-tuning-workshop/tree/main/guide">guide</a><span class="note">手順書（Markdown）</span></li>
+<li><a href="https://github.com/dmasubuchi/rag-data-tuning-workshop/tree/main/basic">basic</a><span class="note">基礎編のスクリプト・Notebook・データ</span></li>
+<li><a href="https://github.com/dmasubuchi/rag-data-tuning-workshop/tree/main/applied">applied</a><span class="note">応用編のスクリプト・Notebook・データ</span></li>
+<li><a href="https://github.com/dmasubuchi/rag-data-tuning-workshop/tree/main/docs/lecture">docs/lecture</a><span class="note">スライドの原稿と、作る道具</span></li>
+<li><a href="https://github.com/dmasubuchi/rag-data-tuning-workshop/tree/main/tools">tools</a><span class="note">チームを作る道具、ページを作る道具</span></li>
+<li><a href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/NOTICE.md">NOTICE.md</a><span class="note">データの出どころ、ライセンスの注意</span></li>
+<li><a href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/LICENSE">LICENSE</a><span class="note">コードのライセンス</span></li>
+<li><a href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/LICENSE-docs.md">LICENSE-docs.md</a><span class="note">文書のライセンス</span></li>
+</ul>
+</section>
+</main>
+</body>
+</html>

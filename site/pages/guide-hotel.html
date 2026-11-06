@@ -1,0 +1,1190 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>ホテル：Azure の検索を、ポータルで作る | データに着目した RAG の研修</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="bar"><a class="home" href="../index.html">← 入口に戻る</a><a class="source" href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/guide/hotel.md">元の Markdown（GitHub）</a></header>
+<main>
+<article class="doc">
+<h1 id="ホテルazure-の検索をポータルで作る">ホテル：Azure の検索を、ポータルで作る</h1>
+<nav class="toc"><details><summary>このページの目次</summary>
+<ul>
+<li class="l2"><a href="#0-この手順の使い方">0. この手順の使い方</a></li>
+<li class="l3"><a href="#役割">役割</a></li>
+<li class="l3"><a href="#前提">前提</a></li>
+<li class="l3"><a href="#名前">名前</a></li>
+<li class="l3"><a href="#使うファイル">使うファイル</a></li>
+<li class="l3"><a href="#確認の欄">確認の欄</a></li>
+<li class="l3"><a href="#全体の流れ">全体の流れ</a></li>
+<li class="l2"><a href="#1-リソースを作る">1. リソースを作る</a></li>
+<li class="l2"><a href="#2-blob-のホテルを-ai-search-に取り込む">2. Blob のホテルを AI Search に取り込む</a></li>
+<li class="l3"><a href="#2-1-ai-search-のマネージド-id-をオンにする">2-1. AI Search のマネージド ID をオンにする</a></li>
+<li class="l3"><a href="#2-2-blob-を読む権限を付ける">2-2. Blob を読む権限を付ける</a></li>
+<li class="l3"><a href="#2-3-ホテルの-json-を-blob-に置く">2-3. ホテルの JSON を Blob に置く</a></li>
+<li class="l3"><a href="#2-4-インデックスを作る">2-4. インデックスを作る</a></li>
+<li class="l3"><a href="#2-5-データソースを作る">2-5. データソースを作る</a></li>
+<li class="l3"><a href="#2-6-インデクサーを作る">2-6. インデクサーを作る</a></li>
+<li class="l3"><a href="#2-7-取り込みと5分ごとの取り込みを確かめる">2-7. 取り込みと、5分ごとの取り込みを確かめる</a></li>
+<li class="l2"><a href="#3-6つの機能を試す">3. 6つの機能を試す</a></li>
+<li class="l3"><a href="#3-0-検索エクスプローラーを開く">3-0. 検索エクスプローラーを開く</a></li>
+<li class="l3"><a href="#3-1-自動取り込み">3-1. 自動取り込み</a></li>
+<li class="l3"><a href="#3-2-キーワード検索">3-2. キーワード検索</a></li>
+<li class="l3"><a href="#3-3-フィルタ検索">3-3. フィルタ検索</a></li>
+<li class="l3"><a href="#3-4-地理検索">3-4. 地理検索</a></li>
+<li class="l3"><a href="#3-5-ファセット集計">3-5. ファセット（集計）</a></li>
+<li class="l3"><a href="#3-6-ソート">3-6. ソート</a></li>
+<li class="l2"><a href="#4-cosmos-db-のベクトル検索">4. Cosmos DB のベクトル検索</a></li>
+<li class="l3"><a href="#4-1-ベクトル検索の機能を有効にする">4-1. ベクトル検索の機能を有効にする</a></li>
+<li class="l3"><a href="#4-2-データベースとコンテナーを作る">4-2. データベースとコンテナーを作る</a></li>
+<li class="l3"><a href="#4-3-ベクトルを足してホテルを入れる">4-3. ベクトルを足して、ホテルを入れる</a></li>
+<li class="l3"><a href="#4-4-検索文のベクトルを用意する">4-4. 検索文のベクトルを用意する</a></li>
+<li class="l3"><a href="#4-5-自然文で検索する">4-5. 自然文で検索する</a></li>
+<li class="l3"><a href="#4-6-条件をつけて検索する">4-6. 条件をつけて検索する</a></li>
+<li class="l3"><a href="#4-7-2つのコンテナーを比べる">4-7. 2つのコンテナーを比べる</a></li>
+<li class="l3"><a href="#4-8-距離の種類を変える">4-8. 距離の種類を変える</a></li>
+<li class="l3"><a href="#4-9-全走査で確かめる">4-9. 全走査で確かめる</a></li>
+<li class="l2"><a href="#5-cosmos-db-のホテルを-ai-search-に取り込む">5. Cosmos DB のホテルを AI Search に取り込む</a></li>
+<li class="l3"><a href="#5-1-search-に-cosmos-db-を読む権限を付ける">5-1. Search に Cosmos DB を読む権限を付ける</a></li>
+<li class="l3"><a href="#5-2-インデックス-hotels-cosmos-を作る">5-2. インデックス hotels-cosmos を作る</a></li>
+<li class="l3"><a href="#5-3-データソース-hotels-cosmos-ds-を作る">5-3. データソース hotels-cosmos-ds を作る</a></li>
+<li class="l3"><a href="#5-4-インデクサー-hotels-cosmos-indexer-を作る">5-4. インデクサー hotels-cosmos-indexer を作る</a></li>
+<li class="l3"><a href="#5-5-取り込みを確かめる">5-5. 取り込みを確かめる</a></li>
+<li class="l3"><a href="#5-6-search-で検索する">5-6. Search で検索する</a></li>
+<li class="l3"><a href="#5-7-章5の確認">5-7. 章5の確認</a></li>
+<li class="l2"><a href="#6-つまずいたとき">6. つまずいたとき</a></li>
+</ul>
+</details></nav>
+
+<p>Microsoft のホテルのサンプルデータ（日本語版）で、Azure AI Search を作って試す自習用の手順です。画面の操作を中心に、1章から順に進めます。</p>
+<h2 id="0-この手順の使い方">0. この手順の使い方</h2>
+<h3 id="役割">役割</h3>
+<ul>
+<li>構築する人（チームで1人）が、ポータルの画面を操作します。</li>
+<li>ほかのメンバーは、手順を声に出して読み、画面と合っているか確かめます。</li>
+<li>ボタンが押せないとき、画面が書いてあるとおりでないときは、進行役に聞きます。</li>
+</ul>
+<h3 id="前提">前提</h3>
+<ul>
+<li><a href="guide-setup-azure-setup.html">Azure の準備</a>が終わっている（リソース グループ、ストレージ、AI Search、Cosmos DB、Foundry、モデルのデプロイ）。</li>
+<li>構築する人が、Azure で「所有者」になっている（ロールの割り当てに使います）。</li>
+<li>1〜3章で使うのは、ストレージと AI Search です。4〜5章は、Cosmos DB と、埋め込みのモデル（Foundry）も使います。</li>
+</ul>
+<h3 id="名前">名前</h3>
+<p>手順の中の <code>&lt;org&gt;</code>・<code>&lt;team&gt;</code> は、組織の名前とチームの名前に置き換えます。リソースの名前は、<code>python tools/team.py names</code> で表示できます。</p>
+<p>例は、組織が <code>acme</code>、チームが <code>red</code> のときです。</p>
+<ul>
+<li>リソース グループ：<code>rg-&lt;org&gt;-&lt;team&gt;</code>（例 <code>rg-acme-red</code>）</li>
+<li>ストレージ アカウント：<code>st&lt;org&gt;&lt;team&gt;</code>（例 <code>stacmered</code>）</li>
+<li>AI Search：<code>srch-&lt;org&gt;-&lt;team&gt;</code>（例 <code>srch-acme-red</code>）</li>
+<li>Cosmos DB：<code>cosmos-&lt;org&gt;-&lt;team&gt;</code>（例 <code>cosmos-acme-red</code>）</li>
+</ul>
+<p>どのチームでも同じ名前を使うもの：</p>
+<ul>
+<li>ストレージのコンテナー：<code>hotels</code></li>
+<li>検索のインデックス：<code>hotels-blob</code>、<code>hotels-cosmos</code></li>
+<li>検索のデータソース：<code>hotels-blob-ds</code>、<code>hotels-cosmos-ds</code></li>
+<li>検索のインデクサー：<code>hotels-blob-indexer</code>、<code>hotels-cosmos-indexer</code></li>
+<li>Cosmos DB のデータベース：<code>Hotels</code></li>
+<li>Cosmos DB のコンテナー：<code>hotels_diskann</code>、<code>hotels_quantizedflat</code></li>
+</ul>
+<h3 id="使うファイル">使うファイル</h3>
+<ul>
+<li>ホテルのデータ（日本語版）：<a href="https://github.com/dmasubuchi/azure-search-sample-data-ja/blob/82c5f4a/hotels/ja/HotelsData_toAzureBlobs_ja.json">HotelsData_toAzureBlobs_ja.json</a>（50ホテル。元のデータの英語とフランス語の欄に、日本語の欄を足したもの）<ul>
+<li>GitHub の画面でファイルを開き、「Download raw file」で保存します。</li>
+<li>日本語は AI で作った訳です。出どころとライセンスは、同じフォルダーの <a href="https://github.com/dmasubuchi/azure-search-sample-data-ja/blob/82c5f4a/hotels/ja/README.md">README</a> に書いてあります。</li>
+</ul>
+</li>
+<li>ホテルのデータに含まれる項目：<code>HotelId</code>（キー）、<code>HotelName</code>・<code>HotelName_ja</code>、<code>Description</code>（英語）・<code>Description_fr</code>・<code>Description_ja</code>、<code>Category</code>・<code>Category_ja</code>、<code>Tags</code>・<code>Tags_ja</code>、<code>ParkingIncluded</code>、<code>IsDeleted</code>、<code>LastRenovationDate</code>、<code>Rating</code>、<code>Address</code>（住所の入れ子）、<code>Location</code>（緯度と経度）、<code>Rooms</code>（客室の配列）</li>
+</ul>
+<h3 id="確認の欄">確認の欄</h3>
+<p>各章の最後の「確認」の欄を、1つずつ確かめます。</p>
+<h3 id="全体の流れ">全体の流れ</h3>
+<ul>
+<li>章1〜3：リソースを作る、Blob にホテルを置く、AI Search に取り込む、検索を試す</li>
+<li>章4〜5：Cosmos DB でベクトル検索をする、Cosmos DB を AI Search に取り込む</li>
+</ul>
+<pre class="mermaid">flowchart LR
+  J["ホテルの JSON"]
+  B["Blob Storage hotels"]
+  C["Cosmos DB Hotels"]
+  S1["AI Search hotels-blob"]
+  S2["AI Search hotels-cosmos"]
+  J --&gt;|"章2 置く"| B
+  B --&gt;|"章2 インデクサーが取り込む"| S1
+  J --&gt;|"章4 ベクトルを足して入れる"| C
+  C --&gt;|"章5 インデクサーが取り込む"| S2
+</pre>
+<p>Cosmos DB の中でも、ベクトル検索ができます（章4）。</p>
+<h2 id="1-リソースを作る">1. リソースを作る</h2>
+<p><a href="guide-setup-azure-setup.html">Azure の準備</a>の「3. リソースを作る」で作ります。</p>
+<h2 id="2-blob-のホテルを-ai-search-に取り込む">2. Blob のホテルを AI Search に取り込む</h2>
+<h3 id="2-1-ai-search-のマネージド-id-をオンにする">2-1. AI Search のマネージド ID をオンにする</h3>
+<ol>
+<li>リソース グループ <code>rg-&lt;org&gt;-&lt;team&gt;</code> を開き、<code>srch-&lt;org&gt;-&lt;team&gt;</code> を選びます。</li>
+<li>左メニューの「設定」の「ID（Identity）」を開きます。</li>
+<li>「システム割り当て済み」で、状態を「オン」にします。</li>
+<li>「保存」を選び、確認が出たら「はい」を選びます。</li>
+<li>「オブジェクト識別子（Object (principal) ID）」が表示されたことを確認します。</li>
+</ol>
+<ul>
+<li>すでに「オン」のときは、そのままです（az で作ったときは、オンになっています）。</li>
+<li>オフのままだと、次の手順のロールの割り当てで、Search が候補に出ません。</li>
+</ul>
+<p>確認：</p>
+<ul>
+<li class="task"><input type="checkbox"> 「システム割り当て済み」の状態が「オン」で、オブジェクト識別子が出ている。</li>
+</ul>
+<h3 id="2-2-blob-を読む権限を付ける">2-2. Blob を読む権限を付ける</h3>
+<p>AI Search に、ストレージの Blob を読む権限を付けます。</p>
+<ol>
+<li>ストレージ <code>st&lt;org&gt;&lt;team&gt;</code> を開き、「アクセス制御 (IAM)」を開きます。</li>
+<li>「追加」を選び、「ロールの割り当ての追加」を選びます。</li>
+<li>「ジョブ機能ロール」で「Storage Blob Data Reader」（ストレージ BLOB データ閲覧者）を選び、「次へ」を選びます。</li>
+<li>「メンバー」で「マネージド ID」を選び、「メンバーの選択（Select members）」を開きます。</li>
+<li>「システム割り当てマネージド ID」を選び、種類「Search Service (Foundry IQ)」から <code>srch-&lt;org&gt;-&lt;team&gt;</code> を選んで、「選択」を選びます。</li>
+<li>「次へ」で進み、「レビューと割り当て（Review + assign）」で対象とメンバーが正しいことを確認して、もう一度「レビューと割り当て」を選びます。</li>
+<li>「ロールの割り当て」タブで <code>srch-&lt;org&gt;-&lt;team&gt;</code> を検索します。</li>
+</ol>
+<ul>
+<li>日本語の画面でロールが見つからないときは、<code>Blob</code> で検索します。</li>
+<li>付けるのは読み取りだけです。書き込みと削除のロールは付けません。</li>
+<li>Search は、このマネージド ID で Blob を読みます。</li>
+<li>ボタンが押せないときは、あなたに「所有者」の権限があるか、進行役に確認します。</li>
+</ul>
+<p>az で付けるとき（変数は <a href="guide-setup-azure-setup.html#5-補助az-で作る">Azure の準備の補助</a>と同じです）：</p>
+<pre><code class="language-powershell">$p = az search service show -n "srch-$org-$t" -g $rg --query identity.principalId -o tsv
+$st = az storage account show -n "st$org$t" -g $rg --query id -o tsv
+az role assignment create --assignee-object-id $p --assignee-principal-type ServicePrincipal --role "Storage Blob Data Reader" --scope $st
+</code></pre>
+<p>確認：</p>
+<ul>
+<li class="task"><input type="checkbox"> <code>srch-&lt;org&gt;-&lt;team&gt;</code> の行があり、ロールが「Storage Blob Data Reader」になっている。</li>
+</ul>
+<h3 id="2-3-ホテルの-json-を-blob-に置く">2-3. ホテルの JSON を Blob に置く</h3>
+<ol>
+<li>ストレージ <code>st&lt;org&gt;&lt;team&gt;</code> の「データ ストレージ」の「コンテナー」を開きます。</li>
+<li>「+ コンテナー」を選び、名前に <code>hotels</code> と入れます。</li>
+<li>「匿名アクセス レベル」は「プライベート (匿名アクセスなし)」のままにします。</li>
+<li>「作成」を選びます。</li>
+<li>「使うファイル」のホテルのデータ（日本語版）を、「Download raw file」で保存します。</li>
+<li>コンテナー <code>hotels</code> を開き、「アップロード」を選びます。</li>
+<li>「アップロード」の画面で、保存した <code>HotelsData_toAzureBlobs_ja.json</code> を選び、「アップロード」を選びます。</li>
+</ol>
+<ul>
+<li>ホテル50件は、1つのファイルのままで構いません。50ファイルに分けません。</li>
+<li>このコンテナーには、このファイルだけを置きます。</li>
+<li>アップロードで権限のエラーが出たら、進行役に伝えます。</li>
+</ul>
+<p>az で行うとき：</p>
+<pre><code class="language-powershell">az storage container create -n hotels --account-name "st$org$t" --auth-mode key
+az storage blob upload --account-name "st$org$t" -c hotels -n HotelsData_toAzureBlobs_ja.json -f HotelsData_toAzureBlobs_ja.json --auth-mode key
+</code></pre>
+<p>確認：</p>
+<ul>
+<li class="task"><input type="checkbox"> コンテナー <code>hotels</code> に、<code>HotelsData_toAzureBlobs_ja.json</code> が表示されている。</li>
+<li class="task"><input type="checkbox"> 「匿名アクセス レベル」が「プライベート (匿名アクセスなし)」になっている。</li>
+</ul>
+<h3 id="2-4-インデックスを作る">2-4. インデックスを作る</h3>
+<p>作る順番：インデックス、データソース、インデクサー。</p>
+<ol>
+<li>Search <code>srch-&lt;org&gt;-&lt;team&gt;</code> を開き、左メニュー「検索管理」の「インデックス」を開きます。</li>
+<li>「インデックスの追加」の「∨」を開き、JSON で追加する項目を選びます。</li>
+<li>入力欄にある文字を消し、次の JSON を貼り付けます。</li>
+</ol>
+<pre><code class="language-json">{
+ "name":"hotels-blob",
+ "fields":[
+  {"name":"HotelId","type":"Edm.String","key":true,"searchable":true,
+   "filterable":true,"sortable":true,"facetable":true,"retrievable":true},
+  {"name":"HotelName","type":"Edm.String","searchable":true,
+   "filterable":false,"sortable":true,"facetable":false,"retrievable":true},
+  {"name":"HotelName_ja","type":"Edm.String","searchable":true,
+   "filterable":false,"sortable":true,"facetable":false,"retrievable":true,
+   "analyzer":"ja.microsoft"},
+  {"name":"Description","type":"Edm.String","searchable":true,
+   "filterable":false,"sortable":false,"facetable":false,"retrievable":true,
+   "analyzer":"en.lucene"},
+  {"name":"Description_fr","type":"Edm.String","searchable":true,
+   "filterable":false,"sortable":false,"facetable":false,"retrievable":true,
+   "analyzer":"fr.lucene"},
+  {"name":"Description_ja","type":"Edm.String","searchable":true,
+   "filterable":false,"sortable":false,"facetable":false,"retrievable":true,
+   "analyzer":"ja.microsoft"},
+  {"name":"Category","type":"Edm.String","searchable":true,"filterable":true,
+   "sortable":true,"facetable":true,"retrievable":true},
+  {"name":"Category_ja","type":"Edm.String","searchable":true,"filterable":true,
+   "sortable":true,"facetable":true,"retrievable":true,
+   "analyzer":"ja.microsoft"},
+  {"name":"Tags","type":"Collection(Edm.String)","searchable":true,
+   "filterable":true,"sortable":false,"facetable":true,"retrievable":true},
+  {"name":"Tags_ja","type":"Collection(Edm.String)","searchable":true,
+   "filterable":true,"sortable":false,"facetable":true,"retrievable":true,
+   "analyzer":"ja.microsoft"},
+  {"name":"ParkingIncluded","type":"Edm.Boolean","searchable":false,
+   "filterable":true,"sortable":true,"facetable":true,"retrievable":true},
+  {"name":"IsDeleted","type":"Edm.Boolean","searchable":false,
+   "filterable":true,"sortable":true,"facetable":false,"retrievable":true},
+  {"name":"LastRenovationDate","type":"Edm.DateTimeOffset","searchable":false,
+   "filterable":true,"sortable":true,"facetable":true,"retrievable":true},
+  {"name":"Rating","type":"Edm.Double","searchable":false,"filterable":true,
+   "sortable":true,"facetable":true,"retrievable":true},
+  {"name":"Address","type":"Edm.ComplexType","fields":[
+   {"name":"StreetAddress","type":"Edm.String","searchable":true,
+    "filterable":false,"sortable":false,"facetable":false,"retrievable":true},
+   {"name":"City","type":"Edm.String","searchable":true,"filterable":true,
+    "sortable":true,"facetable":true,"retrievable":true},
+   {"name":"StateProvince","type":"Edm.String","searchable":true,
+    "filterable":true,"sortable":true,"facetable":true,"retrievable":true},
+   {"name":"PostalCode","type":"Edm.String","searchable":true,
+    "filterable":true,"sortable":true,"facetable":true,"retrievable":true},
+   {"name":"Country","type":"Edm.String","searchable":true,"filterable":true,
+    "sortable":true,"facetable":true,"retrievable":true}
+  ]},
+  {"name":"Location","type":"Edm.GeographyPoint","searchable":false,
+   "filterable":true,"sortable":true,"facetable":false,"retrievable":true},
+  {"name":"Rooms","type":"Collection(Edm.ComplexType)","fields":[
+   {"name":"Description","type":"Edm.String","searchable":true,
+    "filterable":false,"sortable":false,"facetable":false,"retrievable":true,
+    "analyzer":"en.lucene"},
+   {"name":"Description_fr","type":"Edm.String","searchable":true,
+    "filterable":false,"sortable":false,"facetable":false,"retrievable":true,
+    "analyzer":"fr.lucene"},
+   {"name":"Description_ja","type":"Edm.String","searchable":true,
+    "filterable":false,"sortable":false,"facetable":false,"retrievable":true,
+    "analyzer":"ja.microsoft"},
+   {"name":"Type","type":"Edm.String","searchable":true,"filterable":true,
+    "sortable":false,"facetable":true,"retrievable":true},
+   {"name":"Type_ja","type":"Edm.String","searchable":true,"filterable":true,
+    "sortable":false,"facetable":true,"retrievable":true,
+    "analyzer":"ja.microsoft"},
+   {"name":"BaseRate","type":"Edm.Double","searchable":false,
+    "filterable":true,"sortable":false,"facetable":true,"retrievable":true},
+   {"name":"BedOptions","type":"Edm.String","searchable":true,
+    "filterable":true,"sortable":false,"facetable":true,"retrievable":true},
+   {"name":"SleepsCount","type":"Edm.Int32","searchable":false,
+    "filterable":true,"sortable":false,"facetable":true,"retrievable":true},
+   {"name":"SmokingAllowed","type":"Edm.Boolean","searchable":false,
+    "filterable":true,"sortable":false,"facetable":true,"retrievable":true},
+   {"name":"Tags","type":"Collection(Edm.String)","searchable":true,
+    "filterable":true,"sortable":false,"facetable":true,"retrievable":true}
+  ]}
+ ],
+ "suggesters":[{"name":"sg","searchMode":"analyzingInfixMatching",
+  "sourceFields":["HotelName"]}]
+}
+</code></pre>
+<ol start="4">
+<li>「保存」を選びます。</li>
+</ol>
+<ul>
+<li>項目の名前が画面と違うときは、進行役に聞きます。</li>
+<li><code>HotelId</code> がキーです。</li>
+<li><code>HotelName_ja</code>・<code>Description_ja</code> は、日本語のホテル名と説明です（<code>ja.microsoft</code> で日本語の単語に分けます）。<code>Category_ja</code>・<code>Tags_ja</code> は、日本語のカテゴリとタグです。</li>
+<li><code>Description</code> は英語の全文検索、<code>Rating</code> は絞り込みと並べ替え、<code>Location</code> は地理検索に使います。</li>
+<li><code>Rooms</code> は、客室の配列です。</li>
+<li>データにある項目は、入れ子の中も、すべてインデックスに書いてあります。</li>
+</ul>
+<p>確認：</p>
+<ul>
+<li class="task"><input type="checkbox"> インデックスの一覧に <code>hotels-blob</code> がある。</li>
+</ul>
+<h3 id="2-5-データソースを作る">2-5. データソースを作る</h3>
+<ol>
+<li>左メニュー「検索管理」の「データ ソース」を開き、「データ ソースの追加」を選びます。</li>
+<li>名前に <code>hotels-blob-ds</code> と入れます。</li>
+<li>種類で「Azure Blob Storage」を選びます。</li>
+<li>ストレージ アカウント <code>st&lt;org&gt;&lt;team&gt;</code> とコンテナー <code>hotels</code> を指定し、認証でシステム割り当てのマネージド ID（System-assigned managed identity）を選びます。</li>
+<li>「保存」を選びます。</li>
+</ol>
+<ul>
+<li>キーは使いません。Search のマネージド ID で Blob を読みます。</li>
+<li>JSON を貼る画面のときは、次の JSON を貼ります。<code>&lt;サブスクリプション ID&gt;</code>・<code>&lt;org&gt;</code>・<code>&lt;team&gt;</code> は置き換えます（サブスクリプション ID は <code>workshop.config</code> の <code>AZURE_SUBSCRIPTION_ID</code> の値です）。</li>
+</ul>
+<pre><code class="language-json">{
+  "name": "hotels-blob-ds",
+  "type": "azureblob",
+  "container": { "name": "hotels" },
+  "credentials": {
+    "connectionString":
+      "ResourceId=/subscriptions/&lt;サブスクリプション ID&gt;/resourceGroups/rg-&lt;org&gt;-&lt;team&gt;/providers/Microsoft.Storage/storageAccounts/st&lt;org&gt;&lt;team&gt;/;"
+  }
+}
+</code></pre>
+<p>確認：</p>
+<ul>
+<li class="task"><input type="checkbox"> データソースの一覧に <code>hotels-blob-ds</code> がある。</li>
+</ul>
+<h3 id="2-6-インデクサーを作る">2-6. インデクサーを作る</h3>
+<ol>
+<li>左メニュー「検索管理」の「インデクサー」を開き、「インデクサーの追加」を選びます。</li>
+<li>名前に <code>hotels-blob-indexer</code> と入れます。</li>
+<li>インデックスで <code>hotels-blob</code>、データソースで <code>hotels-blob-ds</code> を選びます。</li>
+<li>解析モードで「JSON 配列」（<code>jsonArray</code>）を選びます。</li>
+<li>スケジュールで「カスタム」を選び、5分ごと（<code>PT5M</code>）にします。</li>
+<li>フィールド マッピングで、<code>HotelId</code> を <code>HotelId</code> に対応させます。</li>
+<li>「失敗したアイテムの最大数」（Max failed items）を <code>0</code> にします。</li>
+<li>「保存」を選びます。</li>
+</ol>
+<ul>
+<li><code>jsonArray</code> は、1つの Blob にある配列の各要素を、別々の検索ドキュメントにする指定です。</li>
+<li>保存すると、取り込みが始まります。</li>
+<li>「インデクサー定義 (JSON)」タブがあるときは、次の JSON を貼ります。</li>
+</ul>
+<pre><code class="language-json">{
+  "name": "hotels-blob-indexer",
+  "dataSourceName": "hotels-blob-ds",
+  "targetIndexName": "hotels-blob",
+  "parameters": {
+    "maxFailedItems": 0,
+    "maxFailedItemsPerBatch": 0,
+    "configuration": { "parsingMode": "jsonArray" }
+  },
+  "fieldMappings": [
+    { "sourceFieldName": "HotelId", "targetFieldName": "HotelId" }
+  ],
+  "schedule": { "interval": "PT5M" }
+}
+</code></pre>
+<p>確認：</p>
+<ul>
+<li class="task"><input type="checkbox"> インデクサーの一覧に <code>hotels-blob-indexer</code> がある。</li>
+</ul>
+<h3 id="2-7-取り込みと5分ごとの取り込みを確かめる">2-7. 取り込みと、5分ごとの取り込みを確かめる</h3>
+<ol>
+<li>「インデクサー」の一覧で <code>hotels-blob-indexer</code> を開きます。</li>
+<li>「設定」の「スケジュール」で、5分ごと（<code>PT5M</code>）であることを確認します。</li>
+<li>「実行履歴」で、最初の実行が「成功（Success）」であることを確認します。</li>
+<li>処理された件数（「成功したドキュメント」）が50、失敗が0であることを確認します。</li>
+<li>「インデックス」の一覧で、<code>hotels-blob</code> のドキュメント数が50であることを確認します。</li>
+<li>手動の「実行」は押しません。</li>
+<li>ストレージの <code>hotels</code> に、同じファイルをもう一度アップロードして、置き換えます。</li>
+<li>5分ほど待ちます。</li>
+<li>実行履歴に、アップロードのあとの新しい実行が増えていることを確認します。</li>
+</ol>
+<ul>
+<li>Blob に保存してすぐに取り込む方式ではありません。5分ごとに取り込みます。</li>
+<li>Blob 用のインデックスは、ベクトル インデックス（Vector index size）が <code>0 Bytes</code> のままで正常です。ベクトルの列がないためです。</li>
+<li>権限を付けた直後に失敗したときは、5分ほど待って、次の実行を見ます。</li>
+</ul>
+<p>確認：</p>
+<ul>
+<li class="task"><input type="checkbox"> 最初の実行が「成功」で、処理50・失敗0になっている。</li>
+<li class="task"><input type="checkbox"> <code>hotels-blob</code> のドキュメント数が50になっている。</li>
+<li class="task"><input type="checkbox"> 上書きのあと、手動で実行しなくても、新しい実行が「成功」になった。</li>
+</ul>
+<h2 id="3-6つの機能を試す">3. 6つの機能を試す</h2>
+<h3 id="3-0-検索エクスプローラーを開く">3-0. 検索エクスプローラーを開く</h3>
+<ol>
+<li>Search <code>srch-&lt;org&gt;-&lt;team&gt;</code> の「概要」を開き、コマンド バーの「検索エクスプローラー」を選びます。</li>
+<li>インデックスで <code>hotels-blob</code> を選びます。</li>
+<li>表示を「JSON ビュー（JSON view）」に切り替えます。</li>
+<li>以降は、クエリを入れて「検索」を選びます。</li>
+</ol>
+<ul>
+<li>見つからないときは、左メニュー「検索管理」の「インデックス」で <code>hotels-blob</code> を開き、「検索エクスプローラー」タブを選びます。</li>
+<li>結果の <code>@odata.count</code> が、件数です。</li>
+<li>Rating は、サンプルの評価値です。公式の星の数ではありません。</li>
+</ul>
+<p>確認：</p>
+<ul>
+<li class="task"><input type="checkbox"> 検索エクスプローラーで、<code>hotels-blob</code> を選んだ JSON ビューになっている。</li>
+</ul>
+<h3 id="3-1-自動取り込み">3-1. 自動取り込み</h3>
+<p>インデックスは先に作ってあり、取り込みだけをインデクサーに任せています。取り込まれた件数を見ます。</p>
+<ol>
+<li>次のクエリを入れ、「検索」を選びます。</li>
+</ol>
+<pre><code class="language-json">{
+  "search": "*",
+  "count": true,
+  "top": 0
+}
+</code></pre>
+<ol start="2">
+<li><code>@odata.count</code> を見ます。</li>
+</ol>
+<ul>
+<li>Blob のファイルを置き換えると、次の5分ごとの取り込みで、インデックスも更新されます。</li>
+</ul>
+<p>確認：</p>
+<ul>
+<li class="task"><input type="checkbox"> <code>@odata.count</code> が <code>50</code> になっている。</li>
+</ul>
+<h3 id="3-2-キーワード検索">3-2. キーワード検索</h3>
+<ol>
+<li>次のクエリ（beach）を入れ、「検索」を選びます。</li>
+</ol>
+<pre><code class="language-json">{
+  "search": "beach",
+  "searchFields": "HotelName,Description,Tags",
+  "count": true,
+  "top": 50,
+  "select": "HotelId,HotelName,Tags,Rating,Address/City"
+}
+</code></pre>
+<ol start="2">
+<li>次のクエリ（pool）を入れ、「検索」を選びます。</li>
+</ol>
+<pre><code class="language-json">{
+  "search": "pool",
+  "searchFields": "HotelName,Description,Tags",
+  "count": true,
+  "top": 50,
+  "select": "HotelId,HotelName,Tags,Rating,Address/City"
+}
+</code></pre>
+<ol start="3">
+<li>次のクエリ（wifi）を入れ、「検索」を選びます。</li>
+</ol>
+<pre><code class="language-json">{
+  "search": "wifi",
+  "searchFields": "HotelName,Description,Tags",
+  "count": true,
+  "top": 50,
+  "select": "HotelId,HotelName,Tags,Rating,Address/City"
+}
+</code></pre>
+<ol start="4">
+<li>日本語で、次のクエリ（ビーチ）を入れ、「検索」を選びます。</li>
+</ol>
+<pre><code class="language-json">{
+  "search": "ビーチ",
+  "searchFields": "HotelName_ja,Description_ja",
+  "count": true,
+  "top": 50,
+  "select": "HotelId,HotelName_ja,Description_ja,Rating"
+}
+</code></pre>
+<ol start="5">
+<li><code>"search"</code> を <code>プール</code> に替えて、もう一度「検索」を選びます。</li>
+</ol>
+<ul>
+<li>検索する場所は、<code>HotelName</code>、<code>Description</code>、<code>Tags</code> です（4・5 は日本語の <code>HotelName_ja</code>、<code>Description_ja</code>）。</li>
+<li>4・5 の件数を、英語の beach・pool と比べます。訳し方（「浜辺」「海辺」など）で件数が変わることがあります。</li>
+<li>「value」の <code>HotelName</code> で、どのホテルが出たかを見ます。</li>
+<li>beach の4件は、次のホテルです。<ul>
+<li>Happy Lake Resort &amp; Restaurant</li>
+<li>Johnson's Family Resort</li>
+<li>Lakeside B &amp; B</li>
+<li>Windy Ocean Motel</li>
+</ul>
+</li>
+</ul>
+<p>確認：</p>
+<ul>
+<li class="task"><input type="checkbox"> beach の <code>@odata.count</code> が <code>4</code> になっている。</li>
+<li class="task"><input type="checkbox"> pool の <code>@odata.count</code> が <code>18</code> になっている。</li>
+<li class="task"><input type="checkbox"> wifi の <code>@odata.count</code> が <code>22</code> になっている。</li>
+<li class="task"><input type="checkbox"> ビーチ・プールで、日本語の名前と説明のホテルが出た。</li>
+</ul>
+<h3 id="3-3-フィルタ検索">3-3. フィルタ検索</h3>
+<ol>
+<li>評価4以上のクエリを入れ、「検索」を選びます。</li>
+</ol>
+<pre><code class="language-json">{
+  "search": "*",
+  "filter": "Rating ge 4",
+  "count": true,
+  "top": 50,
+  "select": "HotelId,HotelName,Rating"
+}
+</code></pre>
+<ol start="2">
+<li>200ドル以下の客室があるホテルのクエリを入れ、「検索」を選びます。</li>
+</ol>
+<pre><code class="language-json">{
+  "search": "*",
+  "filter": "Rooms/any(r: r/BaseRate le 200)",
+  "count": true,
+  "top": 50,
+  "select": "HotelId,HotelName,Rating"
+}
+</code></pre>
+<ol start="3">
+<li>ダブルベッド2台の客室があるホテルのクエリを入れ、「検索」を選びます。</li>
+</ol>
+<pre><code class="language-json">{
+  "search": "*",
+  "filter": "Rooms/any(r: r/BedOptions eq '2 Double Beds')",
+  "count": true,
+  "top": 50,
+  "select": "HotelId,HotelName,Rating"
+}
+</code></pre>
+<ol start="4">
+<li>3つの条件を合わせたクエリを入れ、「検索」を選びます。</li>
+</ol>
+<pre><code class="language-json">{
+  "search": "*",
+  "filter": "Rating ge 4 and Rooms/any(r: r/BaseRate le 200 and r/BedOptions eq '2 Double Beds')",
+  "count": true,
+  "top": 50,
+  "select": "HotelId,HotelName,Rating"
+}
+</code></pre>
+<ul>
+<li>200ドル以下の客室も、ダブルベッド2台の客室も、このサンプルでは、どのホテルにもあります。</li>
+<li>そのため、単独の条件では50件です。</li>
+<li>3つを合わせると、22件に絞られます。</li>
+<li>料金とベッドの条件は、同じ客室が両方を満たすように、1つの <code>any</code> の中に書きます。</li>
+<li>「ダブルルーム」は、<code>BedOptions</code> が <code>2 Double Beds</code> の客室です。</li>
+</ul>
+<p>確認：</p>
+<ul>
+<li class="task"><input type="checkbox"> 評価4以上の <code>@odata.count</code> が <code>23</code> になっている。</li>
+<li class="task"><input type="checkbox"> 200ドル以下の <code>@odata.count</code> が <code>50</code> になっている。</li>
+<li class="task"><input type="checkbox"> ダブルベッド2台の <code>@odata.count</code> が <code>50</code> になっている。</li>
+<li class="task"><input type="checkbox"> 3つを合わせた <code>@odata.count</code> が <code>22</code> になっている。</li>
+</ul>
+<h3 id="3-4-地理検索">3-4. 地理検索</h3>
+<ol>
+<li>次のクエリを入れ、「検索」を選びます。</li>
+</ol>
+<pre><code class="language-json">{
+  "search": "*",
+  "filter": "geo.distance(Location, geography'POINT(-73.9857 40.7484)') le 10",
+  "orderby": "geo.distance(Location, geography'POINT(-73.9857 40.7484)') asc",
+  "count": true,
+  "top": 50,
+  "select": "HotelId,HotelName,Address/City,Location,Rating"
+}
+</code></pre>
+<ul>
+<li>ニューヨークの基準点から、半径10kmのホテルです。</li>
+<li><code>POINT</code> の並びは、経度、緯度の順です。</li>
+<li><code>geo.distance</code> の単位は、km です。</li>
+<li>近い順：By the Market Hotel、Stay-Kay City Hotel、City Skyline Antiquity Hotel</li>
+</ul>
+<p>確認：</p>
+<ul>
+<li class="task"><input type="checkbox"> <code>@odata.count</code> が <code>3</code> になっている。</li>
+<li class="task"><input type="checkbox"> 3件とも、市が New York になっている。</li>
+</ul>
+<h3 id="3-5-ファセット集計">3-5. ファセット（集計）</h3>
+<ol>
+<li>次のクエリを入れ、「検索」を選びます。</li>
+</ol>
+<pre><code class="language-json">{
+  "search": "*",
+  "count": true,
+  "top": 0,
+  "facets": [
+    "Rating,interval:1",
+    "Category_ja,count:10"
+  ]
+}
+</code></pre>
+<ol start="2">
+<li>結果の <code>@search.facets</code> を見ます。</li>
+</ol>
+<ul>
+<li>数えているのは、ホテルの件数です。客室の件数ではありません。</li>
+<li><code>Rating</code>：2 が11件、3 が16件、4 が23件（合計50）</li>
+<li><code>Category_ja</code>：バジェット 13件、スイート 12件、ブティック 7件、リゾート＆スパ 7件、長期滞在型 6件、ラグジュアリー 5件（合計50）</li>
+</ul>
+<p>確認：</p>
+<ul>
+<li class="task"><input type="checkbox"> <code>Rating</code> の合計が50になっている。</li>
+<li class="task"><input type="checkbox"> <code>Category_ja</code> の合計が50になっている。</li>
+</ul>
+<h3 id="3-6-ソート">3-6. ソート</h3>
+<ol>
+<li>評価が高い順のクエリを入れ、「検索」を選びます。</li>
+</ol>
+<pre><code class="language-json">{
+  "search": "*",
+  "orderby": "Rating desc,HotelId asc",
+  "count": true,
+  "top": 50,
+  "select": "HotelId,HotelName,Rating"
+}
+</code></pre>
+<ol start="2">
+<li>改装が新しい順のクエリを入れ、「検索」を選びます。</li>
+</ol>
+<pre><code class="language-json">{
+  "search": "*",
+  "orderby": "LastRenovationDate desc,HotelId asc",
+  "count": true,
+  "top": 50,
+  "select": "HotelId,HotelName,LastRenovationDate"
+}
+</code></pre>
+<ul>
+<li>同じ値のときは、<code>HotelId</code> の昇順で並べています。</li>
+<li><code>Rooms/BaseRate</code> は客室の配列なので、そのままでは並べ替えに使えません。客室の最安料金などで並べたいときは、ホテルごとの値（例：<code>MinRoomRate</code>）をデータとインデックスに足します。</li>
+<li>評価が高い順の先頭の3件は、次のとおりです。<ul>
+<li>City Center Summer Wind Resort（4.9）</li>
+<li>Gastronomic Landscape Hotel（4.8）</li>
+<li>Johnson's Family Resort（4.8）</li>
+</ul>
+</li>
+<li>改装が新しい順の先頭の3件は、次のとおりです。<ul>
+<li>Bellevue Suites（2024年1月）</li>
+<li>Royal Cottage Resort（2023年11月）</li>
+<li>Twin Vortex Hotel（2023年11月）</li>
+</ul>
+</li>
+</ul>
+<p>確認：</p>
+<ul>
+<li class="task"><input type="checkbox"> 評価が高い順の先頭が、City Center Summer Wind Resort になっている。</li>
+<li class="task"><input type="checkbox"> 改装が新しい順の先頭が、Bellevue Suites になっている。</li>
+<li class="task"><input type="checkbox"> 6つの機能とも、件数や先頭のホテルが合っていた。</li>
+</ul>
+<p>ここまでが、章1〜3です。続きの章4〜5は、Cosmos DB を使います。</p>
+<h2 id="4-cosmos-db-のベクトル検索">4. Cosmos DB のベクトル検索</h2>
+<p>章1〜3で作ったリソースと、<code>.env.local</code>（<a href="guide-setup-azure-setup.html#4-接続の設定を作る">Azure の準備の 4</a>）を使います。</p>
+<h3 id="4-1-ベクトル検索の機能を有効にする">4-1. ベクトル検索の機能を有効にする</h3>
+<ol>
+<li>Cosmos DB <code>cosmos-&lt;org&gt;-&lt;team&gt;</code> を開きます。</li>
+<li>左メニューの「機能」を開きます。</li>
+<li>「NoSQL API のベクトル検索」を選び、「有効にする」を選びます。</li>
+<li>反映されるまで待ちます。</li>
+</ol>
+<ul>
+<li>反映には、最大15分かかります。</li>
+<li>管理画面で完了と出ても、反映には時間がかかります。</li>
+<li>反映の前にコンテナーを作ると、「capability has not been enabled」というエラーで失敗します。</li>
+<li>az で作ったとき（Cosmos DB の作成で指定したとき）は、有効になっています。</li>
+</ul>
+<p>確認：</p>
+<ul>
+<li class="task"><input type="checkbox"> ベクトル検索の機能が「有効」になっている。</li>
+<li class="task"><input type="checkbox"> 有効にしてから、15分たった。</li>
+</ul>
+<h3 id="4-2-データベースとコンテナーを作る">4-2. データベースとコンテナーを作る</h3>
+<p>ベクトルの設定は、2つのコンテナーで共通です。索引の種類だけを変えます。</p>
+<p>ベクトルの設定：</p>
+<ul>
+<li>パス：<code>/DescriptionVector</code></li>
+<li>データ型：<code>float32</code></li>
+<li>次元数：<code>1536</code></li>
+<li>距離関数：<code>cosine</code></li>
+</ul>
+<ol>
+<li>左メニューの「データ エクスプローラー」を開きます。</li>
+<li>「新しいコンテナー」を選びます。</li>
+<li>データベース ID を新しく作り、<code>Hotels</code> と入れます。</li>
+<li>コンテナー ID に <code>hotels_diskann</code> と入れます。</li>
+<li>パーティション キーに <code>/HotelId</code> と入れます。</li>
+<li>スループットを手動にし、<code>400</code> と入れます。</li>
+<li>ベクトル ポリシーで、ベクトル埋め込みを1つ足し、上の4つの値を入れます。</li>
+<li>ベクトル インデックスで、パス <code>/DescriptionVector</code>、種類 <code>diskANN</code> を選びます。</li>
+<li>インデックス作成ポリシーで、<code>/_etag/?</code> と <code>/DescriptionVector/*</code> を除外します。</li>
+<li>「OK」を選びます。</li>
+<li>もう一度「新しいコンテナー」を選び、データベースは <code>Hotels</code> を選びます。</li>
+<li>コンテナー ID に <code>hotels_quantizedflat</code> と入れます。</li>
+<li>パーティション キーに <code>/HotelId</code> と入れ、スループットを手動の <code>400</code> にします。</li>
+<li>ベクトル ポリシーに、手順7と同じ値を入れます。</li>
+<li>ベクトル インデックスで、パス <code>/DescriptionVector</code>、種類 <code>quantizedFlat</code> を選びます。</li>
+<li>インデックス作成ポリシーで、手順9と同じ2つを除外します。</li>
+<li>「OK」を選びます。</li>
+</ol>
+<ul>
+<li>画面が JSON で入れる形のときは、次の JSON を使います。</li>
+<li>50件では、どちらの索引も全走査になります（1,000件未満のため）。</li>
+<li>速さを比べるのではなく、検索の動きを見ます。</li>
+</ul>
+<p>ベクトル埋め込みポリシー：</p>
+<pre><code class="language-json">{
+  "vectorEmbeddings": [
+    {
+      "path": "/DescriptionVector",
+      "dataType": "float32",
+      "dimensions": 1536,
+      "distanceFunction": "cosine"
+    }
+  ]
+}
+</code></pre>
+<p>インデックス作成ポリシー（<code>hotels_diskann</code>）：</p>
+<pre><code class="language-json">{
+  "indexingMode": "consistent",
+  "automatic": true,
+  "includedPaths": [ { "path": "/*" } ],
+  "excludedPaths": [
+    { "path": "/_etag/?" },
+    { "path": "/DescriptionVector/*" }
+  ],
+  "vectorIndexes": [
+    { "path": "/DescriptionVector", "type": "diskANN" }
+  ]
+}
+</code></pre>
+<p><code>hotels_quantizedflat</code> は、<code>"type": "quantizedFlat"</code> だけを変えます。</p>
+<p>確認：</p>
+<ul>
+<li class="task"><input type="checkbox"> <code>Hotels</code> に、<code>hotels_diskann</code> と <code>hotels_quantizedflat</code> の2つがある。</li>
+<li class="task"><input type="checkbox"> 2つとも、スループットが400になっている。</li>
+</ul>
+<h3 id="4-3-ベクトルを足してホテルを入れる">4-3. ベクトルを足して、ホテルを入れる</h3>
+<p>日本語版のホテルの JSON には、ベクトルが入っていません。各ホテルの日本語の説明（<code>Description_ja</code>）を、チームの埋め込みのモデル（<code>text-embedding-3-small</code>）でベクトルにして、Cosmos DB に入れるファイルを作ります。</p>
+<ol>
+<li>2-3 で保存したホテルの JSON（<code>HotelsData_toAzureBlobs_ja.json</code>）を、Repo 直下の <code>_work/hotel-vectors</code> フォルダーに置きます（なければ作ります。<code>_work</code> は Git に入りません）。</li>
+<li>Repo 直下で、ファイルを作ります。</li>
+</ol>
+<pre><code>python tools/hotel_vectors.py hotels
+</code></pre>
+<ol start="3">
+<li><code>_work/hotel-vectors/hotels_cosmos.json</code> ができたことを確認します（約1MB）。</li>
+<li><code>hotels_diskann</code> の「Items」で「Upload Items」を開き、<code>hotels_cosmos.json</code> を入れます。</li>
+<li><code>hotels_quantizedflat</code> にも、同じファイルを入れます。</li>
+<li>各コンテナーで、次のクエリを実行します。</li>
+</ol>
+<pre><code class="language-sql">SELECT VALUE COUNT(1) FROM c
+</code></pre>
+<ul>
+<li>作ったファイルでは、各ホテルに <code>HotelId</code> と同じ値の <code>id</code> と、1536個の数のベクトル <code>DescriptionVector</code> を足してあります。</li>
+<li>「Upload Items」の上限は、1回の全ファイル合計で2MB未満です。作ったファイルが大きすぎるときは、道具が止まって知らせます。</li>
+<li><code>.env.local</code> の Azure OpenAI の接続先とキーを使います。メンバーの設定でも動きます。</li>
+</ul>
+<p>確認：</p>
+<ul>
+<li class="task"><input type="checkbox"> <code>hotels_diskann</code> の件数が <code>50</code> になっている。</li>
+<li class="task"><input type="checkbox"> <code>hotels_quantizedflat</code> の件数が <code>50</code> になっている。</li>
+</ul>
+<h3 id="4-4-検索文のベクトルを用意する">4-4. 検索文のベクトルを用意する</h3>
+<p>Cosmos DB の検索は、検索文を1536個の数のベクトルにして渡します。</p>
+<ol>
+<li>Repo 直下で、検索文をベクトルにします。</li>
+</ol>
+<pre><code>python tools/hotel_vectors.py query "海の近くで、屋外プールがあり、海が見えるホテル"
+</code></pre>
+<ol start="2">
+<li><code>_work/hotel-vectors/query.txt</code> を、メモ帳か VS Code で開きます。</li>
+<li>中身（<code>[</code> から <code>]</code> まで）を、全部コピーします。</li>
+</ol>
+<ul>
+<li>別の検索文も試せます。ファイルの名前を変えるときは、<code>--name city</code> のように付けます（<code>city.txt</code> ができます）。</li>
+</ul>
+<p>確認：</p>
+<ul>
+<li class="task"><input type="checkbox"> <code>query.txt</code> のベクトルをコピーできた。</li>
+</ul>
+<h3 id="4-5-自然文で検索する">4-5. 自然文で検索する</h3>
+<ol>
+<li>コンテナー <code>hotels_diskann</code> で、「新しい SQL クエリ」を開きます。</li>
+<li>次の SQL を入れ、<code>@embedding</code>（2か所）を、コピーしたベクトルに置き換えます。</li>
+<li>「クエリの実行」を選びます。</li>
+</ol>
+<pre><code class="language-sql">SELECT TOP 5 c.HotelId, c.HotelName, c.HotelName_ja, c.Description_ja,
+  c.Rating, c.ParkingIncluded, c.Address.City AS City,
+  VectorDistance(c.DescriptionVector, @embedding) AS SimilarityScore
+FROM c
+ORDER BY VectorDistance(c.DescriptionVector, @embedding)
+</code></pre>
+<ul>
+<li><code>SimilarityScore</code> は、Cosine では高いほど近い内容です。</li>
+<li>結果の <code>Description_ja</code> を読んで、検索文に近い内容のホテルが上に来ているかを見ます。</li>
+</ul>
+<p>確認：</p>
+<ul>
+<li class="task"><input type="checkbox"> 上位5件が出ている。</li>
+<li class="task"><input type="checkbox"> 上位のホテルの説明が、検索文（海の近く、屋外プール、海の眺め）に近い内容になっている。</li>
+</ul>
+<h3 id="4-6-条件をつけて検索する">4-6. 条件をつけて検索する</h3>
+<ol>
+<li>4-5 の SQL に、評価と駐車場の条件を足して実行します（同じベクトル）。</li>
+</ol>
+<pre><code class="language-sql">SELECT TOP 5 c.HotelId, c.HotelName, c.HotelName_ja, c.Description_ja,
+  c.Rating, c.ParkingIncluded, c.Address.City AS City,
+  VectorDistance(c.DescriptionVector, @embedding) AS SimilarityScore
+FROM c
+WHERE c.Rating &gt;= 4 AND c.ParkingIncluded = true
+ORDER BY VectorDistance(c.DescriptionVector, @embedding)
+</code></pre>
+<ol start="2">
+<li>客室の条件を足して実行します。</li>
+</ol>
+<pre><code class="language-sql">SELECT TOP 5 c.HotelId, c.HotelName, c.HotelName_ja, c.Description_ja,
+  c.Rating, c.ParkingIncluded, c.Address.City AS City,
+  VectorDistance(c.DescriptionVector, @embedding) AS SimilarityScore
+FROM c
+WHERE c.Rating &gt;= 4 AND EXISTS(SELECT VALUE r FROM r IN c.Rooms
+  WHERE r.BaseRate &lt;= 100 AND r.BedOptions = '2 Double Beds')
+ORDER BY VectorDistance(c.DescriptionVector, @embedding)
+</code></pre>
+<ul>
+<li>2 は、評価4以上で、同じ客室が100ドル以下かつダブルベッド2台のホテルです。</li>
+</ul>
+<p>確認：</p>
+<ul>
+<li class="task"><input type="checkbox"> 1 の結果が、すべて評価4以上で、駐車場ありになっている。</li>
+<li class="task"><input type="checkbox"> 2 の結果が、すべて評価4以上になっている。</li>
+</ul>
+<h3 id="4-7-2つのコンテナーを比べる">4-7. 2つのコンテナーを比べる</h3>
+<ol>
+<li>4-5 の SQL を、コンテナー <code>hotels_quantizedflat</code> でも実行します。</li>
+<li>上位5件を、<code>hotels_diskann</code> の結果と比べます。</li>
+</ol>
+<ul>
+<li>50件のサンプルでは、2つの上位5件は同じになります。</li>
+<li>索引の性能を比べるものではありません。</li>
+</ul>
+<p>確認：</p>
+<ul>
+<li class="task"><input type="checkbox"> 2つのコンテナーの上位5件が、同じになっている。</li>
+</ul>
+<h3 id="4-8-距離の種類を変える">4-8. 距離の種類を変える</h3>
+<ol>
+<li><code>hotels_diskann</code> で、次の SQL を実行します（同じベクトル）。</li>
+</ol>
+<pre><code class="language-sql">SELECT TOP 5 c.HotelId, c.HotelName,
+  VectorDistance(c.DescriptionVector, @embedding, true,
+    {'distanceFunction': 'Cosine'}) AS SimilarityScore
+FROM c
+ORDER BY VectorDistance(c.DescriptionVector, @embedding, true,
+    {'distanceFunction': 'Cosine'})
+</code></pre>
+<ol start="2">
+<li>上の SQL の <code>Cosine</code>（2か所）を、<code>DotProduct</code> に変えて実行します。</li>
+<li>同じ2か所を、<code>Euclidean</code> に変えて実行します。</li>
+</ol>
+<ul>
+<li>3つとも、上位5件の順位は同じです。<code>text-embedding-3-small</code> のベクトルは長さが1にそろっているため、3つの距離で順位が変わりません。</li>
+<li>Cosine と DotProduct は、高いほど近い内容です。</li>
+<li>Euclidean は、小さいほど近い内容です。</li>
+</ul>
+<p>確認：</p>
+<ul>
+<li class="task"><input type="checkbox"> 3つとも、上位5件の順位が同じになっている。</li>
+</ul>
+<h3 id="4-9-全走査で確かめる">4-9. 全走査で確かめる</h3>
+<ol>
+<li><code>hotels_diskann</code> で、次の SQL を実行します（同じベクトル）。</li>
+</ol>
+<pre><code class="language-sql">SELECT TOP 5 c.HotelId, c.HotelName,
+  VectorDistance(c.DescriptionVector, @embedding, true) AS SimilarityScore
+FROM c
+ORDER BY VectorDistance(c.DescriptionVector, @embedding, true)
+</code></pre>
+<ol start="2">
+<li>上位5件を、4-5 の結果と比べます。</li>
+</ol>
+<p>確認：</p>
+<ul>
+<li class="task"><input type="checkbox"> 上位5件が、4-5 の結果と同じになっている。</li>
+</ul>
+<h2 id="5-cosmos-db-のホテルを-ai-search-に取り込む">5. Cosmos DB のホテルを AI Search に取り込む</h2>
+<h3 id="5-1-search-に-cosmos-db-を読む権限を付ける">5-1. Search に Cosmos DB を読む権限を付ける</h3>
+<p>AI Search に、Cosmos DB のホテルを読む権限を付けます。2つのロールが要ります。</p>
+<ol>
+<li>Search <code>srch-&lt;org&gt;-&lt;team&gt;</code> の「ID」で、システム割り当て済みが「オン」であることを確認します。</li>
+<li>Cosmos DB <code>cosmos-&lt;org&gt;-&lt;team&gt;</code> の「アクセス制御 (IAM)」を開きます。</li>
+<li>「追加」を選び、「ロールの割り当ての追加」を選びます。</li>
+<li>ロール「Cosmos DB Account Reader Role」を選びます。</li>
+<li>「メンバー」で「マネージド ID」を選び、<code>srch-&lt;org&gt;-&lt;team&gt;</code> を選んで保存します（画面の進み方は 2-2 の 3〜6 と同じ）。</li>
+<li>もう1つのロール「Cosmos DB Built-in Data Reader」は、下の az で付けます。</li>
+</ol>
+<ul>
+<li>「Cosmos DB Built-in Data Reader」は、データ用のロールです。IAM の画面では付けられません。</li>
+<li>このロールは、アカウントの中のデータを読める範囲です。</li>
+</ul>
+<p>az で付けるとき（変数は <a href="guide-setup-azure-setup.html#5-補助az-で作る">Azure の準備の補助</a>と同じです）。2つのロールとも、az で付けられます。</p>
+<pre><code class="language-powershell">$p = az search service show -n "srch-$org-$t" -g $rg --query identity.principalId -o tsv
+$cos = az cosmosdb show -n "cosmos-$org-$t" -g $rg --query id -o tsv
+az role assignment create --assignee-object-id $p --assignee-principal-type ServicePrincipal --role "Cosmos DB Account Reader Role" --scope $cos
+az cosmosdb sql role assignment create --account-name "cosmos-$org-$t" -g $rg --role-definition-name "Cosmos DB Built-in Data Reader" --principal-id $p --scope "/"
+</code></pre>
+<p>確認：</p>
+<ul>
+<li class="task"><input type="checkbox"> 「Cosmos DB Account Reader Role」が付いている。</li>
+<li class="task"><input type="checkbox"> <code>az cosmosdb sql role assignment list --account-name "cosmos-$org-$t" -g $rg</code> に、「Cosmos DB Built-in Data Reader」の割り当てが出る。</li>
+</ul>
+<h3 id="5-2-インデックス-hotels-cosmos-を作る">5-2. インデックス hotels-cosmos を作る</h3>
+<ol>
+<li>Search <code>srch-&lt;org&gt;-&lt;team&gt;</code> の、左メニュー「検索管理」の「インデックス」を開きます。</li>
+<li>「インデックスの追加」の「∨」を開き、JSON で追加する項目を選びます。</li>
+<li>入力欄にある文字を消し、次の JSON を貼り付けます。</li>
+</ol>
+<pre><code class="language-json">{
+ "name":"hotels-cosmos",
+ "fields":[
+  {"name":"HotelId","type":"Edm.String","key":true,"searchable":true,
+   "filterable":true,"sortable":true,"facetable":true,"retrievable":true},
+  {"name":"HotelName","type":"Edm.String","searchable":true,
+   "filterable":false,"sortable":true,"facetable":false,"retrievable":true},
+  {"name":"HotelName_ja","type":"Edm.String","searchable":true,
+   "filterable":false,"sortable":true,"facetable":false,"retrievable":true,
+   "analyzer":"ja.microsoft"},
+  {"name":"Description","type":"Edm.String","searchable":true,
+   "filterable":false,"sortable":false,"facetable":false,"retrievable":true,
+   "analyzer":"en.lucene"},
+  {"name":"Description_fr","type":"Edm.String","searchable":true,
+   "filterable":false,"sortable":false,"facetable":false,"retrievable":true,
+   "analyzer":"fr.lucene"},
+  {"name":"Description_ja","type":"Edm.String","searchable":true,
+   "filterable":false,"sortable":false,"facetable":false,"retrievable":true,
+   "analyzer":"ja.microsoft"},
+  {"name":"Category","type":"Edm.String","searchable":true,"filterable":true,
+   "sortable":true,"facetable":true,"retrievable":true},
+  {"name":"Category_ja","type":"Edm.String","searchable":true,"filterable":true,
+   "sortable":true,"facetable":true,"retrievable":true,
+   "analyzer":"ja.microsoft"},
+  {"name":"Tags","type":"Collection(Edm.String)","searchable":true,
+   "filterable":true,"sortable":false,"facetable":true,"retrievable":true},
+  {"name":"Tags_ja","type":"Collection(Edm.String)","searchable":true,
+   "filterable":true,"sortable":false,"facetable":true,"retrievable":true,
+   "analyzer":"ja.microsoft"},
+  {"name":"ParkingIncluded","type":"Edm.Boolean","searchable":false,
+   "filterable":true,"sortable":true,"facetable":true,"retrievable":true},
+  {"name":"IsDeleted","type":"Edm.Boolean","searchable":false,
+   "filterable":true,"sortable":true,"facetable":false,"retrievable":true},
+  {"name":"LastRenovationDate","type":"Edm.DateTimeOffset","searchable":false,
+   "filterable":true,"sortable":true,"facetable":true,"retrievable":true},
+  {"name":"Rating","type":"Edm.Double","searchable":false,"filterable":true,
+   "sortable":true,"facetable":true,"retrievable":true},
+  {"name":"Address","type":"Edm.ComplexType","fields":[
+   {"name":"StreetAddress","type":"Edm.String","searchable":true,
+    "filterable":false,"sortable":false,"facetable":false,"retrievable":true},
+   {"name":"City","type":"Edm.String","searchable":true,"filterable":true,
+    "sortable":true,"facetable":true,"retrievable":true},
+   {"name":"StateProvince","type":"Edm.String","searchable":true,
+    "filterable":true,"sortable":true,"facetable":true,"retrievable":true},
+   {"name":"PostalCode","type":"Edm.String","searchable":true,
+    "filterable":true,"sortable":true,"facetable":true,"retrievable":true},
+   {"name":"Country","type":"Edm.String","searchable":true,"filterable":true,
+    "sortable":true,"facetable":true,"retrievable":true}
+  ]},
+  {"name":"Location","type":"Edm.GeographyPoint","searchable":false,
+   "filterable":true,"sortable":true,"facetable":false,"retrievable":true},
+  {"name":"Rooms","type":"Collection(Edm.ComplexType)","fields":[
+   {"name":"Description","type":"Edm.String","searchable":true,
+    "filterable":false,"sortable":false,"facetable":false,"retrievable":true,
+    "analyzer":"en.lucene"},
+   {"name":"Description_fr","type":"Edm.String","searchable":true,
+    "filterable":false,"sortable":false,"facetable":false,"retrievable":true,
+    "analyzer":"fr.lucene"},
+   {"name":"Description_ja","type":"Edm.String","searchable":true,
+    "filterable":false,"sortable":false,"facetable":false,"retrievable":true,
+    "analyzer":"ja.microsoft"},
+   {"name":"Type","type":"Edm.String","searchable":true,"filterable":true,
+    "sortable":false,"facetable":true,"retrievable":true},
+   {"name":"Type_ja","type":"Edm.String","searchable":true,"filterable":true,
+    "sortable":false,"facetable":true,"retrievable":true,
+    "analyzer":"ja.microsoft"},
+   {"name":"BaseRate","type":"Edm.Double","searchable":false,
+    "filterable":true,"sortable":false,"facetable":true,"retrievable":true},
+   {"name":"BedOptions","type":"Edm.String","searchable":true,
+    "filterable":true,"sortable":false,"facetable":true,"retrievable":true},
+   {"name":"SleepsCount","type":"Edm.Int32","searchable":false,
+    "filterable":true,"sortable":false,"facetable":true,"retrievable":true},
+   {"name":"SmokingAllowed","type":"Edm.Boolean","searchable":false,
+    "filterable":true,"sortable":false,"facetable":true,"retrievable":true},
+   {"name":"Tags","type":"Collection(Edm.String)","searchable":true,
+    "filterable":true,"sortable":false,"facetable":true,"retrievable":true}
+  ]},
+  {"name":"DescriptionVector","type":"Collection(Edm.Single)",
+   "searchable":true,"retrievable":false,"dimensions":1536,
+   "vectorSearchProfile":"hotels-vector-profile"}
+ ],
+ "suggesters":[{"name":"sg","searchMode":"analyzingInfixMatching",
+  "sourceFields":["HotelName"]}],
+ "vectorSearch":{
+  "algorithms":[{"name":"hotels-hnsw","kind":"hnsw",
+   "hnswParameters":{"metric":"cosine"}}],
+  "profiles":[{"name":"hotels-vector-profile",
+   "algorithm":"hotels-hnsw"}]}
+}
+</code></pre>
+<ol start="4">
+<li>「保存」を選びます。</li>
+</ol>
+<ul>
+<li><code>hotels-blob</code>（2-4）に、<code>DescriptionVector</code> と <code>vectorSearch</code> を足したものです。</li>
+<li><code>DescriptionVector</code> は、1536次元、cosine、HNSW のベクトル列です。</li>
+<li>Cosmos DB の diskANN 索引そのものを、コピーするわけではありません。Search に、別のインデックスを作ります。</li>
+</ul>
+<p>確認：</p>
+<ul>
+<li class="task"><input type="checkbox"> インデックスの一覧に <code>hotels-cosmos</code> がある。</li>
+</ul>
+<h3 id="5-3-データソース-hotels-cosmos-ds-を作る">5-3. データソース hotels-cosmos-ds を作る</h3>
+<ol>
+<li>左メニュー「検索管理」の「データ ソース」を開き、「データ ソースの追加」を選びます。</li>
+<li>名前に <code>hotels-cosmos-ds</code> と入れます。</li>
+<li>種類で「Azure Cosmos DB for NoSQL」を選びます。</li>
+<li>アカウントで <code>cosmos-&lt;org&gt;-&lt;team&gt;</code> を選びます。</li>
+<li>データベースに <code>Hotels</code> と入れます。</li>
+<li>コンテナーに <code>hotels_diskann</code> と入れます。</li>
+<li>認証で「システム割り当てのマネージド ID」を選びます。</li>
+<li>変更の検出に、<code>_ts</code> を指定します。</li>
+<li>「保存」を選びます。</li>
+</ol>
+<ul>
+<li>アカウントのキーは使いません。</li>
+<li>JSON を貼る画面のときは、次の JSON を貼ります。<code>&lt;サブスクリプション ID&gt;</code>・<code>&lt;org&gt;</code>・<code>&lt;team&gt;</code> は置き換えます。</li>
+</ul>
+<pre><code class="language-json">{
+  "name": "hotels-cosmos-ds",
+  "type": "cosmosdb",
+  "credentials": {
+    "connectionString":
+      "ResourceId=/subscriptions/&lt;サブスクリプション ID&gt;/resourceGroups/rg-&lt;org&gt;-&lt;team&gt;/providers/Microsoft.DocumentDB/databaseAccounts/cosmos-&lt;org&gt;-&lt;team&gt;;Database=Hotels;IdentityAuthType=AccessToken"
+  },
+  "container": { "name": "hotels_diskann" },
+  "dataChangeDetectionPolicy": {
+    "@odata.type": "#Microsoft.Azure.Search.HighWaterMarkChangeDetectionPolicy",
+    "highWaterMarkColumnName": "_ts"
+  }
+}
+</code></pre>
+<p>確認：</p>
+<ul>
+<li class="task"><input type="checkbox"> データソースの一覧に <code>hotels-cosmos-ds</code> がある。</li>
+</ul>
+<h3 id="5-4-インデクサー-hotels-cosmos-indexer-を作る">5-4. インデクサー hotels-cosmos-indexer を作る</h3>
+<ol>
+<li>左メニュー「検索管理」の「インデクサー」を開き、「インデクサーの追加」を選びます。</li>
+<li>名前に <code>hotels-cosmos-indexer</code> と入れます。</li>
+<li>インデックスで <code>hotels-cosmos</code> を選びます。</li>
+<li>データソースで <code>hotels-cosmos-ds</code> を選びます。</li>
+<li>スケジュールを5分ごと（<code>PT5M</code>）にします。</li>
+<li>「保存」を選びます。</li>
+</ol>
+<ul>
+<li>保存すると、取り込みが始まります。</li>
+<li>変更の検出は、Cosmos DB の <code>_ts</code> です。</li>
+<li>この設定では、Cosmos DB で物理的に削除したホテルは、Search に自動で反映されません。</li>
+<li>JSON を貼る画面のときは、次の JSON を貼ります。</li>
+</ul>
+<pre><code class="language-json">{
+  "name": "hotels-cosmos-indexer",
+  "dataSourceName": "hotels-cosmos-ds",
+  "targetIndexName": "hotels-cosmos",
+  "schedule": { "interval": "PT5M" }
+}
+</code></pre>
+<p>確認：</p>
+<ul>
+<li class="task"><input type="checkbox"> インデクサーの一覧に <code>hotels-cosmos-indexer</code> がある。</li>
+</ul>
+<h3 id="5-5-取り込みを確かめる">5-5. 取り込みを確かめる</h3>
+<ol>
+<li><code>hotels-cosmos-indexer</code> の実行履歴を開きます。</li>
+<li>「インデックス」の一覧で、<code>hotels-cosmos</code> を見ます。</li>
+</ol>
+<p>確認：</p>
+<ul>
+<li class="task"><input type="checkbox"> 実行が「成功」で、処理50・失敗0・警告0になっている。</li>
+<li class="task"><input type="checkbox"> <code>hotels-cosmos</code> のドキュメント数が50になっている。</li>
+<li class="task"><input type="checkbox"> ベクトル インデックスの容量が、<code>0 Bytes</code> ではない。</li>
+</ul>
+<h3 id="5-6-search-で検索する">5-6. Search で検索する</h3>
+<ol>
+<li>「検索エクスプローラー」で、インデックス <code>hotels-cosmos</code> を選び、JSON 表示にします。</li>
+<li>キーワード検索のクエリを入れ、「検索」を選びます。</li>
+</ol>
+<pre><code class="language-json">{
+  "search": "beach",
+  "searchFields": "HotelName,Description,Tags",
+  "count": true,
+  "select": "HotelId,HotelName,Rating,ParkingIncluded",
+  "top": 5
+}
+</code></pre>
+<ol start="3">
+<li>ベクトル検索のクエリを入れます。<code>[ここにベクトルの数を貼る]</code> を、4-4 でコピーしたベクトル（<code>[</code> から <code>]</code> まで）に置き換えます。</li>
+</ol>
+<pre><code class="language-json">{
+  "vectorQueries": [
+    {
+      "kind": "vector",
+      "vector": [ここにベクトルの数を貼る],
+      "fields": "DescriptionVector",
+      "k": 5,
+      "exhaustive": true
+    }
+  ],
+  "select": "HotelId,HotelName,Rating,ParkingIncluded",
+  "top": 5
+}
+</code></pre>
+<ol start="4">
+<li>ハイブリッド検索のクエリを入れます。<code>[ここにベクトルの数を貼る]</code> を、同じベクトルに置き換えます。</li>
+</ol>
+<pre><code class="language-json">{
+  "search": "beach pool",
+  "searchFields": "HotelName,Description,Tags",
+  "vectorQueries": [
+    {
+      "kind": "vector",
+      "vector": [ここにベクトルの数を貼る],
+      "fields": "DescriptionVector",
+      "k": 5
+    }
+  ],
+  "select": "HotelId,HotelName,Rating,ParkingIncluded",
+  "top": 5
+}
+</code></pre>
+<ol start="5">
+<li>条件つきのベクトル検索のクエリを入れます。<code>[ここにベクトルの数を貼る]</code> を、同じベクトルに置き換えます。</li>
+</ol>
+<pre><code class="language-json">{
+  "filter": "Rating ge 4 and ParkingIncluded eq true",
+  "vectorFilterMode": "preFilter",
+  "vectorQueries": [
+    {
+      "kind": "vector",
+      "vector": [ここにベクトルの数を貼る],
+      "fields": "DescriptionVector",
+      "k": 5,
+      "exhaustive": true
+    }
+  ],
+  "select": "HotelId,HotelName,Rating,ParkingIncluded",
+  "top": 5
+}
+</code></pre>
+<ul>
+<li>キーワード検索は、全文検索です。ベクトルは使いません。</li>
+<li>ハイブリッド検索は、全文検索とベクトル検索を組み合わせます。</li>
+<li>検索のスコアは、サービスによって意味が違います。数をそのまま比べません。</li>
+</ul>
+<p>確認：</p>
+<ul>
+<li class="task"><input type="checkbox"> キーワード検索（beach）の <code>@odata.count</code> が <code>4</code> になっている。</li>
+<li class="task"><input type="checkbox"> ベクトル検索の上位5件が、4-5 の結果と同じになっている。</li>
+<li class="task"><input type="checkbox"> 条件つきのベクトル検索の上位5件が、4-6 の 1 の結果と同じになっている。</li>
+<li class="task"><input type="checkbox"> ハイブリッド検索の結果が、5件出ている。</li>
+</ul>
+<h3 id="5-7-章5の確認">5-7. 章5の確認</h3>
+<p>確認：</p>
+<ul>
+<li class="task"><input type="checkbox"> Search に、<code>hotels-blob</code> と <code>hotels-cosmos</code> の2つのインデックスがある。</li>
+</ul>
+<h2 id="6-つまずいたとき">6. つまずいたとき</h2>
+<p>章1〜3と、章4〜5の両方で使います。</p>
+<ul>
+<li>ロールの付与で Search が候補に出ない：Search の ID が「オン」か（2-1）、<code>rg-&lt;org&gt;-&lt;team&gt;</code> の Search を選んでいるかを確認します。</li>
+<li>50件にならない：Blob の中身が JSON の配列か、インデクサーの解析モードが <code>jsonArray</code> か（2-6）を確認します。</li>
+<li>検索結果が変わらない、インデクサーが失敗する：実行履歴を見ます（2-7）。失敗が続くときは、エラーを読み、進行役に伝えます。</li>
+<li>ポータルの画面の読み込みが遅い：待ち続けず、ページを読み込み直します。それでも進まないときは、進行役に伝えます。</li>
+<li>名前が使われていると言われる（ストレージなど）：チームの名前を変えます（<a href="guide-setup-azure-setup.html#2-チームの名前を決める">Azure の準備の 2</a>）。</li>
+<li>コンテナーを作ると「capability has not been enabled」と出る（章4）：ベクトル検索の機能の反映待ちです。最大15分待ちます（4-1）。</li>
+<li>「Upload Items」が失敗する（章4）：1回の全ファイル合計が2MB未満か確認します。超えているときは、<code>python tools/hotel_vectors.py hotels --decimals 5</code> のように、ベクトルの小数の桁を減らして作り直します。</li>
+<li><code>hotel_vectors.py</code> が止まる（章4）：<ul>
+<li>「次の項目がありません」：Repo 直下に <code>.env.local</code> があるか確認します（<a href="guide-setup-azure-setup.html#4-接続の設定を作る">Azure の準備の 4</a>）。</li>
+<li>「埋め込みのデプロイが見つかりません」：Foundry に <code>text-embedding-3-small</code> をデプロイしたか確認します（<a href="guide-setup-azure-setup.html#3-6-モデルのデプロイ">Azure の準備の 3-6</a>）。</li>
+</ul>
+</li>
+</ul>
+</article>
+</main>
+<footer class="bar"><a class="home" href="../index.html">← 入口に戻る</a><a class="source" href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/guide/hotel.md">元の Markdown（GitHub）</a></footer>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js" integrity="sha384-rbtjAdnIQE/aQJGEgXrVUlMibdfTSa4PQju4HDhN3sR2PmaKFzhEafuePsl9H/9I" crossorigin="anonymous"></script>
+<script>
+if (window.mermaid) {
+  var dark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+  mermaid.initialize({ startOnLoad: true, theme: dark ? "dark" : "default", securityLevel: "strict" });
+}
+</script>
+</body>
+</html>

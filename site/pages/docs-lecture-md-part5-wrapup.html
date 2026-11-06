@@ -1,0 +1,687 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>比較と締め | データに着目した RAG の研修</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="bar"><a class="home" href="../index.html">← 入口に戻る</a><a class="source" href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/docs/lecture/md/part5-wrapup.md">元の Markdown（GitHub）</a></header>
+<main>
+<article class="doc">
+<h1 id="比較と締め">比較と締め</h1>
+<nav class="toc"><details><summary>このページの目次</summary>
+<ul>
+<li class="l2"><a href="#a作り方の比較">A 作り方の比較</a></li>
+<li class="l3"><a href="#p46-手作業の開発pythonlangchainai-search-だけfoundry-iq">p.46 手作業の開発（Python、LangChain）、AI Search だけ、Foundry IQ</a></li>
+<li class="l3"><a href="#p47-ai-search-だけとfoundry-iqai-search-の拡張だけ">p.47 AI Search だけと、Foundry IQ（AI Search の拡張）だけ</a></li>
+<li class="l2"><a href="#brag-と出典">B RAG と出典</a></li>
+<li class="l3"><a href="#p48-rag-の基本の流れ">p.48 RAG の基本の流れ</a></li>
+<li class="l3"><a href="#p49-出典付きの回答">p.49 出典付きの回答</a></li>
+<li class="l3"><a href="#p50-ハルシネーション">p.50 ハルシネーション</a></li>
+<li class="l2"><a href="#c直し方">C 直し方</a></li>
+<li class="l3"><a href="#うまくいかない5つの場面と直し方">うまくいかない5つの場面と直し方</a></li>
+<li class="l3"><a href="#直す前にどこで壊れたかを確かめる">直す前に、どこで壊れたかを確かめる</a></li>
+<li class="l2"><a href="#d版と料金">D 版と料金</a></li>
+<li class="l3"><a href="#p51-ga-とプレビュー">p.51 GA とプレビュー</a></li>
+<li class="l3"><a href="#p52-料金の構造">p.52 料金の構造</a></li>
+</ul>
+</details></nav>
+
+<!-- この Markdown は docs/lecture/tools/build.py --md が、keywords.md・decks.json・diagrams/ から作る。直すときは原稿を直す -->
+
+<p>作り方の比較、RAG の流れと出典、うまくいかない場面、プレビューと料金</p>
+<p><em>ハンズオン資料 p.46〜52　／　確かめるトピック：06・19</em></p>
+<p><a href="docs-lecture-md-index.html">目次に戻る</a></p>
+<h2 id="a作り方の比較">A　作り方の比較</h2>
+<h3 id="p46-手作業の開発pythonlangchainai-search-だけfoundry-iq">p.46 手作業の開発（Python、LangChain）、AI Search だけ、Foundry IQ</h3>
+<p><em>それぞれで、誰が何を受け持つか</em></p>
+<ul>
+<li><strong>一般的な説明</strong><ul>
+<li><strong>手作業の開発（Python だけ、または LangChain）</strong><ul>
+<li>Python だけの場合：読む、ばらす、切る、索引、検索、回答の組み立てを、すべて自分のコードで書きます。</li>
+<li>LangChain の場合：同じ流れを、部品（ローダー、分割、ベクトルストア、リトリーバー）を組み合わせて書きます。中の動きは部品に隠れます。</li>
+<li>共通の点：中身が全部見えて、どこでも変えられます。そのかわり、更新、権限、運用も自分で持つことになります。</li>
+</ul>
+</li>
+<li><strong>検索サービスを使う（AI Search だけ）</strong><ul>
+<li>取り込みと索引と検索をサービスに任せ、回答の組み立ては自分で書きます。</li>
+<li>検索方法（BM25、ベクトル、ハイブリッド、ランカー）は設定で切り替えます。</li>
+<li>アプリは、質問から検索の命令を作り、結果を生成 AI に渡すところを受け持ちます。</li>
+</ul>
+</li>
+<li><strong>検索の上に「探し方」まで任せる（Foundry IQ）</strong><ul>
+<li>質問の分解（プレビューの構成）、何度かの検索、結果のまとめまでをサービスが受け持ちます。</li>
+<li>アプリは、ナレッジベースに質問を投げて、出典付きの結果を受け取ります。</li>
+<li>中の手順は見えにくくなるので、調整は設定で行います。</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><strong>Azure での説明</strong><ul>
+<li><strong>手作業の開発</strong><ul>
+<li>LangChain：<code>AzureSearch</code> などのベクトルストアのクラスで、AI Search を部品の1つとして呼べます（クラス名は LangChain の版で変わります）。</li>
+<li>Azure の料金がかかるのは、呼んだサービス（埋め込み、生成、AI Search）の分だけです。</li>
+</ul>
+</li>
+<li><strong>AI Search だけ</strong><ul>
+<li>取り込み：インデクサー、スキルセット、インデックスプロジェクション、統合ベクトル化です。</li>
+<li>検索：<code>search</code>、<code>vectorQueries</code>、<code>queryType: semantic</code>、RRF によるハイブリッドです。</li>
+<li>回答の組み立て：アプリ側で Azure OpenAI を呼びます。</li>
+</ul>
+</li>
+<li><strong>Foundry IQ（AI Search の拡張）</strong><ul>
+<li>中身：AI Search のエージェント型検索（ナレッジソースとナレッジベース）です。</li>
+<li>設定：reasoning effort（GA は minimal だけで設定なし。2026-08-01-preview では low、medium、auto）。回答の形は GA では抽出型のみです。</li>
+<li>呼び方：REST、SDK、MCP。Foundry のエージェントからナレッジとしてつなげます。</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p><strong>比べる項目</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>項目</th>
+<th>Python だけ</th>
+<th>LangChain</th>
+<th>AI Search だけ</th>
+<th>Foundry IQ</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>取り込み</td>
+<td>自分で書く</td>
+<td>部品で書く</td>
+<td>インデクサーとスキル</td>
+<td>AI Search と同じ（ナレッジソースが作ることもある）</td>
+</tr>
+<tr>
+<td>検索方法</td>
+<td>自分で書く</td>
+<td>部品を選ぶ</td>
+<td>設定で選ぶ</td>
+<td>インデックスと設定に応じてサービスが選ぶ</td>
+</tr>
+<tr>
+<td>質問の分解</td>
+<td>自分で書く</td>
+<td>チェーンで書く</td>
+<td>なし（アプリで書く）</td>
+<td>サービスが行う（プレビューの構成。GA の minimal では行わない）</td>
+</tr>
+<tr>
+<td>中の見え方</td>
+<td>全部見える</td>
+<td>部品の中は隠れる</td>
+<td>設定と結果が見える</td>
+<td>手順の記録が返る</td>
+</tr>
+<tr>
+<td>運用（更新、権限）</td>
+<td>自分で持つ</td>
+<td>自分で持つ</td>
+<td>サービスが持つ</td>
+<td>サービスが持つ</td>
+</tr>
+</tbody>
+</table></div>
+<p><img alt="手作業から Foundry IQ へ、サービスが受け持つ範囲が広がる" src="img/p46.svg"></p>
+<p><em>運用（更新、権限）は、手作業の開発では自分で持ち、サービスを使うとサービスが持つ</em></p>
+<details>
+<summary>ノート</summary>
+<ul>
+<li>位置：検索方法、取り込み、評価を見たあとで、作り方の選び方を並べるページです。p.47 で AI Search と Foundry IQ の2つに絞ります。</li>
+<li>言いたいこと：4つの作り方の違いは、取り込み、検索方法、質問の分解、運用を誰が受け持つかの違いです。</li>
+<li>気をつけること：<ul>
+<li>どれがよいかの評価はしません。受け持ちの違いだけを並べます。</li>
+<li>Foundry IQ は検索の回数が増えます。費用の比較はこのページに入れていません。</li>
+</ul>
+</li>
+</ul>
+<p><strong>図のノート</strong></p>
+<p>狙い：4つの作り方の違いが、取り込み、検索、探し方（質問の分解）、回答の組み立てを誰が受け持つかの違いだと言える。</p>
+<p>話すこと：</p>
+<ul>
+<li>段階0：手作業の開発（Python だけ、または LangChain）は、取り込みから回答の組み立てまで、すべて自分のコードで書く。LangChain は部品（ローダー、分割、ベクトルストア、リトリーバー）を組み合わせるが、中の動きは部品に隠れる。中身が全部見えて、どこでも変えられるかわりに、更新、権限、運用も自分で持つ</li>
+<li>段階1：AI Search だけは、取り込みと索引と検索をサービスに任せる。検索方法（BM25、ベクトル、ハイブリッド、ランカー）は設定で切り替える。質問から検索の命令を作り、結果を生成 AI に渡すところはアプリが持つ。質問の分解もアプリで書く</li>
+<li>段階2：Foundry IQ は、検索の上の「探し方」まで任せる。質問の分解（プレビューの構成）、何度かの検索、結果のまとめをサービスが行う。アプリは、ナレッジベースに質問を投げて、出典付きの結果を受け取る。中の手順は見えにくくなるので、調整は設定で行う</li>
+</ul>
+<p>補足：運用（更新、権限）は、手作業の開発では自分で持ち、AI Search だけと Foundry IQ ではサービスが持つ。LangChain から、AzureSearch などのベクトルストアのクラスで AI Search を部品の1つとして呼ぶこともできる（クラス名は LangChain の版で変わる）。Azure の料金がかかるのは、呼んだサービス（埋め込み、生成、AI Search）の分だけ。次の p.47 で、AI Search だけと Foundry IQ だけの2つに絞る</p>
+<p>注意：どれがよいかの評価はしない。受け持ちの違いだけを並べる。GA の minimal では、質問の分解は行わない。Foundry IQ は検索の回数が増える。費用の比較はこのページに入れていない</p>
+</details>
+<h3 id="p47-ai-search-だけとfoundry-iqai-search-の拡張だけ">p.47 AI Search だけと、Foundry IQ（AI Search の拡張）だけ</h3>
+<p><em>検索の手順を、アプリが決めるかサービスが決めるか</em></p>
+<ul>
+<li><strong>一般的な説明</strong><ul>
+<li><strong>AI Search だけ</strong><ul>
+<li>1つの質問に対して、1回検索して、上位の結果を返します。</li>
+<li>質問をどう検索の命令に直すか、何回検索するかは、アプリが決めます。</li>
+<li>回答の文章を作るのも、アプリ側（生成 AI を呼ぶ）です。</li>
+</ul>
+</li>
+<li><strong>Foundry IQ だけ</strong><ul>
+<li>プレビューの構成（low、medium、auto）では、1つの質問を、サービスがいくつかの小さな質問に分けて、それぞれ検索します。GA の minimal では分けません。</li>
+<li>結果をまとめて、出典付きで返します。プレビューの構成では、会話の流れも考えに入れます。</li>
+<li>アプリは、質問を投げて結果を受け取るだけになります。</li>
+</ul>
+</li>
+<li><strong>何が変わるか</strong><ul>
+<li>決める人：AI Search では検索の手順をアプリが決め、Foundry IQ ではサービスが決めます。</li>
+<li>速さと回数：Foundry IQ は検索と生成 AI の呼び出しが増える（minimal の計画では生成 AI を使わない）ので、時間がかかり、呼び出しの数も増えます。</li>
+<li>調整のしかた：AI Search はクエリの中身で調整し、Foundry IQ は設定（どこまで考えさせるか）で調整します。</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><strong>Azure での説明</strong><ul>
+<li><strong>AI Search だけ</strong><ul>
+<li>呼び方：<code>/indexes/{name}/docs/search</code> に、<code>search</code>、<code>vectorQueries</code>、<code>queryType: semantic</code> などを指定します。</li>
+<li>返るもの：文書の一覧、<code>@search.score</code>、<code>@search.rerankerScore</code>、キャプションです。</li>
+<li>生成 AI：組み込みでは呼びません（セマンティックランカーは生成 AI ではありません）。</li>
+</ul>
+</li>
+<li><strong>Foundry IQ だけ</strong><ul>
+<li>呼び方：ナレッジベースの <code>retrieve</code> の操作です。REST、SDK、MCP のどれでも呼べます。</li>
+<li>返るもの：まとめた結果、出典の一覧、どう検索したかの記録です。</li>
+<li>設定：reasoning effort は、GA では minimal だけ（設定なし）、2026-08-01-preview では low、medium、auto を選べます。回答の形は GA では抽出型のみです。</li>
+</ul>
+</li>
+<li><strong>中で共通のもの</strong><ul>
+<li>取り込み：どちらもインデックスが土台です（インデクサー、スキル、統合ベクトル化）。</li>
+<li>検索方法：Foundry IQ も、中では AI Search の検索（インデックスと設定に応じて、キーワード・ベクトル・ハイブリッド）を使い、結果をセマンティックランカーで並べ直します。</li>
+<li>置き場所：Foundry IQ のナレッジベースは、AI Search のサービスの中に作られます。</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p><strong>比べる項目</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>項目</th>
+<th>AI Search だけ</th>
+<th>Foundry IQ だけ</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1回の質問で検索する回数</td>
+<td>1回（アプリが増やすことはできる）</td>
+<td>サービスが決める（low 以上は複数回）</td>
+</tr>
+<tr>
+<td>質問の分解</td>
+<td>アプリが書く</td>
+<td>サービスが行う（プレビューの構成）</td>
+</tr>
+<tr>
+<td>検索先</td>
+<td>1つのインデックス</td>
+<td>複数のナレッジソース</td>
+</tr>
+<tr>
+<td>返るもの</td>
+<td>文書の一覧と点数</td>
+<td>まとめた結果、出典、検索の記録</td>
+</tr>
+<tr>
+<td>生成 AI の呼び出し</td>
+<td>なし</td>
+<td>あり（low 以上の計画と、回答の合成。minimal の計画では使わない）</td>
+</tr>
+<tr>
+<td>調整</td>
+<td>クエリの中身</td>
+<td>reasoning effort などの設定</td>
+</tr>
+</tbody>
+</table></div>
+<p><img alt="Foundry IQ は、検索の手順をアプリからサービスへ移す" src="img/p47.svg"></p>
+<p><em>Foundry IQ のナレッジベースは、AI Search の上に作られている。質問を分けるのはプレビューの構成（GA の minimal は分けない）</em></p>
+<p><strong>確かめる</strong>：<a href="applied-topics-19-agentic-retrieval-README.html">応用 19 エージェント型検索のデモ</a></p>
+<details>
+<summary>ノート</summary>
+<ul>
+<li>位置：キーワード解説の最後のページです。p.46 の4列の比較から、AI Search と Foundry IQ の2列に絞ります。p.32 のエージェント型検索と合わせて見せます。</li>
+<li>言いたいこと：違いは、検索の手順をアプリが決めるかサービスが決めるかです。土台のインデックスと検索方法は共通です。</li>
+<li>気をつけること：<ul>
+<li>セマンティックランカーは生成 AI ではない、という点を言い間違えないでください。</li>
+<li>reasoning effort が minimal のときは、計画に生成 AI を使いません。low 以上で、質問の分解に生成 AI を使います。</li>
+<li>費用の差は話しません。</li>
+</ul>
+</li>
+</ul>
+<p><strong>図のノート</strong></p>
+<p>狙い：違いは、検索の手順をアプリが決めるかサービスが決めるかだと言える。土台のインデックスと検索方法は共通だと言える。</p>
+<p>話すこと：</p>
+<ul>
+<li>段階0：AI Search だけでは、アプリが質問を検索の命令に直して送る。1つの質問に1回検索する。何回検索するかも、アプリが決める</li>
+<li>段階1：上位の結果（文書の一覧と点数）が返る。回答の文章を作るのも、アプリ側で生成 AI を呼ぶ</li>
+<li>段階2：Foundry IQ だけでは、アプリは質問を投げるだけになる。プレビューの構成（low、medium、auto）では、ナレッジベースが質問をいくつかの小さな質問に分けて、複数のナレッジソースをそれぞれ検索する。GA の minimal では分けない</li>
+<li>段階3：まとめた結果、出典の一覧、どう検索したかの記録が返る。プレビューの構成では、会話の流れも考えに入れる</li>
+</ul>
+<p>補足：どちらも同じ Azure AI Search のサービスで動く。どちらもインデックスが土台で、Foundry IQ も、中では AI Search の検索（インデックスと設定に応じて、キーワード・ベクトル・ハイブリッド）を使い、結果をセマンティックランカーで並べ直す。ナレッジベースは AI Search のサービスの中に作られる。調整は、AI Search ではクエリの中身、Foundry IQ では設定（reasoning effort）で行う。Foundry IQ は検索と生成 AI の呼び出しが増えるので、時間がかかり、呼び出しの数も増える</p>
+<p>注意：セマンティックランカーは生成 AI ではない。reasoning effort が minimal のときは、計画に生成 AI を使わない。low 以上で、質問の分解に生成 AI を使う。費用の差は話さない</p>
+</details>
+<h2 id="brag-と出典">B　RAG と出典</h2>
+<h3 id="p48-rag-の基本の流れ">p.48 RAG の基本の流れ</h3>
+<p><em>探してから、見つけた文を渡して答えさせる</em></p>
+<ul>
+<li><strong>一般的な説明</strong><ul>
+<li><strong>流れの段</strong><ul>
+<li>質問を受けて、インデックスを探し、上位のチャンクを選びます。</li>
+<li>質問と選んだチャンクを、プロンプトに入れます。</li>
+<li>生成 AI が、プロンプトをもとに答えます。</li>
+</ul>
+</li>
+<li><strong>前もって行うこと</strong><ul>
+<li>文書を取り込み、切って、インデックスに入れておきます（第2部、p.16）。</li>
+<li>出典の欄を付けておきます（p.26）。</li>
+<li>文書が変わったら、インデックスも入れ直します（p.29）。</li>
+</ul>
+</li>
+<li><strong>生成 AI が答えに使うもの</strong><ul>
+<li>生成 AI は、渡された文と、自分がもともと持っている知識の両方で答えます。</li>
+<li>プロンプトで「渡した文だけで答える」と書いても、もともとの知識が混ざることがあります（p.50）。</li>
+<li>渡した文に答えがないときに「分からない」と言わせるかどうかも、プロンプトで決めます。</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><strong>Azure AI Search での説明</strong><ul>
+<li><strong>検索と選ぶ段</strong><ul>
+<li>検索の段は Azure AI Search が受け持ちます（キーワード、ベクトル、ハイブリッド、ランカー）。</li>
+<li>何件を選んで渡すか（top）は、アプリで決めます。</li>
+<li>ランカーの点数（rerankerScore、0〜4）で、低いチャンクを外すこともできます。外す境目の値は決まっていないので、評価で決めます。</li>
+</ul>
+</li>
+<li><strong>組み立てと生成の段</strong><ul>
+<li>1回の検索の形では、アプリが、検索の結果をプロンプトに入れて、Azure OpenAI などを呼びます。</li>
+<li>ナレッジベースを使う形では、検索と、まとめる段をナレッジベースが受け持ちます（p.32、p.36）。</li>
+<li>GA のナレッジベースでは、返るのは抽出型の結果なので、回答の文はアプリの側で生成 AI に作らせます。</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p><img alt="RAG は、探してから、見つけた文を渡して答えさせる" src="img/p48.svg"></p>
+<p><em>生成 AI は、渡された文と自分の知識の両方で答える</em></p>
+<p><strong>確かめる</strong>：<a href="basic-topics-06-answer-from-results-README.html">基礎 06 検索結果から答えを作る</a></p>
+<details>
+<summary>ノート</summary>
+<ul>
+<li>位置：締めの部で、ここまでの検索と取り込みを、RAG の流れの中に置き直すページです。冒頭（はじめに）の全体図の振り返りです。</li>
+<li>言いたいこと：RAG は、探してから、見つけた文を生成 AI に渡して答えさせる流れです。検索の段の質が、答えの質に効きます。</li>
+<li>気をつけること：<ul>
+<li>生成 AI は渡された文だけで答えるわけではない、と言ってください。</li>
+<li>どちらの形がよいかは言いません。</li>
+</ul>
+</li>
+</ul>
+<p><strong>図のノート</strong></p>
+<p>狙い：RAG の流れ（質問、検索、選ぶ、プロンプトに入れる、生成）と、前もって行うことが言える。</p>
+<p>話すこと：</p>
+<ul>
+<li>最初から見えているもの：前もって、文書を取り込み、切って、インデックスに入れておく（第2部、p.16）。出典の欄も付けておき（p.26）、文書が変わったらインデックスも入れ直す（p.29）</li>
+<li>段階0：利用者が質問する</li>
+<li>段階1：アプリがインデックスを探す。検索の段は Azure AI Search が受け持つ（キーワード、ベクトル、ハイブリッド、ランカー）</li>
+<li>段階2：上位のチャンクを選ぶ。何件を選んで渡すか（top）は、アプリで決める。ランカーの点数（rerankerScore、0〜4）で低いチャンクを外すこともできる。外す境目の値は決まっていないので、評価で決める</li>
+<li>段階3：質問と選んだチャンクをプロンプトに入れ、生成 AI が答える。1回の検索の形では、アプリが検索の結果をプロンプトに入れて、Azure OpenAI などを呼ぶ</li>
+</ul>
+<p>補足：生成 AI は、渡された文と自分がもともと持っている知識の両方で答える。プロンプトで「渡した文だけで答える」と書いても、もともとの知識が混ざることがある（p.50）。渡した文に答えがないときに「分からない」と言わせるかどうかも、プロンプトで決める。ナレッジベースを使う形では、検索と、まとめる段をナレッジベースが受け持つ（p.32、p.36）。GA のナレッジベースが返すのは抽出型の結果なので、回答の文はアプリの側で生成 AI に作らせる</p>
+<p>注意：生成 AI は渡された文だけで答えるわけではない、と言う。どちらの形がよいかは言わない。冒頭（はじめに）の全体図の振り返りとして見せる</p>
+</details>
+<h3 id="p49-出典付きの回答">p.49 出典付きの回答</h3>
+<p><em>回答の文ごとに、根拠のチャンクを示す</em></p>
+<ul>
+<li><strong>一般的な説明</strong><ul>
+<li><strong>何のためか</strong><ul>
+<li>利用者が、回答の根拠を元の文書で確かめられるようにします。</li>
+<li>根拠のない文（出典が付かない文）を見つけやすくなります。</li>
+<li>回答が間違っていたときに、文書の側か生成の側かを調べやすくなります。</li>
+</ul>
+</li>
+<li><strong>付け方</strong><ul>
+<li>プロンプトで、チャンクに番号やファイル名を付けて渡します。</li>
+<li>生成 AI に、文ごとに [1] のような記号で、使ったチャンクを示すように指示します。</li>
+<li>記号を、ファイル名とページなどの出典に置き換えて表示します。</li>
+</ul>
+</li>
+<li><strong>気をつける点</strong><ul>
+<li>生成 AI が、渡していない番号や、内容と合わない番号を付けることがあります。</li>
+<li>記号が付いていても、その文が本当にチャンクに書かれているとは限りません。</li>
+<li>記号が付いているかは、プログラムで数えられます（has_citation など）。中身が合っているかは、Groundedness などで確かめます。</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><strong>Azure AI Search での説明</strong><ul>
+<li><strong>出典の材料</strong><ul>
+<li>チャンクごとの出典の欄（ファイル名、ページ、見出し、シートと行）を、検索の結果と一緒に返します（p.26）。</li>
+<li>返す欄は <code>select</code> で決めます。</li>
+<li>欄が <code>retrievable</code> でないと、結果に返りません。</li>
+</ul>
+</li>
+<li><strong>ナレッジベースの場合</strong><ul>
+<li>エージェント型検索では、結果と、参照（references）が分けて返ります。</li>
+<li>参照には、どのナレッジソースのどの文書かが入ります。</li>
+<li>プレビューの回答の文を作る形（回答の合成）でも、参照の番号（<code>[ref_id:3]</code> のような形）が回答の中に付きます。</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p><img alt="回答の文ごとに、根拠のチャンクを示す" src="img/p49.svg"></p>
+<p><em>チャンクに出典の欄があれば、回答から元の文書へ戻れる</em></p>
+<details>
+<summary>ノート</summary>
+<ul>
+<li>位置：p.48 の RAG の流れのうち、回答の出し方を見るページです。p.26 の出典の欄が、ここで使われます。</li>
+<li>言いたいこと：出典は、チャンクごとの欄と、生成 AI に付けさせる記号の組で示します。記号が付いていても、中身が合っているとは限りません。</li>
+<li>気をつけること：<ul>
+<li>図の文と出典は説明用です。</li>
+<li>出典が付いていることと、正しいことは別だ、と言ってください。</li>
+</ul>
+</li>
+</ul>
+<p><strong>図のノート</strong></p>
+<p>狙い：回答の文ごとに根拠のチャンクを示す付け方と、出典が付いていても中身が合うとは限らない点が言える。</p>
+<p>話すこと：</p>
+<ul>
+<li>段階0：プロンプトで、チャンクに番号やファイル名を付けて生成 AI に渡す。チャンクごとの出典の欄（ファイル名、ページ、見出し、シートと行）は、検索の結果と一緒に返しておく（p.26）</li>
+<li>段階1：生成 AI に、文ごとに [1] のような記号で、使ったチャンクを示すように指示する。回答の中に、記号が付く</li>
+<li>段階2：記号を、ファイル名とページなどの出典に置き換えて表示する。利用者は、回答の根拠を元の文書で確かめられる。根拠のない文（出典が付かない文）を見つけやすくなり、回答が間違っていたときに、文書の側か生成の側かも調べやすくなる</li>
+<li>段階3：記号が付いていても、その文が本当にチャンクに書かれているとは限らない。生成 AI が、渡していない番号や、内容と合わない番号を付けることもある。付いているかは、プログラムで数えられる（has_citation など）。中身が合っているかは、Groundedness などで確かめる</li>
+</ul>
+<p>補足：文と出典は説明用の例。出典の欄は select で決め、retrievable でない欄は結果に返らない。エージェント型検索では、結果と参照（references）が分けて返り、参照には、どのナレッジソースのどの文書かが入る。プレビューの回答の合成でも、参照の番号（[ref_id:3] のような形）が回答の中に付く</p>
+<p>注意：出典が付いていることと、正しいことは別、と言う。図の文と出典は説明用</p>
+</details>
+<h3 id="p50-ハルシネーション">p.50 ハルシネーション</h3>
+<p><em>根拠にないことを、もっともらしく答える</em></p>
+<ul>
+<li><strong>一般的な説明</strong><ul>
+<li><strong>何が起きるか</strong><ul>
+<li>生成 AI が、渡した文にも事実にもないことを、もっともらしく答えます。</li>
+<li>文の形は自然なので、読んだだけでは気付きにくくなります。</li>
+<li>RAG にしても、なくなるわけではありません。</li>
+</ul>
+</li>
+<li><strong>RAG で起きる場所</strong><ul>
+<li>検索で起きる：正しい文書が見つからず、生成 AI が自分の知識で埋めます。</li>
+<li>生成で起きる：正しい文書は渡したが、読み違えたり、別の文書と混ぜたり、書かれていないことを足したりします。</li>
+<li>文書の側で起きる：古い版の文書や別の部署の文書が当たる、文書どうしが食い違う、などです。</li>
+</ul>
+</li>
+<li><strong>見つけ方と減らし方</strong><ul>
+<li>検索の結果を残し、回答の文が検索の結果に書かれているかを確かめます。</li>
+<li>渡した文に答えがないときは「分からない」と答えるように、プロンプトで決めます。</li>
+<li>古い版の文書は、日付の欄で見分けるか、外します（p.29）。</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><strong>Azure AI Search での説明</strong><ul>
+<li><strong>検索の側で減らす</strong><ul>
+<li>ハイブリッド検索とセマンティックランカーで、正しい文書を上位に出しやすくします（p.3、p.5）。</li>
+<li>フィルターで、部署や期間を絞ります（p.11）。</li>
+<li>ランカーの点数（rerankerScore）の低いチャンクを外すと、合わない文書を渡しにくくなります。</li>
+</ul>
+</li>
+<li><strong>回答の側で確かめる</strong><ul>
+<li>Groundedness の評価器（azure-ai-evaluation の <code>GroundednessEvaluator</code> など）で、回答が渡した文に沿っているかを点数にします。</li>
+<li>Groundedness は、渡した文が正しいかどうかは見ません。</li>
+<li>文書の側で起きた場合は、Groundedness が高くても間違った回答になることがあります。</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p><img alt="RAG にしても、ハルシネーションは3つの場所で起きる" src="img/p50.svg"></p>
+<p><em>RAG では、どこで起きたかによって見る場所が変わる</em></p>
+<p><strong>確かめる</strong>：<a href="basic-topics-06-answer-from-results-README.html">基礎 06 検索結果から答えを作る</a></p>
+<details>
+<summary>ノート</summary>
+<ul>
+<li>位置：p.48 の RAG の流れで、どこで間違いが起きるかを見るページです。p.43 の検索と回答の評価の分け方とつながります。</li>
+<li>言いたいこと：RAG のハルシネーションは、検索、生成、文書の側の3つの場所で起きます。場所によって、見る物差しが変わります。</li>
+<li>気をつけること：<ul>
+<li>Groundedness は渡した文に沿っているかを見るもので、文が正しいかは見ない、と必ず言ってください。</li>
+<li>「RAG にすればなくなる」とは言いません。</li>
+</ul>
+</li>
+</ul>
+<p><strong>図のノート</strong></p>
+<p>狙い：RAG のハルシネーションが起きる3つの場所（文書の側、検索、生成）と、場所によって見る物差しが変わることが言える。</p>
+<p>話すこと：</p>
+<ul>
+<li>段階0：文書を入れたインデックスを検索し、見つけたチャンクを生成 AI に渡して答えさせる。ハルシネーションは、渡した文にも事実にもないことを、もっともらしく答えること。文の形は自然なので、読んだだけでは気付きにくく、RAG にしても、なくなるわけではない</li>
+<li>段階1：文書の側で起きる。古い版の文書や別の部署の文書が当たる、文書どうしが食い違う、など。古い版の文書は、日付の欄で見分けるか、外す（p.29）</li>
+<li>段階2：検索で起きる。正しい文書が見つからず、生成 AI が自分の知識で埋める。ハイブリッド検索とセマンティックランカー（p.3、p.5）で正しい文書を上位に出しやすくし、フィルターで部署や期間を絞り（p.11）、ランカーの点数（rerankerScore）の低いチャンクを外すと、減らせる</li>
+<li>段階3：生成で起きる。正しい文書は渡したが、読み違えたり、別の文書と混ぜたり、書かれていないことを足したりする。Groundedness の評価器（azure-ai-evaluation の GroundednessEvaluator など）で、回答が渡した文に沿っているかを点数にする</li>
+</ul>
+<p>補足：Groundedness は「回答が渡した文に沿っているか」を見る。渡した文が正しいかは見ない。文書の側で起きた場合は、Groundedness が高くても間違った回答になることがある。見つけ方は、検索の結果を残し、回答の文が検索の結果に書かれているかを確かめること。渡した文に答えがないときは「分からない」と答えるように、プロンプトで決める。p.43 の検索と回答の評価の分け方とつながる</p>
+<p>注意：Groundedness は渡した文に沿っているかを見るもので、文が正しいかは見ない、と必ず言う。「RAG にすればなくなる」とは言わない</p>
+</details>
+<h2 id="c直し方">C　直し方</h2>
+<h3 id="うまくいかない5つの場面と直し方">うまくいかない5つの場面と直し方</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>場面</th>
+<th>何が起きるか</th>
+<th>直し方</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>版の違い</td>
+<td>古い版と新しい版が両方出て、古い値で答える</td>
+<td>有効期間の欄で絞る（フィルター）</td>
+</tr>
+<tr>
+<td>表の分断</td>
+<td>表の見出しと行が別のチャンクに分かれ、行の意味が失われる</td>
+<td>条ごとに切る、表の行を1件にする</td>
+</tr>
+<tr>
+<td>似た条文</td>
+<td>国内と海外、隣の行など、似た一節を取り違える</td>
+<td>上位を確かめる、欄で絞る、親を渡す</td>
+</tr>
+<tr>
+<td>数え上げ</td>
+<td>生成 AI に渡るのは上位の数件だけで、全部を数えられない</td>
+<td>絞り込みと件数（count）で数える</td>
+</tr>
+<tr>
+<td>資料にない質問</td>
+<td>それらしい答えを作ってしまう</td>
+<td>「資料にない」と答える約束をプロンプトに書く</td>
+</tr>
+</tbody>
+</table></div>
+<details>
+<summary>ノート</summary>
+<p>言いたいこと：検索をよくしても直らない場面がある。何が起きたかに合わせて、絞り込み、切り方、件数の数え方、プロンプトの約束で直す。</p>
+<ul>
+<li>版の違い：たとえば求人票 REQ-042 は、v1 が週4日出社、v3 が週2日出社（応用 17）。版を別の文書として置くと、絞り込みがなければ、時点に関係なく両方の版が検索に出る。</li>
+<li>表の分断：たとえば、ページをまたぐ表は、見出しの行が1ページ目、最後の行が2ページ目に分かれる。ページの切れ目で切ると、見出しと行が別のチャンクになる（例）。</li>
+<li>数え上げ：たとえば上位3件しか渡さないと、該当が10件あっても、数えられるのは3件まで。絞り込みと件数で数える（件数は例）。</li>
+<li>資料にない質問は、出典つきで答える仕組み（p.49・p.50）で扱う。</li>
+</ul>
+</details>
+<h3 id="直す前にどこで壊れたかを確かめる">直す前に、どこで壊れたかを確かめる</h3>
+<p><strong>取り込み</strong> → <strong>切り方</strong> → <strong>検索</strong> → <strong>回答</strong></p>
+<ul>
+<li><strong>取り込み</strong>：文字や表が読めているか</li>
+<li><strong>切り方</strong>：根拠がどのチャンクにあるか</li>
+<li><strong>検索</strong>：根拠のチャンクが何位か</li>
+<li><strong>回答</strong>：渡した中に根拠があるのに外したか</li>
+</ul>
+<blockquote>
+<p>工程の順に確かめると、直す場所が1つに決まる</p>
+</blockquote>
+<details>
+<summary>ノート</summary>
+<p>言いたいこと：答えが違ったときは、取り込み、切り方、検索、回答の順に、どこで壊れたかを確かめる。</p>
+<ul>
+<li>取り込みで失ったもの（表の見出し、数字）は、あとで取り戻せない。</li>
+<li>根拠が上位に来ていないなら検索、上位にあるのに答えが違うなら回答（プロンプト）を直す。</li>
+</ul>
+</details>
+<h2 id="d版と料金">D　版と料金</h2>
+<h3 id="p51-ga-とプレビュー">p.51 GA とプレビュー</h3>
+<p><em>どの機能が GA で、どの機能がプレビューか</em></p>
+<ul>
+<li><strong>一般的な説明</strong><ul>
+<li><strong>GA とプレビューの違い</strong><ul>
+<li>GA（一般提供）は、正式な機能として、サポートや SLA の対象になります。</li>
+<li>プレビューは、試しに使える段の機能で、名前や形が変わったり、なくなったりすることがあります。</li>
+<li>プレビューの機能は、本番で使う前に、使ってよい条件を確かめます。</li>
+</ul>
+</li>
+<li><strong>API の版</strong><ul>
+<li>REST API には、日付の付いた版があり、<code>api-version</code> で指定します。</li>
+<li><code>-preview</code> の付いた版には、プレビューの機能が入ります。</li>
+<li>同じ機能でも、版によって書き方が違うことがあります。</li>
+</ul>
+</li>
+<li>
+<p><strong>教材での書き分け</strong></p>
+<ul>
+<li>機能ごとに、GA かプレビューかを書きます。</li>
+<li>画面や資料が古いときは、今の状態を確かめてから使います。</li>
+<li>状態は変わるので、版の日付（2026-04-01、2026-08-01-preview）を添えます。</li>
+</ul>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>項目</th>
+<th>GA 2026-04-01</th>
+<th>プレビュー 2026-08-01-preview</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ナレッジソース</td>
+<td>searchIndex、azureBlob、indexedOneLake、web</td>
+<td>左に加えて SharePoint、Azure SQL、ファイル、MCP サーバー、Fabric、Work IQ など</td>
+</tr>
+<tr>
+<td>取得</td>
+<td>抽出型（見つけた内容を返す。Web の内容だけは LLM が要約）</td>
+<td>抽出型に加えて、LLM が回答を作る回答の合成</td>
+</tr>
+<tr>
+<td>reasoning effort</td>
+<td>minimal だけ（設定なし）</td>
+<td>minimal、low、medium、auto</td>
+</tr>
+</tbody>
+</table></div>
+</li>
+</ul>
+</li>
+</ul>
+<p><img alt="API の版（api-version）で、使える機能が変わる" src="img/p51.svg"></p>
+<p><em>プレビューは、名前や形が変わったり、なくなったりすることがある</em></p>
+<details>
+<summary>ノート</summary>
+<ul>
+<li>言いたいこと：この資料で見せる機能には、プレビューのものがあります（エージェント型検索の質問の分解など）。本番で使うなら、GA の範囲を確かめます。</li>
+<li>気をつけること：<ul>
+<li>どちらを使うべきかは言いません。</li>
+<li>状態は変わるので、表の日付（2026-04-01、2026-08-01-preview）を必ず添えてください。</li>
+</ul>
+</li>
+</ul>
+<p><strong>図のノート</strong></p>
+<p>狙い：api-version で版を選ぶと使える機能が変わること、プレビューの機能は本番で使う前に確かめることが言える。</p>
+<p>話すこと：</p>
+<ul>
+<li>段階0：アプリは、REST API の api-version で版を指定して呼ぶ。GA（一般提供）の版（2026-04-01）は、正式な機能として、サポートや SLA の対象になる。ナレッジソースは searchIndex、azureBlob、indexedOneLake、web。取得は抽出型（Web の内容だけは LLM が要約）。reasoning effort は minimal だけ（設定なし）</li>
+<li>段階1：-preview の付いた版（2026-08-01-preview）には、GA に加えて、プレビューの機能が入る。ナレッジソースに SharePoint、Azure SQL、ファイル、MCP サーバー、Fabric、Work IQ など。取得に、LLM が回答を作る回答の合成。reasoning effort は minimal、low、medium、auto</li>
+<li>段階2：この資料で見せる機能には、プレビューのもの（エージェント型検索の質問の分解など）がある。プレビューは、名前や形が変わったり、なくなったりすることがあるので、本番で使うなら、GA の範囲と、使ってよい条件を確かめる</li>
+</ul>
+<p>補足：同じ機能でも、版によって書き方が違うことがある。状態は変わるので、版の日付を添える。画面や資料が古いときは、今の状態を確かめてから使う。3つの軸の一覧は、前のスライドの表にある</p>
+<p>注意：どちらを使うべきかは言わない。状態は変わるので、版の日付（2026-04-01、2026-08-01-preview）を必ず添える</p>
+</details>
+<h3 id="p52-料金の構造">p.52 料金の構造</h3>
+<p><em>何に対して料金がかかるか</em></p>
+<ul>
+<li><strong>一般的な説明</strong><ul>
+<li><strong>かかり方の種類</strong><ul>
+<li>動かしている時間でかかるもの（サービスの台数や大きさ）。</li>
+<li>使った回数や量でかかるもの（呼び出しの数、処理したページ、トークン）。</li>
+<li>置いているデータの量でかかるもの。</li>
+</ul>
+</li>
+<li><strong>RAG で増えやすいところ</strong><ul>
+<li>取り込み：OCR やベクトルにする処理は、文書の量に比例します。</li>
+<li>検索：ランカーやエージェント型検索の計画は、質問の数に比例します。</li>
+<li>評価：生成 AI で採点すると、採点の回数分かかります。</li>
+</ul>
+</li>
+<li><strong>金額を書かない理由</strong><ul>
+<li>料金は地域と時期で変わります。</li>
+<li>この教材では、金額は書かず、何に対してかかるかだけを書きます。</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><strong>Azure AI Search での説明</strong><ul>
+<li><strong>4つのかかり方</strong><ul>
+<li>サービスの層 × SU：Free、Basic、Standard などの層と、SU（パーティション × レプリカ）の数で、動かしている時間でかかります。</li>
+<li>セマンティックランカー：Free プラン（既定）は毎月の無料枠（回数は公式の料金ページ <a href="https://azure.microsoft.com/ja-jp/pricing/details/search/">https://azure.microsoft.com/ja-jp/pricing/details/search/</a>）まで使え、使い切ると要求は課金のエラーになります。Standard プラン（Basic 以上）は、無料枠を超えた分が使った回数でかかります。</li>
+<li>ここでの Free は、検索サービスの層の Free（共有の小さなサービス）とは別のものです。</li>
+<li>AI エンリッチメントと、埋め込み・生成 AI：OCR や Document Layout は処理した量で、Azure OpenAI などはトークンでかかります。</li>
+</ul>
+</li>
+<li><strong>ベクトルの容量</strong><ul>
+<li>ベクトルは、インデックスの容量の多くを占めます。</li>
+<li>量子化（p.8）で小さくできます（スカラーは約4分の1、バイナリは最大で約28分の1）。</li>
+<li>小さくすると、検索の質が変わることがあるので、評価で確かめます（p.42）。</li>
+</ul>
+</li>
+<li><strong>この教材での扱い</strong><ul>
+<li>実際に試すと、課金や新しいリソースを伴うことがあるので、紹介にとどめます。</li>
+<li>エージェント型検索は、トークンの量でかかります。検索側（サブクエリの実行とセマンティックランキング）と、Azure OpenAI 側（計画と回答の合成）の2系統です。金額は公式の料金ページで見ます。</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p><img alt="料金は、時間・回数や量・データの量に対してかかる" src="img/p52.svg"></p>
+<p><em>金額は書かない。料金は地域と時期で変わるので、公式の料金ページで確かめる</em></p>
+<details>
+<summary>ノート</summary>
+<ul>
+<li>言いたいこと：料金は、時間、回数や量、データの量でかかります。金額はこの教材では書きません。</li>
+<li>気をつけること：<ul>
+<li>層を上げることや、プランを変えることを勧めません。</li>
+</ul>
+</li>
+</ul>
+<p><strong>図のノート</strong></p>
+<p>狙い：料金が、動かしている時間、使った回数や量、置いているデータの量でかかることと、RAG のどこで増えやすいかが言える。金額は言わない。</p>
+<p>話すこと：</p>
+<ul>
+<li>段階0：取り込み。OCR や Document Layout などの AI エンリッチメントは処理した量で、埋め込み（Azure OpenAI など）はトークンでかかる。どちらも文書の量に比例して増える</li>
+<li>段階1：サービス。Free、Basic、Standard などの層と、SU（パーティション × レプリカ）の数で、動かしている時間でかかる。ベクトルは、インデックスの容量の多くを占める。量子化（p.8）で小さくできるが、検索の質が変わることがあるので、評価で確かめる（p.42）</li>
+<li>段階2：検索。セマンティックランカーは、Free プラン（既定）は毎月の無料枠まで使え、使い切ると要求は課金のエラーになる。Standard プラン（Basic 以上）は、無料枠を超えた分が使った回数でかかる。エージェント型検索の計画は、質問の数に比例する</li>
+<li>段階3：回答と評価。生成 AI（Azure OpenAI など）はトークンでかかる。生成 AI で採点すると、採点の回数分かかる</li>
+</ul>
+<p>補足：エージェント型検索は、トークンの量でかかる。検索側（サブクエリの実行とセマンティックランキング）と、Azure OpenAI 側（計画と回答の合成）の2系統。エージェント型検索の計画にかかる料金の数え方と金額は、公式の料金ページ（<a href="https://azure.microsoft.com/ja-jp/pricing/details/search/">https://azure.microsoft.com/ja-jp/pricing/details/search/</a>）で確かめる。ここでの Free プランは、検索サービスの層の Free（共有の小さなサービス）とは別のもの。実際に試すと、課金や新しいリソースを伴うことがあるので、紹介にとどめる</p>
+<p>注意：金額は書かない（セマンティックランカーの無料枠の回数も、料金ページで見る）。層を上げることや、プランを変えることを勧めない</p>
+</details>
+</article>
+</main>
+<footer class="bar"><a class="home" href="../index.html">← 入口に戻る</a><a class="source" href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/docs/lecture/md/part5-wrapup.md">元の Markdown（GitHub）</a></footer>
+</body>
+</html>

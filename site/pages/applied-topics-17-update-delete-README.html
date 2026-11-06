@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>17 更新と削除 | データに着目した RAG の研修</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="bar"><a class="home" href="../index.html">← 入口に戻る</a><a class="source" href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/applied/topics/17-update-delete/README.md">元の Markdown（GitHub）</a></header>
+<main>
+<article class="doc">
+<h1 id="17-更新と削除">17 更新と削除</h1>
+<nav class="toc"><details><summary>このページの目次</summary>
+<ul>
+<li class="l2"><a href="#何を学ぶか">何を学ぶか</a></li>
+<li class="l2"><a href="#前提">前提</a></li>
+<li class="l2"><a href="#実行">実行</a></li>
+<li class="l2"><a href="#見るところ">見るところ</a></li>
+<li class="l2"><a href="#気をつけること">気をつけること</a></li>
+<li class="l2"><a href="#発展">発展</a></li>
+</ul>
+</details></nav>
+
+<p>文書は、あとから変わります。応募が取り下げられたら消し、求人票が改訂されたら置き換えます。
+Storage のファイルを変えたとき、検索の索引はどうなるか、を確かめます。</p>
+<p>このトピックは、<strong>チームの本物の文書</strong>（Storage の入れ物と、インデックス <code>hr-docs</code>）を、そのまま直して、<strong>最後に元に戻します</strong>。
+写しは作りません。構築する人の画面で動かし、メンバーは見ます。</p>
+<blockquote>
+<p><strong>17 の間は、チームの検索の結果も変わります。</strong> 取り下げた応募の書類が検索に出なくなったり、求人票が旧い版になったりする時間があります。
+ほかのメンバーが 15・16・18・19 を動かしていないときに実行してください。最後に元に戻ります（途中で止めたときは <code>cleanup.py</code>）。</p>
+</blockquote>
+<h2 id="何を学ぶか">何を学ぶか</h2>
+<ul>
+<li>文書は、Storage の入れ物の直下に、manifest の相対パスのまま置いてある（例 <code>resumes/CV-APP-0471.docx</code>）。同じデータソース・同じインデクサー・同じインデックス <code>hr-docs</code> に入る</li>
+<li>削除（<code>withdraw_application.py</code>）<ul>
+<li>ファイルを消すだけでは、インデクサーは気づかず、索引に残る（検索に出続ける）</li>
+<li>blob のメタデータに <code>IsDeleted=true</code> を付けて、インデクサーを動かすと、索引から消える。そのあとで blob を消す</li>
+<li>索引から消えたことを確かめてから、blob を消す。消えていなければ、blob は残したまま止まって、案内が出る（先に blob を消すと、印を読めなくなる）</li>
+<li>この教材は、親の文書（blob）の削除を検出すると、射影（index projections）で作った子のチャンクも一緒に消える方式。経歴書とスキャンのチャンクが 0 件になるのを確かめる
+    （一般の Blob の削除の説明にある、1つの文書が複数の検索文書になる場合の制限は、射影を使わない方式の話。射影のページ（Microsoft Learn の index projections、Content lifecycle）は、削除の検出で親の削除を検出すれば、子も削除されると書いている）</li>
+<li>メタデータを足すときは、今のものを読んで残す。<code>set_blob_metadata</code> は、指定したもので全部を置き換える</li>
+<li>消してしまった blob の取り残しは、同じ名前で <code>IsDeleted=true</code> を付けて置き直すと消せる</li>
+</ul>
+</li>
+<li>更新（<code>revise_job_posting.py</code>）<ul>
+<li>同じ名前で上書きするだけ。インデクサーが、blob の最終更新日時が前回より新しいことで見つける（設定は要らない）</li>
+<li>求人票 REQ-042 の本物（<code>jobs/JOB-REQ042-v3.pdf</code>）を、旧い版 v1（チャンク 3 件）の中身で上書きし、v3（チャンク 2 件）で上書きして戻すと、v3 の内容に変わる。余った古いチャンクは残らなかった（実測）</li>
+</ul>
+</li>
+<li>元に戻す（<code>cleanup.py</code>）<ul>
+<li>manifest の全部の文書が、<code>applied/data/</code> のとおりに、Storage とインデックスにある状態にする</li>
+<li><code>data/</code> と違う（中身かメタデータ。削除の印が付いたままのものも）文書だけ置き直し、manifest にない blob は、削除の印を付けて索引から消えたのを確かめてから消す</li>
+<li>そのあと、インデクサーを動かし、見てよい人（<code>allowed</code>）を付け直す。何度実行しても、同じ結果になる</li>
+</ul>
+</li>
+<li>見てよい人（<code>allowed</code>）は、インデクサーを動かすたびに、全部のチャンクに付け直す<ul>
+<li>インデクサーが取り込み直したチャンクは <code>allowed</code> が空に戻るため（<code>lib/acl.py</code> の <code>sync</code>。<code>build_hr_index.py</code> も同じ）</li>
+</ul>
+</li>
+</ul>
+<h2 id="前提">前提</h2>
+<ul>
+<li><code>pip install -r applied/requirements.txt</code>（Repo 直下で、仮想環境の中で）</li>
+<li>構築する人の設定（<code>python tools/team.py env --role builder</code>）：AI Search の管理者キーと、Storage の接続文字列が要ります。メンバーの設定では、始めに「この手順は構築する人の設定（--role builder）で実行します」と止まります</li>
+<li>構築する人が <code>applied/tools/build_hr_index.py</code> でインデックス <code>hr-docs</code> を作ってあること。データソースは、入れ物の全体を読む設定になっていること（<code>show_pipeline.py</code> の 1 で見える）</li>
+<li>v1 の求人票は <code>applied/data/updates/JOB-REQ042-v1.pdf</code>（17 だけで使う。<code>build_hr_index.py</code> は Storage に置かない）</li>
+</ul>
+<h2 id="実行">実行</h2>
+<pre><code>python withdraw_application.py       # 応募の取り下げ（削除）。インデクサーを何回も動かすので、数分かかる
+python revise_job_posting.py         # 求人票の改訂（更新）。数分かかる
+python cleanup.py                    # 途中で止めたときの、元に戻す
+</code></pre>
+<ul>
+<li>どちらも、最初に前の回の途中の状態を元に戻し、<code>withdraw_application.py</code> は最後に自分で元に戻す（<code>revise_job_posting.py</code> は、最後の手順が元に戻す手順）。何回実行しても同じ結果になる</li>
+<li><code>withdraw_application.py --keep</code> を付けると、最後に元に戻さない（取り下げた状態のまま、Storage や索引を見たいとき）。<strong>そのあいだ、チームの検索から、この応募の書類が消えたままです。</strong> 元に戻すのは <code>cleanup.py</code></li>
+<li>「インデクサーが実行中なので待ちます」と出たら、そのままお待ちください</li>
+</ul>
+<h2 id="見るところ">見るところ</h2>
+<ul>
+<li><code>withdraw_application.py</code>（応募 APP-0471 の経歴書・メール・スキャンの 3 ファイル、チャンク 4 件）<ol>
+<li>いまの「状態」の表：3 つとも Storage に「ある」、チャンクが 4 件。検索で名前が当たる</li>
+<li>失敗：メールの blob を消してインデクサーを動かしても、表の「索引のチャンク」が 1 のまま。「← 取り残し」と出る。検索でも出てくる</li>
+<li>正しい方法：メタデータの「前」と「後」で、<code>IsDeleted</code> が足されただけで、ほかは残っている。インデクサーのあと、経歴書とスキャンのチャンクが 0 件になる</li>
+<li>取り残しの掃除：同じ名前で印つきで置き直すと、メールの取り残しも 0 件になり、検索で何も当たらない</li>
+<li>最後に元に戻す：3 ファイルが Storage に戻り、チャンクも戻る</li>
+</ol>
+</li>
+<li><code>revise_job_posting.py</code><ol>
+<li>v1：チャンク 3 件。年収は 500万円から700万円、勤務は週4日出社、「試用期間」の記載がある</li>
+<li>上書き：blob の最終更新日時が新しくなる。v3：チャンク 2 件。年収は 600万円から800万円、週2日出社、「試用期間」はない</li>
+<li>「試用期間」「500万円」で探すと、v1 のときは当たり、v3 では当たらない</li>
+<li>v1 にしかない語を含むチャンクは 0 件。チャンクの数が 3 から 2 に減っても、余りは残らない</li>
+<li>最後は、始める前と同じ状態（v3）</li>
+</ol>
+</li>
+</ul>
+<h2 id="気をつけること">気をつけること</h2>
+<ul>
+<li>削除の検出は、最初のインデクサー実行から設定しておく。設定する前に消した blob の文書は、あとから設定を足しても、インデクサーをリセットしても索引に残る（Microsoft Learn の記載）。この教材のデータソースは、最初から設定してある</li>
+<li>更新の検出は、blob の最終更新日時を使う。変わっていない blob は、基本的には取り込み直さない。ただし、直近に取り込んだ最新のファイルは、変更がなくても、もう一度処理されることがある（実測）。そのため、インデクサーの「処理した文書の数」は、変更があったかの目印にしない</li>
+<li>インデクサーが実行中のとき、<code>run_indexer</code> は 409（実行中）で断られる。スクリプトは 10 秒待って、頼み直す。元に戻す（<code>cleanup.py</code>）は、実行中のインデクサーが終わるのを待ってから、文書を変える</li>
+<li>インデクサーの状態を取れなかったとき（通信の失敗）は、待ってやり直す。やり直しても取れなければ、止まる。取れなかったのを、「前の実行が終わった」と取り違えない</li>
+<li>元に戻したあと、全部の文書のチャンクが索引に入ったかを確かめる。入っていなければ、止まって案内する（元に戻したと言わない）</li>
+<li>スキャンを置き直すと、OCR が走る（チームの Foundry に課金される。数件ならわずか）</li>
+<li>17 の最中に、ほかの人が検索すると、途中の状態が見える。元に戻すまでの時間は、ふつう数分</li>
+</ul>
+<h2 id="発展">発展</h2>
+<ul>
+<li>ネイティブの論理削除（<code>NativeBlobSoftDeleteDeletionDetectionPolicy</code>）：Storage の Blob の論理削除を有効にして、このデータソースの削除の検出を切り替えると、blob を普通に消すだけで、インデクサーが索引から消す。印を付ける手順は要らない。代わりに、Storage 側の設定（論理削除の有効化、保持期間をインデクサーの実行間隔より十分長くする、Blob のバージョン管理は使わない）が要る。この教材は、Storage 側の設定が要らない方式（<code>IsDeleted</code>）を使っている</li>
+<li>版を名前に入れて、別の blob として置く（<code>JOB-REQ042-v1.pdf</code> と <code>JOB-REQ042-v3.pdf</code> を並べる）と、旧い版も検索に出続ける。「どの版か」を欄に持たせて絞る設計もある</li>
+<li>復元：<code>IsDeleted</code> を <code>false</code> に戻し、最終更新日時が前回のインデクサー実行より新しいことを確かめて、インデクサーを動かす</li>
+</ul>
+</article>
+</main>
+<footer class="bar"><a class="home" href="../index.html">← 入口に戻る</a><a class="source" href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/applied/topics/17-update-delete/README.md">元の Markdown（GitHub）</a></footer>
+</body>
+</html>

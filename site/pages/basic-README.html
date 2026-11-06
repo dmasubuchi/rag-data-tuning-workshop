@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>基礎編：検索と RAG を自分の手で動かす | データに着目した RAG の研修</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="bar"><a class="home" href="../index.html">← 入口に戻る</a><a class="source" href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/basic/README.md">元の Markdown（GitHub）</a></header>
+<main>
+<article class="doc">
+<h1 id="基礎編検索と-rag-を自分の手で動かす">基礎編：検索と RAG を自分の手で動かす</h1>
+<nav class="toc"><details><summary>このページの目次</summary>
+<ul>
+<li class="l2"><a href="#前提">前提</a></li>
+<li class="l2"><a href="#構築する人とメンバー">構築する人とメンバー</a></li>
+<li class="l2"><a href="#スクリプトと-notebook">スクリプトと Notebook</a></li>
+<li class="l2"><a href="#トピックの一覧">トピックの一覧</a></li>
+<li class="l2"><a href="#途中からの再開">途中からの再開</a></li>
+<li class="l2"><a href="#困ったときに見る中間結果">困ったときに見る中間結果</a></li>
+<li class="l2"><a href="#セマンティックランカーの使いすぎに注意">セマンティックランカーの使いすぎに注意</a></li>
+<li class="l2"><a href="#自分の資料に差し替えるとき">自分の資料に差し替えるとき</a></li>
+<li class="l2"><a href="#作る人進行役向け">作る人・進行役向け</a></li>
+<li class="l2"><a href="#フォルダ">フォルダ</a></li>
+</ul>
+</details></nav>
+
+<p>戦国武将のデータ（<code>data/sengoku/</code>）で、検索と RAG を一つずつ動かします。</p>
+<p>LangChain は使いません。使うのは <code>azure-search-documents</code>、<code>openai</code>、<code>python-dotenv</code> だけです。</p>
+<p>各スクリプトそのものが完成形です。上から順に実行し、画面に出る<strong>中間結果</strong>を読みながら進めます。
+スクリプトは <code># %%</code> で区切ったセルの形です。同じフォルダに同じ名前の Notebook（<code>.ipynb</code>）があり、どちらで動かしても同じ中身です。</p>
+<h2 id="前提">前提</h2>
+<ul>
+<li>Python 3.11 か 3.12。<code>python</code> が見つからないときは <code>py</code> に置き換えます（Windows）</li>
+<li>ライブラリ（最初に1回）：<code>pip install -r basic/requirements.txt</code></li>
+<li>Azure の接続先とキーは、Repo 直下の <code>.env.local</code> に入っています。Repo 直下で <code>python tools/team.py env --role builder</code>（メンバーは <code>--role member</code>）を実行すると作れます。ほかの人に渡しません（Git にも入りません）</li>
+<li>接続先とキーは、いつも <code>.env.local</code> の中身を使います（パソコンに残っている <code>AZURE_*</code> の環境変数は読みません）</li>
+<li>コマンドは PowerShell でも bash でも同じです。パスの区切りは <code>/</code> で書いてあります（PowerShell でも動きます）</li>
+</ul>
+<h2 id="構築する人とメンバー">構築する人とメンバー</h2>
+<p>チームは、自分たちの AI Search と Foundry を持ちます。インデックスの名前は固定です（武将は <code>sengoku</code>、同義語マップは <code>sengoku-synonyms</code>）。</p>
+<ul>
+<li>構築する人（<code>--role builder</code>）：AI Search の管理者キーを使います。インデックスと同義語マップを作り、武将を登録します（01 の <code>create_index.py</code>・<code>upload.py</code>・<code>analyze.py</code>、02、03 の <code>embed.py</code>、<code>tools/reset.py</code>）</li>
+<li>メンバー（<code>--role member</code>）：検索だけのキーを使います。構築する人が作ったインデックスを検索できます（01 の <code>keyword_search.py</code>・<code>search_paraphrase.py</code>、03 の <code>vector_search.py</code>、04、05、06）</li>
+<li>メンバーの設定で、作る・変える・調べる手順を実行すると、不透明なエラーになる前に「この手順は構築する人の設定（--role builder）で実行します」と止まります</li>
+</ul>
+<h2 id="スクリプトと-notebook">スクリプトと Notebook</h2>
+<ul>
+<li>スクリプト：トピックのフォルダで <code>python xxx.py</code>。VS Code では <code># %%</code> のところに出る「Run Cell」で1セルずつ動かせます</li>
+<li>Notebook：同じ名前の <code>xxx.ipynb</code> を開き、上のセルから順に実行します。VS Code の Jupyter 拡張と、<code>requirements.txt</code> に入っている <code>ipykernel</code> を使います</li>
+<li>質問や件数は、先頭近くの「変えてよい値」のセルで変えます。スクリプトでは引数でも変えられます（引数があれば引数、なければ変数）</li>
+<li>前のトピックが終わっていないと、最初のセルで止まります。構築する人の設定なら、<code>REBUILD = True</code> にして実行し直すと、武将のインデックスを作り直してから進みます。作り直せたら <code>REBUILD = False</code> に戻します（<code>True</code> のままだと、実行のたびに作り直します）。メンバーの設定では、構築する人に実行してもらいます</li>
+<li>中身を直すときは <code>.py</code> を直します。Notebook は <code>.py</code> から作ったものです（作る人用の <code>tools/make_notebooks.py</code>）</li>
+</ul>
+<h2 id="トピックの一覧">トピックの一覧</h2>
+<p>番号の順に進めます。各トピックの README に、前提のトピック、実行するコマンド、見るところが書いてあります。
+「発展」は、早く終わった人と、あとで試したい人用です。</p>
+<ul>
+<li><code>topics/01-keyword-search</code>　キーワード検索：武将を読み込み、インデックスを作り、登録して、検索する</li>
+<li><code>topics/02-analyzers-synonyms</code>　言い換えと日本語の分かれ方：Analyze API で分かれ方を見て、同義語マップに1行足す。発展は順位の調整（語の重み、欄の重み、除外の落とし穴）</li>
+<li><code>topics/03-vector-search</code>　ベクトル検索：言い換えの質問で、キーワード検索が外れ、ベクトル検索が当たるのを見る</li>
+<li><code>topics/04-hybrid-ranker</code>　ハイブリッド検索とセマンティックランカー：4つの方式の順位を並べる</li>
+<li><code>topics/05-measure-search</code>　検索の良し悪しを数字で測る：60問×4方式の nDCG@10・再現率@10・1位の割合。自分の質問も足せる</li>
+<li><code>topics/06-answer-from-results</code>　検索結果から答えを作る：プロンプトを組み、LLM に答えさせる</li>
+</ul>
+<p>応用編のトピックは <code>applied/</code> にあります。</p>
+<p>前提のトピックが終わっていないときは、最初のセルが止まって、先に実行するスクリプトか reset のコマンドを出します。</p>
+<h2 id="途中からの再開">途中からの再開</h2>
+<p>トピックを始める直前の状態（武将のインデックス、登録済みのデータ、埋め込み）を、1コマンドで作り直せます（構築する人の設定で実行します）。</p>
+<pre><code>python basic/tools/reset.py --to 04
+</code></pre>
+<ul>
+<li>番号はトピックの番号です（<code>04-hybrid-ranker</code> のようにフォルダ名でもかまいません）</li>
+<li>消すのは、武将のインデックス <code>sengoku</code> だけです。同じ AI Search の、ほかのインデックスには触りません</li>
+<li>同義語マップ <code>sengoku-synonyms</code> は消しません（02 の最後で、武将のインデックスの欄から外します）</li>
+<li>埋め込みは、既定では同梱の埋め込み済みファイル（<code>basic/embeddings/</code>）を使います。Azure OpenAI で埋め込み直すときは <code>--embed live</code></li>
+<li>先に何も変えずに見たいとき：<code>--dry-run</code></li>
+</ul>
+<h2 id="困ったときに見る中間結果">困ったときに見る中間結果</h2>
+<p>答えがおかしいときは、最初に「いいえ」になった工程が、失敗した工程です。上から順に確かめます。</p>
+<ol>
+<li>正解の武将は、検索の上位に入ったか（検索）：<code>04-hybrid-ranker/compare_methods.py</code></li>
+<li>正解の武将は、実際に LLM に渡したプロンプトに入っているか（組み立て）：<code>06-answer-from-results/build_prompt.py</code></li>
+<li>答えは、プロンプトの資料と、正解の武将に合っているか（回答生成）：<code>06-answer-from-results/generate_answer.py</code></li>
+</ol>
+<p>エラーが出たときは、画面の <code>確かめること:</code> を読みます。表示ではキーを <code>***</code> に伏せています。よくある原因：</p>
+<ul>
+<li>「設定ファイルが見つかりません」「次の項目がありません」：Repo 直下で <code>python tools/team.py env --role builder</code>（メンバーは <code>--role member</code>）を実行したか</li>
+<li>「この手順は構築する人の設定で実行します」：いまの <code>.env.local</code> が検索だけのキー（メンバー用）です。構築する人が実行するか、構築する人の <code>.env.local</code> で実行します</li>
+<li>「キーまたは権限」：<code>.env.local</code> のキーが古くなっていないか。作り直せます</li>
+<li>「インデックスがありません」：前のトピックのスクリプトを実行したか。構築する人は <code>reset.py</code> で作り直せる</li>
+<li>「呼びすぎ（429）」：自動で待って再試行します。それでも続くときは1分ほど待つ</li>
+<li>セマンティックランカーが使えない：AI Search の料金プランが対応しているか、月の無料枠を使い切っていないか</li>
+</ul>
+<h2 id="セマンティックランカーの使いすぎに注意">セマンティックランカーの使いすぎに注意</h2>
+<p>Free プランの無料枠には月ごとの上限があり、チームの AI Search 全体で使います。回数は料金ページ（<a href="https://azure.microsoft.com/ja-jp/pricing/details/search/">https://azure.microsoft.com/ja-jp/pricing/details/search/</a>）で確かめます。</p>
+<ul>
+<li>1回の実行で各 1 回：<code>04-hybrid-ranker</code> の <code>ranker.py</code> と <code>compare_methods.py</code>、<code>06-answer-from-results</code> の <code>build_prompt.py</code> と <code>generate_answer.py</code>、<code>05-measure-search</code> の <code>ndcg_by_hand.py</code></li>
+<li>1回の実行で質問の数（60 回）：<code>05-measure-search</code> の <code>measure_methods.py</code>。チームで何度も実行しないようにします</li>
+<li><code>compare_no_search.py</code> は、<code>generate_answer.py</code> が保存した答えを使えるとき（質問・検索の方式・件数が同じとき）だけ 0 回です。違うときや、<code>REBUILD = True</code>（<code>--rebuild</code>）で保存した答えが消えたあとは、検索し直すので 1 回使います。ほかのスクリプトはランカーを使いません（<code>METHOD = "hybrid_ranker"</code> に書き換えたときだけ使います）</li>
+</ul>
+<h2 id="自分の資料に差し替えるとき">自分の資料に差し替えるとき</h2>
+<ul>
+<li>武将の JSON → <code>data/sengoku/bushou.json</code>（項目 <code>id</code>、<code>name</code>、<code>aliases</code>、<code>battles</code>、<code>profile</code> など）。項目を変えるときは、<code>lib/sengoku.py</code> の <code>build_index()</code> と <code>FIELDS</code>、<code>lib/data.py</code> の <code>embedding_text()</code> を合わせる</li>
+<li>質問と正解（任意）→ <code>data/sengoku/questions.json</code>。ないときは、正解の順位を省略して動きます</li>
+<li>資料を差し替えたら、埋め込み済みファイルは作り直す（作る人用 <code>tools/make_embeddings.py</code>）。古い分は使われず、その場で埋め込まれる</li>
+</ul>
+<h2 id="作る人進行役向け">作る人・進行役向け</h2>
+<ul>
+<li><code>python basic/tools/make_embeddings.py</code>：武将の埋め込み済みファイルを作る。<code>--check</code> で、いまの <code>.env.local</code> と合っているかを確かめる。本文を変えたら作り直す</li>
+<li><code>python basic/tools/reset.py --to 04</code>：構築する人の設定で、トピックの開始の状態を作り直す</li>
+<li><code>python tools/make_notebooks.py</code>：<code>.py</code> から Notebook を作り直す（出力は空）。<code>--check</code> で、ずれているものを一覧にする。jupytext が要る（<code>requirements-dev.txt</code>）</li>
+<li>同義語マップ：Basic は AI Search 全体で 3 個まで。ここで作るのは <code>sengoku-synonyms</code> の 1 個だけ（作れないときは案内が出て止まる）。消すときは <code>lib.synonyms.delete_map()</code></li>
+<li>
+<p>テスト（通信なし）：仮想環境を作って流します</p>
+<pre><code>python3 -m venv .venv
+.venv/bin/pip install -r basic/requirements.txt -r requirements-dev.txt
+.venv/bin/python -m unittest discover -s basic/tests
+</code></pre>
+<p>Windows（PowerShell）では <code>.venv\Scripts\python</code> を使います</p>
+</li>
+<li>
+<p>各スクリプトの実行時間は、スクリプトとして動かしたとき、最後に「（実行時間 n 秒）」と出ます</p>
+</li>
+</ul>
+<h2 id="フォルダ">フォルダ</h2>
+<ul>
+<li><code>topics/</code>：トピックごとのスクリプト・Notebook・README。スクリプトのファイル名は全トピックで重ならない。スクリプトは読み込むと動き出すので、スクリプトどうしでは import しない。トピックをまたいで使う関数は <code>lib/</code> にある</li>
+<li><code>lib/</code>：スクリプトが共通で使う部品<ul>
+<li>設定と接続：<code>config.py</code>（<code>.env.local</code> の読み取りと、固定の名前）、<code>clients.py</code></li>
+<li>状態の確認と作り直し：<code>state.py</code></li>
+<li>検索と表示：<code>search.py</code>、<code>show.py</code>、エラーの表示 <code>runner.py</code>、セルの形の始まりと終わり <code>cells.py</code></li>
+<li>登録と埋め込み：<code>indexing.py</code>、<code>llm.py</code>（埋め込みと回答の生成）、埋め込み済みファイル <code>vectorstore.py</code>、前の結果のメモ <code>worklog.py</code></li>
+<li>データ：<code>data.py</code>、武将のインデックス <code>sengoku.py</code></li>
+<li>トピックの部品：同義語マップ <code>synonyms.py</code>、指標 <code>metrics.py</code>、検索結果からのプロンプト <code>rag_prompt.py</code></li>
+</ul>
+</li>
+<li><code>data/</code>：武将の JSON と質問（<code>sengoku/</code>）</li>
+<li><code>embeddings/</code>：埋め込み済みファイル（text-embedding-3-small、1536 次元。時間が足りないとき用）</li>
+<li><code>tools/</code>：作る人用と再開用（<code>reset.py</code>、<code>make_embeddings.py</code>）</li>
+<li><code>tests/</code>：通信なしのテスト</li>
+<li><code>requirements.txt</code></li>
+</ul>
+</article>
+</main>
+<footer class="bar"><a class="home" href="../index.html">← 入口に戻る</a><a class="source" href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/basic/README.md">元の Markdown（GitHub）</a></footer>
+</body>
+</html>

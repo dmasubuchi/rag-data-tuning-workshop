@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>01 キーワード検索 | データに着目した RAG の研修</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="bar"><a class="home" href="../index.html">← 入口に戻る</a><a class="source" href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/basic/topics/01-keyword-search/README.md">元の Markdown（GitHub）</a></header>
+<main>
+<article class="doc">
+<h1 id="01-キーワード検索">01 キーワード検索</h1>
+<nav class="toc"><details><summary>このページの目次</summary>
+<ul>
+<li class="l2"><a href="#学ぶこと">学ぶこと</a></li>
+<li class="l2"><a href="#前提">前提</a></li>
+<li class="l2"><a href="#実行するコマンドこのフォルダで">実行するコマンド（このフォルダで）</a></li>
+<li class="l2"><a href="#何を見ればよいか">何を見ればよいか</a></li>
+<li class="l2"><a href="#演習先頭の値を書き換えてもう一度実行する">演習：先頭の値を書き換えて、もう一度実行する</a></li>
+<li class="l2"><a href="#次のトピック">次のトピック</a></li>
+</ul>
+</details></nav>
+
+<h2 id="学ぶこと">学ぶこと</h2>
+<ul>
+<li>武将の JSON を、AI Search のインデックスに登録して、キーワード検索（BM25）で探す</li>
+<li>日本語は分かち書きして検索する。質問と本文で同じ単語に分かれるかが、一致の分かれ目になる</li>
+<li>質問を言い換えると、キーワード検索では正解が外れる</li>
+</ul>
+<h2 id="前提">前提</h2>
+<ul>
+<li>なし（最初のトピック）。Repo 直下に <code>.env.local</code> があること（なければ、Repo 直下で <code>python tools/team.py env --role builder</code>、メンバーは <code>--role member</code> で作る）</li>
+<li><code>create_index.py</code> と <code>upload.py</code> は、AI Search の管理者キーが要るので、構築する人の設定（<code>--role builder</code>）で実行する。<code>analyze.py</code>（Analyze API）も管理者キーが要る。メンバーの設定（検索だけのキー）では、「構築する人の設定で実行します」と止まる。検索（<code>keyword_search.py</code>、<code>search_paraphrase.py</code>）は、メンバーの設定でもできる</li>
+</ul>
+<h2 id="実行するコマンドこのフォルダで">実行するコマンド（このフォルダで）</h2>
+<p>必須（この順に）</p>
+<ul>
+<li><code>python load.py</code>　武将の JSON の中身を見る（Azure には接続しない）</li>
+<li><code>python create_index.py</code>　インデックスを作る（文字の項目だけ）</li>
+<li><code>python upload.py</code>　武将を登録する</li>
+<li><code>python keyword_search.py</code>　キーワード検索（既定は「桶狭間」）。<code>--q "姉川"</code> で検索語を変えられる</li>
+<li><code>python analyze.py</code>　質問と本文が、どんな単語に分かれるか（Analyze API）</li>
+<li><code>python search_paraphrase.py</code>　言い換えの質問をキーワード検索で実行する（正解が外れる）</li>
+</ul>
+<p>Notebook でも、同じファイルを上から順にセルで実行できます。<code>--q</code> などの引数に当たるものは、先頭の「変えてよい値」のセルの変数（<code>QUERY</code>・<code>QUESTION</code>、<code>RECREATE = True</code> など）で指定します。
+状態が足りないときは、スクリプトの先頭の <code>REBUILD = True</code>（スクリプトでは <code>--rebuild</code>）で、武将のインデックスを 01 が終わった状態に作り直せます。Notebook では、作り直したら <code>REBUILD = False</code> に戻します（<code>True</code> のままだと、実行のたびに作り直します）。</p>
+<h2 id="何を見ればよいか">何を見ればよいか</h2>
+<ul>
+<li><code>keyword_search.py</code>：一致した武将の人数と、スコアの高い順。珍しい語を含むほどスコアが高い</li>
+<li><code>analyze.py</code>：質問の単語ごとの「正解の項目」と「含む武将の人数」。共通の単語がないと、正解は上位に来にくい</li>
+<li><code>search_paraphrase.py</code>：正解の武将の順位。言い方が違うと、上位に来ない</li>
+</ul>
+<h2 id="演習先頭の値を書き換えてもう一度実行する">演習：先頭の値を書き換えて、もう一度実行する</h2>
+<ul>
+<li><code>keyword_search.py</code> の <code>SEARCH_FIELDS = None</code> を <code>["battles"]</code> にする：検索する項目を絞ると、一致する武将が変わる（<code>["name"]</code> だと 0 人）</li>
+<li><code>search_paraphrase.py</code> の <code>QUESTION = None</code> を <code>"独眼竜と呼ばれた大名は誰ですか。"</code> にする：本文にある言葉を使うと、キーワード検索でも当たる</li>
+<li>発展：<code>QUERY</code> を別の合戦名・地名・年号に変える</li>
+</ul>
+<h2 id="次のトピック">次のトピック</h2>
+<ul>
+<li><code>../03-vector-search</code></li>
+</ul>
+</article>
+</main>
+<footer class="bar"><a class="home" href="../index.html">← 入口に戻る</a><a class="source" href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/basic/topics/01-keyword-search/README.md">元の Markdown（GitHub）</a></footer>
+</body>
+</html>

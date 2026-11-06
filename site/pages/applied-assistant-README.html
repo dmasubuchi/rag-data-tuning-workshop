@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>採用アシスタント | データに着目した RAG の研修</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="bar"><a class="home" href="../index.html">← 入口に戻る</a><a class="source" href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/applied/assistant/README.md">元の Markdown（GitHub）</a></header>
+<main>
+<article class="doc">
+<h1 id="採用アシスタント">採用アシスタント</h1>
+
+<p>採用の文書について質問すると、LLM が検索のやり方を選びながら候補（応募者）を絞り込み、出典つきで答えます。
+エージェント型 RAG の動きを見せるためのデモです。チームのだれかが動かし、ほかの人は画面を見ます。</p>
+<p>検索と LLM だけを使います。メンバーの設定（検索だけのキー、Storage の項目なし）で動きます。</p>
+<h2 id="画面">画面</h2>
+<ul>
+<li>左：用意した質問（19 の <code>questions.json</code> の 10 問）のボタンと、質問の入力欄。答えと、出典（開くと根拠の本文）</li>
+<li>右：検索の段。1 段ごとに、やり方（キーワード・ベクトル・欄で絞る・ID でたどる）、検索の語や条件、残った候補の人数を出す</li>
+</ul>
+<h2 id="仕組み">仕組み</h2>
+<ul>
+<li><code>engine.py</code>：候補の人（応募番号）を持ち、段ごとに絞る。2 段目からの検索は、前の段で残った人の文書だけが対象。0 人になる検索では絞らない</li>
+<li><code>azure_io.py</code>：チームのインデックス <code>hr-docs</code> を、採用担当の役で検索する。LLM（<code>.env.local</code> のチャットのデプロイ）に 4 つの道具を渡し、どれを使うかを選ばせる。段は 6 まで。答えの出典の番号を確かめ（文に書いた人と、資料の人が合わない番号は外す）、1 から振り直す</li>
+<li><code>app.py</code>：画面（Streamlit）。<code>gate.py</code> が合言葉と 1 日の回数の上限を見る。<code>view.py</code> が表示の判断（考えている間に次の段の枠へ「考えています」を出す・段のカードの3行・段を描く間隔・出典の見出しに人を添える・質問のボタンの題）を受け持つ</li>
+<li><code>cli.py</code>：端末で 1 問だけ動かす（確かめ用）</li>
+<li><code>Dockerfile</code>：コンテナで動かすときのイメージ（任意。使い方は先頭のコメント）。Repo 直下の <code>.dockerignore</code> が <code>.env.local</code> などを除く</li>
+</ul>
+<h2 id="自分の-pc-で動かす">自分の PC で動かす</h2>
+<p>前提：Repo 直下の <code>.env.local</code>（<code>python tools/team.py env --role member</code>）と、インデックス <code>hr-docs</code>（構築する人が作ったもの）。</p>
+<pre><code>pip install -r applied/assistant/requirements.txt
+streamlit run applied/assistant/app.py --client.toolbarMode minimal --theme.primaryColor "#1864ab"
+</code></pre>
+<p>端末で 1 問だけ：<code>cd applied</code> のあと <code>python -m assistant.cli --id q10</code></p>
+<h2 id="人に見せるときの設定任意">人に見せるときの設定（任意）</h2>
+<p>環境変数で変えられます。なければ、合言葉なし・既定の値で動きます。</p>
+<ul>
+<li><code>ASSISTANT_ACCESS_CODE</code>：合言葉。決めると、画面を開くときに入力が要ります</li>
+<li><code>ASSISTANT_MAX_QUESTIONS</code>：1 日の質問の上限（既定 200）</li>
+<li><code>ASSISTANT_STEP_PAUSE</code>：段を画面に描く最低の間隔（秒、既定 0.6、0 で間隔なし、上限 3）。LLM が検索を続けて頼んだときも、段が 1 つずつ見えるようにします</li>
+<li><code>ASSISTANT_REASONING_EFFORT</code>：LLM の考える量（<code>none</code>・<code>minimal</code>・<code>low</code>・<code>medium</code>・<code>high</code>。大文字小文字と前後の空白は問いません）。決めなければ <code>.env.local</code> の <code>AZURE_OPENAI_REASONING_EFFORT</code>、それも使える値でなければ <code>low</code>。<code>none</code> では、資料と人の取り違えが出たことがあります</li>
+</ul>
+</article>
+</main>
+<footer class="bar"><a class="home" href="../index.html">← 入口に戻る</a><a class="source" href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/applied/assistant/README.md">元の Markdown（GitHub）</a></footer>
+</body>
+</html>

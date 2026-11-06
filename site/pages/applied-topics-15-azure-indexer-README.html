@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>15 Azure の仕組みに置き換える | データに着目した RAG の研修</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="bar"><a class="home" href="../index.html">← 入口に戻る</a><a class="source" href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/applied/topics/15-azure-indexer/README.md">元の Markdown（GitHub）</a></header>
+<main>
+<article class="doc">
+<h1 id="15-azure-の仕組みに置き換える">15 Azure の仕組みに置き換える</h1>
+<nav class="toc"><details><summary>このページの目次</summary>
+<ul>
+<li class="l2"><a href="#何を学ぶか">何を学ぶか</a></li>
+<li class="l2"><a href="#前提">前提</a></li>
+<li class="l2"><a href="#実行">実行</a></li>
+<li class="l2"><a href="#見るところ">見るところ</a></li>
+<li class="l2"><a href="#設計図は手元のコードから読む">設計図は手元のコードから読む</a></li>
+<li class="l2"><a href="#検索の絞り込みなし">検索の絞り込みなし</a></li>
+<li class="l2"><a href="#インデックスの欄1620-で使う">インデックスの欄（16〜20 で使う）</a></li>
+</ul>
+</details></nav>
+
+<p>14 で手元の Python がしたこと（文書を開く → 文字を取り出す → チャンクに切る）を、Azure AI Search の部品で行います。
+構築する人が <code>applied/tools/build_hr_index.py</code> で1回だけ流して、インデックス <code>hr-docs</code> を作ってあります。メンバーは読んで、検索して確かめます。</p>
+<h2 id="何を学ぶか">何を学ぶか</h2>
+<ul>
+<li>取り込みの部品<ul>
+<li>データソース：どこの文書を読むか（Storage の入れ物の全体。接続文字列、削除の印）</li>
+<li>インデクサー：文書を1つずつ開いて、文字と画像を取り出す</li>
+<li>スキルセット：取り出したものに順に手を加える（OCR → 文字の結合 → 分割 → 埋め込み）</li>
+<li>インデックスの射影：親の文書とチャンクの親子。チャンクを1件ずつ登録し、親の番号（parent_id）を持たせる</li>
+<li>ベクトル化：検索するときの質問も、AI Search が Azure OpenAI でベクトルにする（統合ベクトル化）</li>
+</ul>
+</li>
+<li>OCR を取り込みに入れると、14 で見つからなかった語（入社予定日）が見つかる</li>
+<li>Azure の分割は長さ（400 文字）で切る。Excel の1行や Word の見出しは考えない（14 との違い）</li>
+</ul>
+<h2 id="前提">前提</h2>
+<ul>
+<li><code>pip install -r applied/requirements.txt</code>（Repo 直下で、仮想環境の中で）</li>
+<li>構築する人がインデックス <code>hr-docs</code> を作ってあること（なければ構築する人に聞く）</li>
+<li>メンバーの設定（検索だけのキー、Storage なし）で動きます</li>
+</ul>
+<h2 id="実行">実行</h2>
+<pre><code>python show_pipeline.py      # 設計図と結果を読む（何も変えない）
+python search_documents.py   # 14 で当たらなかった語を探す
+python search_documents.py --term "夜間当番"
+python search_documents.py --question "石田さんはいつから働き始めますか"
+</code></pre>
+<h2 id="見るところ">見るところ</h2>
+<ul>
+<li><code>show_pipeline.py</code><ul>
+<li>スキルセットの表：前の段が出したもの（text、merged_content、pages）を、次の段が受け取っている</li>
+<li>インデックスの欄：後のトピックで使う欄（allowed、req_id など）</li>
+<li>取り込みの結果：文書の種類ごとのチャンクの数に scan が入っている</li>
+</ul>
+</li>
+<li><code>search_documents.py</code><ul>
+<li>「入社予定日」の1位が scan（内定承諾書）。OCR で読んだ全文</li>
+<li>言い換えた質問（ハイブリッド検索）でも見つかる</li>
+</ul>
+</li>
+</ul>
+<h2 id="設計図は手元のコードから読む">設計図は手元のコードから読む</h2>
+<p><code>show_pipeline.py</code> が表示するデータソース・スキルセット・インデックスの設計図は、<code>lib/pipeline.py</code> のコードから読みます
+（構築する人の <code>build_hr_index.py</code> が Azure に送るものと同じ）。取り込みの結果は、インデックスの中を検索して数えます。
+検索だけのキー（メンバー用）は、Azure にあるデータソースやスキルセットの定義を読めないので、手元のコードから読む作りにしてあります。
+構築する人が、Azure にある定義や、インデクサーの実行の記録を見るときは、<code>python applied/tools/build_hr_index.py --status</code> を使います。</p>
+<h2 id="検索の絞り込みなし">検索の絞り込みなし</h2>
+<p>このトピックの検索（<code>search_documents.py</code>）は、インデックス <code>hr-docs</code> の全部の文書を探します（見てよい人での絞り込みは 16 から）。
+17 は、同じインデックスの文書を一時的に直しますが、最後に元に戻します。</p>
+<h2 id="インデックスの欄1620-で使う">インデックスの欄（16〜20 で使う）</h2>
+<ul>
+<li><code>chunk</code>：本文（OCR で読んだ文字を含む）、<code>text_vector</code>：ベクトル</li>
+<li><code>title</code>：ファイル名、<code>parent_id</code>：親の文書、<code>doc_id</code>：文書の番号、<code>kind</code>：文書の種類</li>
+<li><code>req_id</code>・<code>application_ids</code>・<code>person_keys</code>：求人・応募・人の番号（18 関係で探す）</li>
+<li><code>allowed</code>：見てよい人（role:recruiter、role:interviewer、role:employee、user:U-1006 など。16 見せてよい人で絞る）</li>
+</ul>
+</article>
+</main>
+<footer class="bar"><a class="home" href="../index.html">← 入口に戻る</a><a class="source" href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/applied/topics/15-azure-indexer/README.md">元の Markdown（GitHub）</a></footer>
+</body>
+</html>

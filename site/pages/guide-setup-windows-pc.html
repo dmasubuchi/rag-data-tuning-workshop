@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Windows PC の設定 | データに着目した RAG の研修</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="bar"><a class="home" href="../index.html">← 入口に戻る</a><a class="source" href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/guide/setup/windows-pc.md">元の Markdown（GitHub）</a></header>
+<main>
+<article class="doc">
+<h1 id="windows-pc-の設定">Windows PC の設定</h1>
+
+<p>参加者の PC で、最初に1回行います。</p>
+<h2 id="1-確かめる">1. 確かめる</h2>
+<ol>
+<li class="task"><input type="checkbox"> ネットワークにつながっている</li>
+<li class="task"><input type="checkbox"> GitHub で、研修の Repo を開ける（Repo の URL は進行役から聞きます）</li>
+<li class="task"><input type="checkbox"> clone できる：<code>git clone &lt;Repo の URL&gt;</code></li>
+<li class="task"><input type="checkbox"> Python（3.11 か 3.12）：<code>python --version</code></li>
+<li class="task"><input type="checkbox"> ライブラリ：clone したフォルダーで <code>pip install -r basic/requirements.txt</code></li>
+<li class="task"><input type="checkbox"> az：<code>az version</code></li>
+<li class="task"><input type="checkbox"> 連絡の場所：進行役が案内するチャットなどに入る</li>
+</ol>
+<p>コマンドは PowerShell で実行します。macOS・Linux の bash でも、同じコマンドで動きます。</p>
+<h3 id="入っていないとき">入っていないとき</h3>
+<p>PowerShell で、足りないものだけ実行します。入れたら PowerShell を開き直します。</p>
+<pre><code class="language-powershell">winget install -e --id Git.Git
+winget install -e --id Python.Python.3.12
+winget install -e --id Microsoft.AzureCLI
+winget install -e --id Microsoft.VisualStudioCode
+</code></pre>
+<p>winget が使えないときは、公式サイトから入れます。Git（<code>https://git-scm.com</code>）、Python（<code>https://www.python.org/downloads/</code>。「Add python.exe to PATH」にチェック）、az（<code>https://aka.ms/installazurecliwindows</code>）、VS Code（<code>https://code.visualstudio.com</code>）</p>
+<h2 id="2-vs-code-で資料を読む">2. VS Code で資料を読む</h2>
+<ol>
+<li class="task"><input type="checkbox"> 拡張機能（<code>Ctrl+Shift+X</code>）で「Markdown Preview Mermaid Support」を検索して入れる（図が表示されるようになる）<ul>
+<li>コマンドなら：<code>code --install-extension bierner.markdown-mermaid</code></li>
+</ul>
+</li>
+<li class="task"><input type="checkbox"> <code>.md</code> を開いて <code>Ctrl+Shift+V</code> でプレビューする（横に並べるなら <code>Ctrl+K</code> のあとに <code>V</code>）</li>
+</ol>
+<p>GitHub の画面で読むときは、何も入れなくても図が表示されます。</p>
+<h2 id="次の手順">次の手順</h2>
+<p><a href="guide-setup-azure-setup.html">Azure の準備</a></p>
+</article>
+</main>
+<footer class="bar"><a class="home" href="../index.html">← 入口に戻る</a><a class="source" href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/guide/setup/windows-pc.md">元の Markdown（GitHub）</a></footer>
+</body>
+</html>

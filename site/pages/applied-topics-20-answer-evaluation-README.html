@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>20 答えを評価する | データに着目した RAG の研修</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="bar"><a class="home" href="../index.html">← 入口に戻る</a><a class="source" href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/applied/topics/20-answer-evaluation/README.md">元の Markdown（GitHub）</a></header>
+<main>
+<article class="doc">
+<h1 id="20-答えを評価する">20 答えを評価する</h1>
+<nav class="toc"><details><summary>このページの目次</summary>
+<ul>
+<li class="l2"><a href="#何を学ぶか">何を学ぶか</a></li>
+<li class="l2"><a href="#前提">前提</a></li>
+<li class="l2"><a href="#実行">実行</a></li>
+<li class="l2"><a href="#見るところ">見るところ</a></li>
+<li class="l2"><a href="#注意組み込みの評価器を使うとき">注意：組み込みの評価器を使うとき</a></li>
+<li class="l2"><a href="#呼び出しの数">呼び出しの数</a></li>
+<li class="l2"><a href="#ファイル">ファイル</a></li>
+<li class="l2"><a href="#公式資料">公式資料</a></li>
+</ul>
+</details></nav>
+
+<p>19 で作った答え（10問 × ① 普通の検索 / ② エージェント型検索 × 3回）を、LLM に採点させます。採点の方法は2通りです。</p>
+<ul>
+<li><strong>自前の採点プロンプト</strong>：採点の基準を日本語の文で書き、1〜5 で採点させる。観点は3つ（根拠への忠実さ・質問への答え・要点の網羅）</li>
+<li><strong>組み込みの評価器</strong>：<code>azure-ai-evaluation</code> の <code>GroundednessEvaluator</code>（資料に基づいているか）と <code>RelevanceEvaluator</code>（質問に答えているか）。各 1〜5</li>
+</ul>
+<p>同じ質問・同じ方式の答えを、別々に3回ずつ作ってあります。その3つの答えを1回ずつ採点して、<strong>3回の最小・最大で点のぶれ</strong>を見ます。
+このぶれは、<strong>答えの生成のぶれ</strong>（同じ質問でも答えが少しずつ違う）と<strong>採点のぶれ</strong>（同じ答えでも点が少し変わる）を合わせたものです。
+LLM が答えを作り、LLM が採点するので、1回だけ採点して「② が良い」と決めることはできません。</p>
+<blockquote>
+<p>19 の質問の分解は、プレビューの API（<code>2026-08-01-preview</code>）です。20 の採点は、プレビューではありません
+（Azure OpenAI の通常の呼び出しと、<code>azure-ai-evaluation</code> の評価器です）。</p>
+</blockquote>
+<h2 id="何を学ぶか">何を学ぶか</h2>
+<ul>
+<li>「答えの良さ」は1つの数字では決まらない。観点（根拠・質問への答え・要点の網羅）を分けて見る</li>
+<li>採点の基準は、プロンプトの文章として書ける。基準の文が違えば、同じ答えでも点が違う（自前と組み込みの比べ）</li>
+<li>想定の要点（教材を作るときに資料から作る）と比べる「要点の網羅」は、今回使う2つの組み込みの評価器（Groundedness・Relevance）が比べない観点。資料に基づいていても、質問の答えとして足りないことは、groundedness では見えない<ul>
+<li>組み込みには、正解の文章（<code>ground_truth</code>）と答えを比べて網羅を 1〜5 で採点する <code>ResponseCompletenessEvaluator</code> もある。1.18.10 で <code>from azure.ai.evaluation import ResponseCompletenessEvaluator</code> ができるのを確かめた。ただし実験的なクラス（仕様が変わることがある）で、この教材では使わない。自前の採点の「要点の網羅」が同じ見方をする</li>
+</ul>
+</li>
+<li>点には、答えの生成のぶれと、採点のぶれがある。方式の差が小さいときは、ぶれの範囲に埋もれる。採点だけのぶれは、同じ答えを繰り返し採点して見る（<code>score_one.py</code> を同じ答えで何回か実行する）</li>
+<li>組み込みの評価器を使うときの落とし穴（下の「注意」）</li>
+</ul>
+<h2 id="前提">前提</h2>
+<ul>
+<li>19 が動くこと（<code>pip install -r applied/requirements.txt</code>、知識ベース <code>hr-docs-kb</code>）</li>
+<li>組み込みの評価器を使うとき：Repo 直下で一度だけ</li>
+</ul>
+<pre><code>pip install -r applied/requirements-eval.txt
+</code></pre>
+<p><code>applied/requirements.txt</code> に足して入れる <code>azure-ai-evaluation==1.18.10</code> です。<strong>重い</strong>（約 150MB、依存のライブラリが約 30 個増える。ネットワークが速ければ 10 秒ほど）ので、
+  <code>requirements.txt</code> には入れず、20 だけの <code>requirements-eval.txt</code> に分けてあります。入れなくても、自前の採点は動きます。
+  Python のホイールは OS を選ばない形（<code>py3-none-any</code>）で、Windows でも入ります（公式資料で確認。実機では未確認）。</p>
+<h2 id="実行">実行</h2>
+<pre><code>python score_one.py                         1つの答えを、2通りで採点する（メンバーも動かす）
+python score_one.py --id q02 --method plain
+python score_one.py --answer "自分で書いた答え"    答えを書き換えて、点がどう変わるか見る
+python score_all.py                         （進行役）10問 × 2方式 × 3回を採点して、ぶれを見る
+python score_all.py --summary               保存した採点を集計するだけ（LLM を呼ばない）
+python score_all.py --summary --threshold 4 合格のしきい値を 4 にして、合否を数え直す（点は同じで、合格の数だけが変わる）
+python score_all.py --no-builtin            自前の採点だけ
+</code></pre>
+<p>19 の保存（<code>applied/_work/19_answers.json</code>）がなければ、<code>score_all.py</code> が 19 の関数で先に作ります。</p>
+<p>採点の保存（<code>applied/_work/20_scores.json</code>）は、<strong>入力が同じものだけ</strong>使い回します（質問・答え・渡した資料・想定の要点・採点の基準の文から決めた指紋で照合）。
+19 を作り直したり、<code>OWN_SYSTEM</code> や <code>questions.json</code> の要点を直したりすると、その分を採点し直します。
+自前だけで採点したあとに組み込みの評価器を使う（<code>--no-builtin</code> を外す）と、足りない組み込みの分だけを採点します。指紋のない古い保存は、採点し直します。</p>
+<h2 id="見るところ">見るところ</h2>
+<ul>
+<li><code>score_one.py</code><ul>
+<li>自前の採点：観点ごとの点と理由。「要点の網羅」が低いとき、理由が足りない要点を挙げているか</li>
+<li>組み込みの評価器：点、しきい値（既定 3）、合否（pass / fail）、理由。出力の欄の名前の一覧</li>
+<li>「確認の質問」を答えとして採点する確かめ：groundedness が 3 点で <strong>pass（合格）</strong> になる。relevance は低い</li>
+</ul>
+</li>
+<li><code>score_all.py</code><ul>
+<li>方式ごとの平均点：① と ② の差は小さい（5つの観点で -0.2〜+0.1 点）。どちらかが必ず良いわけではない</li>
+<li>質問ごとの点の幅（3回の最小〜最大）：同じ質問・同じ方式の3回で、点が 1〜2 点動くものがある（groundedness と「根拠への忠実さ」は、10 問のうち 4 問で幅が 2 点以上）。
+    （別々に作った 3 つの答えの幅なので、答えの生成と採点の両方のぶれ）差は、このぶれの範囲に収まるか。質問によっては方式で大きく違う（q03 は ② が良く、q07 は ① が良い）</li>
+<li>groundedness の点の分布：3 点は 0 件。9 件が 2 点（fail）で、20 件が 4 点、31 件が 5 点</li>
+<li>自前と組み込みの一致：同じ点になるのは 3 割ほど、1 点以内で一致するのは 8 割ほど。基準の文が違えば、同じ観点でも点は同じにならない</li>
+<li>呼び出しとトークンの合計（最後の表）</li>
+</ul>
+</li>
+</ul>
+<p>教材を作ったときの測定の例（60 件。<strong>実行のたびに少し変わります</strong>。モデルが違えば、数字も変わります）：</p>
+<ul>
+<li>平均点（① / ②）：根拠への忠実さ 3.67 / 3.73、質問への答え 4.47 / 4.23、要点の網羅 3.97 / 3.80、groundedness 4.27 / 4.17、relevance 4.10 / 4.17</li>
+<li>点の幅の平均（①/②）：要点の網羅 0.9 / 1.1、groundedness 1.5 / 1.4、relevance 0.4 / 0.6</li>
+<li>要点の網羅の平均の差は 0.17 点で、同じ方式の 3 回の幅（平均 1.1 点）より小さい。この採点だけで方式の勝ち負けは決められない</li>
+</ul>
+<h2 id="注意組み込みの評価器を使うとき">注意：組み込みの評価器を使うとき</h2>
+<p>実際に動かして確かめたことです（<code>azure-ai-evaluation</code> 1.18.10、gpt-5 系のモデル）。</p>
+<ul>
+<li><strong>groundedness の 3 は「根拠にできる情報がない」の段</strong>です（確認の質問、あいさつなど）。ところが既定のしきい値が 3 で、<strong>3 以上が合格</strong>です。
+    資料に基づいていない答えでも、3 点なら pass になります。合否だけで見ず、点そのものを見る。しきい値は自分で決める（<code>score_all.py --threshold 4</code> のように変えると、保存した点をその値で判定し直して数えます）</li>
+<li><strong>gpt-5 系のモデルは <code>is_reasoning_model=True</code> が要ります。</strong> 付けないと「<code>max_tokens</code> はこのモデルで使えない」という 400 になります
+    （評価器が <code>max_tokens</code> を送るため。<code>True</code> にすると <code>max_completion_tokens</code> に替わる）。公式の「審査役に使えるモデル」の一覧は gpt-4o-mini などで、gpt-5 系は載っていません</li>
+<li><strong>出力の欄の名前は版で変わります。</strong> この版は <code>groundedness</code>・<code>groundedness_score</code>・<code>groundedness_result</code>（pass / fail）・<code>groundedness_passed</code>・
+    <code>groundedness_reason</code>・<code>groundedness_status</code>・<code>groundedness_threshold</code>・<code>groundedness_properties</code>。公式の古い例にある <code>gpt_groundedness</code> のような <code>gpt_</code> 付きの欄はありません。
+    トークン数は <code>groundedness_properties</code> の中（<code>prompt_tokens</code>・<code>completion_tokens</code>）です。<code>lib/evaluation.py</code> の <code>parse_builtin</code> は、両方の名前を読みます。版を固定してあるのは、このためです</li>
+<li>Groundedness に <code>query</code>（質問）も渡すと、質問なしのときと別の採点プロンプトが使われます（3 の意味も違う）。<code>context</code> は文字列で、複数の断片は <code>\n\n</code> でつなぎます</li>
+<li>1回の評価は LLM 1 回の呼び出しです（出力は最大 800 トークンに制限されています）</li>
+<li>自前の採点も完全ではありません。たとえば、資料に書いてあることを「資料にありません」と答えた答えに、根拠への忠実さ 5 をつけることがありました（<code>score_one.py --answer "資料にありません。"</code> で試せる）。
+    採点のプロンプトの基準は、実際の採点結果を読んで直していくもの。想定の要点（<code>questions.json</code>）も、同じように見直す</li>
+<li>評価器の <code>model_config</code> は、<code>azure_endpoint</code>・<code>api_key</code>・<code>azure_deployment</code>（と任意の <code>api_version</code>）で、キーで渡します。マネージド ID は使いません</li>
+</ul>
+<h2 id="呼び出しの数">呼び出しの数</h2>
+<ul>
+<li><code>score_one.py</code> 1回：自前の採点 1 回、組み込みの評価器 2 回、確認の質問の確かめで 2 回。合計 LLM 5 回、約 1.5 万トークン。メンバーが同時に動かしても問題ない数</li>
+<li><code>score_all.py</code>（進行役）：採点 60 件 × （自前 1 回 ＋ 組み込み 2 回）＝ LLM 180 回。19 の保存がないと、答えの生成 60 回と質問の分解 30 回も加わる<ul>
+<li>トークン：自前の採点が入力 21.4 万 / 出力 1.1 万、組み込みの評価器が入力 35.9 万 / 出力 1.4 万。採点だけで入力 57.3 万 / 出力 2.5 万（19 を含めると入力 75.6 万 / 出力 4.3 万）</li>
+<li>1件あたり 4〜5 秒、60 件で 5 分ほど。Azure OpenAI の「1分あたりのトークンの上限」（429）に当たると、組み込みの評価器は 30 秒待ってやり直します（実測で 1 回起きた）。
+    同時に動かすときは、<code>score_all.py</code> は進行役だけが実行する</li>
+</ul>
+</li>
+</ul>
+<h2 id="ファイル">ファイル</h2>
+<ul>
+<li><code>score_one.py</code>：1つの答えを、2通りで採点する</li>
+<li><code>score_all.py</code>：10問 × 2方式 × 3回を採点して、ぶれを集計する（進行役）</li>
+<li><code>../19-agentic-retrieval/questions.json</code>：質問と「想定の要点」（<code>expect</code>）。自前の採点の「要点の網羅」で使う</li>
+<li><code>../../lib/evaluation.py</code>：自前の採点プロンプト（基準の文は <code>OWN_SYSTEM</code>）、組み込みの評価器の呼び出し、ぶれの計算</li>
+<li>保存：<code>applied/_work/19_answers.json</code>（19 の答え）、<code>applied/_work/20_scores.json</code>（採点）。Git には入りません</li>
+</ul>
+<h2 id="公式資料">公式資料</h2>
+<ul>
+<li>評価器（Python SDK）：<a href="https://learn.microsoft.com/en-us/azure/ai-foundry/how-to/develop/evaluate-sdk">https://learn.microsoft.com/en-us/azure/ai-foundry/how-to/develop/evaluate-sdk</a></li>
+<li>GroundednessEvaluator：<a href="https://learn.microsoft.com/en-us/python/api/azure-ai-evaluation/azure.ai.evaluation.groundednessevaluator">https://learn.microsoft.com/en-us/python/api/azure-ai-evaluation/azure.ai.evaluation.groundednessevaluator</a></li>
+<li>RelevanceEvaluator：<a href="https://learn.microsoft.com/en-us/python/api/azure-ai-evaluation/azure.ai.evaluation.relevanceevaluator">https://learn.microsoft.com/en-us/python/api/azure-ai-evaluation/azure.ai.evaluation.relevanceevaluator</a></li>
+<li>RAG の評価器（採点の段の説明）：<a href="https://learn.microsoft.com/en-us/azure/foundry/concepts/evaluation-evaluators/rag-evaluators">https://learn.microsoft.com/en-us/azure/foundry/concepts/evaluation-evaluators/rag-evaluators</a></li>
+</ul>
+</article>
+</main>
+<footer class="bar"><a class="home" href="../index.html">← 入口に戻る</a><a class="source" href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/applied/topics/20-answer-evaluation/README.md">元の Markdown（GitHub）</a></footer>
+</body>
+</html>

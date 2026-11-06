@@ -1,0 +1,462 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>はじめに：研修の進め方 | データに着目した RAG の研修</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="bar"><a class="home" href="../index.html">← 入口に戻る</a><a class="source" href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/docs/lecture/md/intro.md">元の Markdown（GitHub）</a></header>
+<main>
+<article class="doc">
+<h1 id="はじめに研修の進め方">はじめに：研修の進め方</h1>
+<nav class="toc"><details><summary>このページの目次</summary>
+<ul>
+<li class="l2"><a href="#a進め方">A 進め方</a></li>
+<li class="l3"><a href="#スライドで仕組み手元で振る舞いを確かめる">スライドで仕組み、手元で振る舞いを確かめる</a></li>
+<li class="l3"><a href="#rag-は探してから答える仕組み">RAG は、探してから答える仕組み</a></li>
+<li class="l3"><a href="#チームは構築する人とメンバーで進める">チームは、構築する人とメンバーで進める</a></li>
+<li class="l2"><a href="#b動かす準備">B 動かす準備</a></li>
+<li class="l3"><a href="#clone-してenvlocal-を作れば動く">clone して、.env.local を作れば動く</a></li>
+<li class="l3"><a href="#接続の設定は-envlocal-の1つだけ">接続の設定は .env.local の1つだけ</a></li>
+<li class="l3"><a href="#スクリプトと-notebook-は同じ中身">スクリプトと Notebook は同じ中身</a></li>
+<li class="l3"><a href="#前のトピックの状態がなければ止まって案内する">前のトピックの状態がなければ、止まって案内する</a></li>
+<li class="l3"><a href="#インデックスの名前は決まっていて作るのは構築する人">インデックスの名前は決まっていて、作るのは構築する人</a></li>
+<li class="l3"><a href="#使うデータは2つ">使うデータは2つ</a></li>
+<li class="l2"><a href="#cトピックの地図">C トピックの地図</a></li>
+<li class="l3"><a href="#基礎編武将で検索の方式を学ぶ">基礎編：武将で検索の方式を学ぶ</a></li>
+<li class="l3"><a href="#応用編採用の文書で業務の場面を体験する">応用編：採用の文書で業務の場面を体験する</a></li>
+<li class="l3"><a href="#部とトピックの対応">部とトピックの対応</a></li>
+<li class="l3"><a href="#進め方のまとめ">進め方のまとめ</a></li>
+</ul>
+</details></nav>
+
+<!-- この Markdown は docs/lecture/tools/build.py --md が、keywords.md・decks.json・diagrams/ から作る。直すときは原稿を直す -->
+
+<p>チームの役割、clone から動かすまで、スクリプトと Notebook、部とトピックの対応</p>
+<p><a href="docs-lecture-md-index.html">目次に戻る</a></p>
+<h2 id="a進め方">A　進め方</h2>
+<h3 id="スライドで仕組み手元で振る舞いを確かめる">スライドで仕組み、手元で振る舞いを確かめる</h3>
+<ol>
+<li>スライド：手法、Azure のリソース、検索の考え方を説明する</li>
+<li>トピック：同じ仕組みを、スクリプトか Notebook で動かす<ul>
+<li>検索の結果や順位は、スライドではなく手元で見る</li>
+</ul>
+</li>
+<li>各ページの下の「確かめる」が、そのページのトピック<ul>
+<li>例：確かめる　基礎 05 検索の良し悪しを数字で測る</li>
+</ul>
+</li>
+</ol>
+<details>
+<summary>ノート</summary>
+<p>言いたいこと：スライドは仕組みの説明に集中し、コードの結果と検索の振る舞いはトピックのスクリプトと Notebook で確かめる。</p>
+<ul>
+<li>スライドの各ページの下に「確かめる」の欄があり、対応するトピックのフォルダを示す。</li>
+<li>結果の読み方は、Notebook のセルの間の説明に書いてある。</li>
+</ul>
+</details>
+<h3 id="rag-は探してから答える仕組み">RAG は、探してから答える仕組み</h3>
+<p><strong>準備</strong></p>
+<p><strong>文書</strong> →（切る）→ <strong>チャンク</strong> →（ベクトルにする）→ <strong>埋め込み</strong> →（入れる）→ <strong>インデックス</strong></p>
+<ul>
+<li><strong>文書</strong>：PDF や Word など</li>
+<li><strong>チャンク</strong>：検索の単位に切った断片</li>
+<li><strong>埋め込み</strong>：意味を数の並び（ベクトル）にしたもの</li>
+<li><strong>インデックス</strong>：探せるように整理して置いた場所</li>
+</ul>
+<p><strong>質問のとき</strong></p>
+<p><strong>質問</strong> → <strong>検索</strong> →（チャンクを渡す）→ <strong>LLM</strong> → <strong>答え</strong></p>
+<ul>
+<li><strong>質問</strong>：利用者が聞いたこと</li>
+<li><strong>検索</strong>：近いチャンクをインデックスから探す</li>
+<li><strong>LLM</strong>：大規模言語モデル。チャンクを読んで文章で答える</li>
+<li><strong>答え</strong>：出典つきで返す</li>
+</ul>
+<blockquote>
+<p>第1部：検索　／　第2部：準備（取り込み）　／　評価：検索と答えの良し悪し</p>
+</blockquote>
+<details>
+<summary>ノート</summary>
+<p>言いたいこと：RAG は、先に文書をチャンクに切り、ベクトルにしてインデックスに入れておく。質問のときは、近いチャンクを探して LLM に渡し、文章で答えさせる。</p>
+<ul>
+<li>インデックス：検索できるように整理して置いた、チャンクの集まり。本の巻末の索引のようなもの。</li>
+<li>チャンク：文書を検索の単位に切った断片。大きすぎると答えがぼやけ、小さすぎると文脈が消える。</li>
+<li>埋め込み：文を、意味が近いほど近くなる数の並び（ベクトル）にしたもの。ベクトル検索で使う。</li>
+<li>LLM：大規模言語モデル。渡されたチャンクを読んで、文章で答える。渡した文以外の知識も混ざることがある。</li>
+<li>このハンズオン資料は、検索（第1部）から入り、準備（第2部）、評価と進む。最後の p.48 で、この図に戻る。</li>
+</ul>
+</details>
+<h3 id="チームは構築する人とメンバーで進める">チームは、構築する人とメンバーで進める</h3>
+<h4 id="構築する人">構築する人</h4>
+<ul>
+<li>AI Search の管理者キーを使う</li>
+<li>インデックスと同義語マップを作り、データを入れる</li>
+<li><code>--role builder</code> で設定を作る</li>
+</ul>
+<h4 id="メンバー">メンバー</h4>
+<ul>
+<li>検索だけのキーを使う</li>
+<li>構築する人が作ったインデックスを、検索して読む</li>
+<li><code>--role member</code> で設定を作る</li>
+</ul>
+<blockquote>
+<p>チームごとに AI Search と Foundry を持つ。役ごとに、できることが決まっている</p>
+</blockquote>
+<details>
+<summary>ノート</summary>
+<p>言いたいこと：チームは自分たちの AI Search と Foundry を持ち、構築する人とメンバーに役を分けて進める。</p>
+<ul>
+<li>構築する人：AI Search の管理者キーで、インデックスと同義語マップを作り、データを登録する（基礎 01 の create_index.py・upload.py、03 の embed.py など）。</li>
+<li>メンバー：検索だけのキーで、構築する人が作ったインデックスを検索して、結果を読む。</li>
+<li>メンバーの設定で、作る・変える手順を実行すると、不透明なエラーになる前に「この手順は構築する人の設定で実行します」と止まる。その手順は、構築する人に実行してもらう。</li>
+</ul>
+</details>
+<h2 id="b動かす準備">B　動かす準備</h2>
+<h3 id="clone-してenvlocal-を作れば動く">clone して、.env.local を作れば動く</h3>
+<ol>
+<li><strong>Repo を clone する</strong>：研修の Repo<ul>
+<li><code>git clone &lt;Repo の URL&gt;</code></li>
+</ul>
+</li>
+<li><strong>ライブラリを入れる</strong>：基礎編のフォルダの requirements.txt<ul>
+<li><code>pip install -r basic/requirements.txt</code></li>
+</ul>
+</li>
+<li><strong>接続の設定 .env.local を作る</strong>：Repo の直下で。構築する人は builder、メンバーは member<ul>
+<li><code>python tools/team.py env --role builder</code></li>
+</ul>
+</li>
+<li><strong>トピックのフォルダで実行する</strong>：例：基礎 01 キーワード検索<ul>
+<li><code>python load.py</code></li>
+</ul>
+</li>
+</ol>
+<details>
+<summary>ノート</summary>
+<p>言いたいこと：接続先やキーをコピーしたり書き換えたりする手順はない。clone して、ライブラリを入れて、team.py で .env.local を作れば動く。</p>
+<ul>
+<li>チームの名前は、--team か環境変数 WORKSHOP_TEAM で渡す。</li>
+<li>スクリプトはトピックのフォルダで実行する。</li>
+</ul>
+<p>注意：Windows では python が見つからないとき py に置き換える。</p>
+</details>
+<h3 id="接続の設定は-envlocal-の1つだけ">接続の設定は .env.local の1つだけ</h3>
+<h4 id="入っているもの">入っているもの</h4>
+<ul>
+<li>AI Search の接続先とキー（構築する人は管理者キー、メンバーは検索だけのキー）</li>
+<li>Azure OpenAI（Foundry）の接続先とキーと、モデルの名前</li>
+<li>Storage の接続先（構築する人だけ。応用編で使う）</li>
+</ul>
+<h4 id="気をつけること">気をつけること</h4>
+<ul>
+<li>キーが入るので、人に渡さない（Git にも入らない）</li>
+<li>端末の環境変数 <code>AZURE_*</code> ではなく、このファイルを読む</li>
+<li>古くなったら、<code>team.py env</code> で作り直す</li>
+</ul>
+<blockquote>
+<p>全部のスクリプトと Notebook が、Repo の直下の .env.local を読む</p>
+</blockquote>
+<details>
+<summary>ノート</summary>
+<p>言いたいこと：接続先とキーは Repo の直下の .env.local にまとめてあり、全部のスクリプトがここから読む。</p>
+<ul>
+<li>キーが入るので、Repo の外に写さない、人に渡さない。Git にも入らない。</li>
+<li>端末に別の Azure の設定が残っていても、.env.local の値を使う。</li>
+<li>メンバーの .env.local には、AI Search の管理者キーと Storage の接続文字列は入らない。</li>
+<li>キーが古くなったときは、team.py env で作り直せる。</li>
+</ul>
+</details>
+<h3 id="スクリプトと-notebook-は同じ中身">スクリプトと Notebook は同じ中身</h3>
+<h4 id="スクリプト">スクリプト</h4>
+<ul>
+<li>python xxx.py で、上から順に動く</li>
+<li>質問は --q "…" で変える</li>
+<li>何度もやり直すのに向く</li>
+</ul>
+<h4 id="notebook">Notebook</h4>
+<ul>
+<li>1セルずつ動かして、結果を見る</li>
+<li>質問はファイルの先頭の変数で変える</li>
+<li>セルの間に「どこを見るか」の説明</li>
+</ul>
+<blockquote>
+<p>スクリプトが正本。Notebook はスクリプトから作る</p>
+</blockquote>
+<details>
+<summary>ノート</summary>
+<p>言いたいこと：スクリプトと Notebook は同じ処理で、どちらで動かしてもよい。</p>
+<ul>
+<li>スクリプトは引数で、Notebook は先頭の変数で質問を変える。引数があれば引数が優先する。</li>
+<li>Notebook はスクリプトから作るので、中身がずれない。</li>
+</ul>
+</details>
+<h3 id="前のトピックの状態がなければ止まって案内する">前のトピックの状態がなければ、止まって案内する</h3>
+<ol>
+<li>各トピックの最初に、必要なインデックスがあるかを確かめる</li>
+<li>なければ、先に動かすものを1行出して止まる<ul>
+<li>思いがけない作り直しを防ぐ</li>
+</ul>
+</li>
+<li>作り直すときは、reset のコマンドで状態をそろえる<ul>
+<li>例：python basic/tools/reset.py --to 04（構築する人の設定で実行）</li>
+</ul>
+</li>
+</ol>
+<details>
+<summary>ノート</summary>
+<p>言いたいこと：トピックはどの順で動かしてもよいが、前提のインデックスがないときは止まって案内する。</p>
+<ul>
+<li>案内に出たコマンドを、そのまま貼って実行すればよい。</li>
+<li>reset は、そのトピックを始める直前の状態を作り直す。埋め込み済みのファイルを使うので早い。</li>
+<li>メンバーの設定では、構築する人に実行してもらう。</li>
+</ul>
+</details>
+<h3 id="インデックスの名前は決まっていて作るのは構築する人">インデックスの名前は決まっていて、作るのは構築する人</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>作る人</th>
+<th>名前</th>
+<th>使うトピック</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>構築する人</td>
+<td><code>sengoku</code>（インデックス）</td>
+<td>基礎 01〜06（武将）</td>
+</tr>
+<tr>
+<td>構築する人</td>
+<td><code>sengoku-synonyms</code>（同義語マップ）</td>
+<td>基礎 02</td>
+</tr>
+<tr>
+<td>構築する人</td>
+<td><code>hr-docs</code>（インデックス）</td>
+<td>応用 14〜20（採用）</td>
+</tr>
+<tr>
+<td>構築する人</td>
+<td><code>hr-docs-ds</code>・<code>hr-docs-ss</code>・<code>hr-docs-ixr</code></td>
+<td>応用 15（データソース・スキルセット・インデクサー）</td>
+</tr>
+<tr>
+<td>構築する人</td>
+<td><code>hr-docs-ks</code>・<code>hr-docs-kb</code></td>
+<td>応用 19・20（知識ソース・知識ベース）</td>
+</tr>
+</tbody>
+</table></div>
+<details>
+<summary>ノート</summary>
+<p>言いたいこと：チームの AI Search に、インデックスなどが決まった名前で入る。名前が決まっているので、スクリプトは接続先だけで動く。</p>
+<ul>
+<li>作るのは構築する人。武将は基礎 01〜03 のスクリプト、採用は applied/tools の build_hr_index.py と build_hr_kb.py。</li>
+<li>メンバーは、できあがったものを検索して読む。</li>
+<li>AI Search の Basic では、同義語マップはサービス全体で3つまで。ここで作るのは sengoku-synonyms の1つだけ。</li>
+</ul>
+</details>
+<h3 id="使うデータは2つ">使うデータは2つ</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>データ</th>
+<th>中身</th>
+<th>トピック</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>武将</td>
+<td>戦国武将など150人の名前・別名・合戦・プロフィール、正解つきの質問60問</td>
+<td>基礎 01〜06</td>
+</tr>
+<tr>
+<td>採用</td>
+<td>架空の会社の求人票・職務経歴書・面接の評価・メール・スキャン 23件</td>
+<td>応用 14〜20</td>
+</tr>
+</tbody>
+</table></div>
+<details>
+<summary>ノート</summary>
+<p>言いたいこと：基礎編は武将、応用編は採用のデータを使う。どちらも研修用に作ったデータで、採用は架空の会社の文書。</p>
+<ul>
+<li>武将は、言い換えや固有名詞で検索方式の違いを見るのに使う。</li>
+<li>採用は、形式の違う文書（PDF・Word・Excel・メール・スキャン）で、業務の場面を体験する。</li>
+</ul>
+</details>
+<h2 id="cトピックの地図">C　トピックの地図</h2>
+<h3 id="基礎編武将で検索の方式を学ぶ">基礎編：武将で検索の方式を学ぶ</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>番号</th>
+<th>トピック</th>
+<th>データ</th>
+<th>フォルダ</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>基礎 01</td>
+<td>キーワード検索</td>
+<td>武将</td>
+<td><a href="basic-topics-01-keyword-search-README.html"><code>basic/topics/01-keyword-search</code></a></td>
+</tr>
+<tr>
+<td>基礎 02</td>
+<td>言い換えと日本語の分かれ方</td>
+<td>武将</td>
+<td><a href="basic-topics-02-analyzers-synonyms-README.html"><code>basic/topics/02-analyzers-synonyms</code></a></td>
+</tr>
+<tr>
+<td>基礎 03</td>
+<td>ベクトル検索</td>
+<td>武将</td>
+<td><a href="basic-topics-03-vector-search-README.html"><code>basic/topics/03-vector-search</code></a></td>
+</tr>
+<tr>
+<td>基礎 04</td>
+<td>ハイブリッドとランカー</td>
+<td>武将</td>
+<td><a href="basic-topics-04-hybrid-ranker-README.html"><code>basic/topics/04-hybrid-ranker</code></a></td>
+</tr>
+<tr>
+<td>基礎 05</td>
+<td>検索の良し悪しを数字で測る</td>
+<td>武将</td>
+<td><a href="basic-topics-05-measure-search-README.html"><code>basic/topics/05-measure-search</code></a></td>
+</tr>
+<tr>
+<td>基礎 06</td>
+<td>検索結果から答えを作る</td>
+<td>武将</td>
+<td><a href="basic-topics-06-answer-from-results-README.html"><code>basic/topics/06-answer-from-results</code></a></td>
+</tr>
+</tbody>
+</table></div>
+<details>
+<summary>ノート</summary>
+<p>トピックの一覧（基礎編）。番号はデータと前提の順で、この順なら必ず動く。各ページの「確かめる」のトピックを開く。</p>
+</details>
+<h3 id="応用編採用の文書で業務の場面を体験する">応用編：採用の文書で業務の場面を体験する</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>番号</th>
+<th>トピック</th>
+<th>データ</th>
+<th>フォルダ</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>応用 14</td>
+<td>種類の違う文書をまとめて取り込む</td>
+<td>採用</td>
+<td><a href="applied-topics-14-mixed-documents-README.html"><code>applied/topics/14-mixed-documents</code></a></td>
+</tr>
+<tr>
+<td>応用 15</td>
+<td>Azure の仕組みに置き換える</td>
+<td>採用</td>
+<td><a href="applied-topics-15-azure-indexer-README.html"><code>applied/topics/15-azure-indexer</code></a></td>
+</tr>
+<tr>
+<td>応用 16</td>
+<td>見せてよい人で絞る</td>
+<td>採用</td>
+<td><a href="applied-topics-16-security-filter-README.html"><code>applied/topics/16-security-filter</code></a></td>
+</tr>
+<tr>
+<td>応用 17</td>
+<td>更新と削除</td>
+<td>採用</td>
+<td><a href="applied-topics-17-update-delete-README.html"><code>applied/topics/17-update-delete</code></a></td>
+</tr>
+<tr>
+<td>応用 18</td>
+<td>関係で探す（紹介）</td>
+<td>採用</td>
+<td><a href="applied-topics-18-relations-README.html"><code>applied/topics/18-relations</code></a></td>
+</tr>
+<tr>
+<td>応用 19</td>
+<td>エージェント型検索のデモ</td>
+<td>採用</td>
+<td><a href="applied-topics-19-agentic-retrieval-README.html"><code>applied/topics/19-agentic-retrieval</code></a></td>
+</tr>
+<tr>
+<td>応用 20</td>
+<td>答えを評価する</td>
+<td>採用</td>
+<td><a href="applied-topics-20-answer-evaluation-README.html"><code>applied/topics/20-answer-evaluation</code></a></td>
+</tr>
+</tbody>
+</table></div>
+<p>07〜13 はこの Repo には入っていないので、応用編は 14 から始まる。フォルダ名や案内のコマンドに出る番号も、この数字のまま。</p>
+<details>
+<summary>ノート</summary>
+<p>トピックの一覧（応用編）。応用編の番号は 14 から始まる（07〜13 はこの Repo にはない）。前提は、基礎編の検索と、構築する人が作った hr-docs。</p>
+</details>
+<h3 id="部とトピックの対応">部とトピックの対応</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>部</th>
+<th>ページ</th>
+<th>確かめるトピック</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>第1部 検索方法</td>
+<td>p.1〜15</td>
+<td>01・02・03・04</td>
+</tr>
+<tr>
+<td>第2部 取り込み</td>
+<td>p.16〜30</td>
+<td>14・15・16・17</td>
+</tr>
+<tr>
+<td>第3部 関係とエージェント型検索</td>
+<td>p.31〜38</td>
+<td>18・19</td>
+</tr>
+<tr>
+<td>評価</td>
+<td>p.39〜45</td>
+<td>05・20</td>
+</tr>
+<tr>
+<td>比較と締め</td>
+<td>p.46〜52</td>
+<td>06・19</td>
+</tr>
+</tbody>
+</table></div>
+<details>
+<summary>ノート</summary>
+<p>進行は部の順。各部のページから、右の列のトピックを開いて振る舞いを確かめる。部の順とトピックの番号は別。</p>
+</details>
+<h3 id="進め方のまとめ">進め方のまとめ</h3>
+<ul>
+<li>部の順に進め、トピックで振る舞いを確かめる</li>
+<li>トピックの番号は、データと前提の順（この順なら必ず動く）</li>
+<li>構築する人が作り、メンバーが検索して確かめる</li>
+</ul>
+<details>
+<summary>ノート</summary>
+<p>言いたいこと：部の順とトピックの番号は別。番号はデータと前提の順で、どの順で来ても、前提がなければ止まって案内する。</p>
+</details>
+</article>
+</main>
+<footer class="bar"><a class="home" href="../index.html">← 入口に戻る</a><a class="source" href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/docs/lecture/md/intro.md">元の Markdown（GitHub）</a></footer>
+</body>
+</html>

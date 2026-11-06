@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>14 種類の違う文書をまとめて取り込む | データに着目した RAG の研修</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="bar"><a class="home" href="../index.html">← 入口に戻る</a><a class="source" href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/applied/topics/14-mixed-documents/README.md">元の Markdown（GitHub）</a></header>
+<main>
+<article class="doc">
+<h1 id="14-種類の違う文書をまとめて取り込む">14 種類の違う文書をまとめて取り込む</h1>
+
+<p>手元の Python で、形式の違う5種類の文書を読み、検索の単位（チャンク）に分けます。Azure は使いません。</p>
+<h2 id="何を学ぶか">何を学ぶか</h2>
+<ul>
+<li>形式ごとに、読むライブラリとチャンクの切り方が違う<ul>
+<li>PDF（pypdf）：ページごと</li>
+<li>Word（python-docx）：見出しごと。見出しは「見出し」スタイルでなく、太字の大きな文字のことが多いので、書式で見分ける</li>
+<li>Excel（openpyxl）：1行を1チャンク。「列名: 値」の形にして、何の数字かが分かるようにする</li>
+<li>メール（email）：1通を1チャンク。件名・差出人・日時を本文の前に付ける</li>
+</ul>
+</li>
+<li>スキャンした書類（画像だけの PDF、PNG）は、文字が 0 になる。そこにしか書いていない語は、手元の検索では見つからない</li>
+</ul>
+<h2 id="前提">前提</h2>
+<ul>
+<li><code>pip install -r applied/requirements.txt</code>（Repo 直下で、仮想環境の中で）</li>
+<li>前のトピックは要りません。Azure も <code>.env.local</code> も要りません。</li>
+</ul>
+<h2 id="実行">実行</h2>
+<pre><code>python read_documents.py
+python read_documents.py --term "決済基盤"
+</code></pre>
+<h2 id="見るところ">見るところ</h2>
+<ol>
+<li>23 ファイルの一覧の「文字数」：スキャンの3つだけが 0</li>
+<li>チャンクの例：Excel の1行、Word の見出し1つ分、メール1通、PDF の1ページ</li>
+<li>スキャンした書類を、画像のビューアーで開く（人の目には読める）</li>
+<li>「入社予定日」（内定承諾書にだけ書いてある語）が 0 件</li>
+</ol>
+<p>次は 15：Azure のインデクサーとスキルセット（OCR）で、同じ語を探します。</p>
+</article>
+</main>
+<footer class="bar"><a class="home" href="../index.html">← 入口に戻る</a><a class="source" href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/applied/topics/14-mixed-documents/README.md">元の Markdown（GitHub）</a></footer>
+</body>
+</html>

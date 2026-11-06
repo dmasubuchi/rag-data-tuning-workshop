@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>04 ハイブリッド検索とセマンティックランカー | データに着目した RAG の研修</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="bar"><a class="home" href="../index.html">← 入口に戻る</a><a class="source" href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/basic/topics/04-hybrid-ranker/README.md">元の Markdown（GitHub）</a></header>
+<main>
+<article class="doc">
+<h1 id="04-ハイブリッド検索とセマンティックランカー">04 ハイブリッド検索とセマンティックランカー</h1>
+<nav class="toc"><details><summary>このページの目次</summary>
+<ul>
+<li class="l2"><a href="#学ぶこと">学ぶこと</a></li>
+<li class="l2"><a href="#前提">前提</a></li>
+<li class="l2"><a href="#実行するコマンドこのフォルダで">実行するコマンド（このフォルダで）</a></li>
+<li class="l2"><a href="#何を見ればよいか">何を見ればよいか</a></li>
+<li class="l2"><a href="#演習">演習</a></li>
+<li class="l2"><a href="#次のトピック">次のトピック</a></li>
+</ul>
+</details></nav>
+
+<h2 id="学ぶこと">学ぶこと</h2>
+<ul>
+<li>キーワード検索とベクトル検索を、1回の呼び出しで両方使う（ハイブリッド）。順位は RRF（順位の逆数の合計）で決まる</li>
+<li>セマンティックランカーは、前段の上位の候補を、質問と本文の意味を読んで並べ直す</li>
+<li>同じ質問の正解の順位を、4つの方式で並べて比べる。方式の優劣は、質問によって変わる</li>
+</ul>
+<h2 id="前提">前提</h2>
+<ul>
+<li><code>../03-vector-search</code> が終わっていること（武将にベクトルが入っていること）</li>
+<li>検索だけなので、メンバーの設定（検索だけのキー）でも実行できる（05・06 も同じ）</li>
+<li>足りないときは、<code>python ../../tools/reset.py --to 04</code>（スクリプトの先頭の <code>REBUILD = True</code>、スクリプトでは <code>--rebuild</code> でも作り直せる。Notebook では、作り直したら <code>REBUILD = False</code> に戻す。<code>True</code> のままだと、実行のたびに作り直す）</li>
+</ul>
+<h2 id="実行するコマンドこのフォルダで">実行するコマンド（このフォルダで）</h2>
+<p>必須（この順に）</p>
+<ul>
+<li><code>python hybrid_search.py</code>　ハイブリッド検索（キーワード ＋ ベクトル）</li>
+<li><code>python rrf.py</code>　RRF の計算の途中を表示し、AI Search の順位と照合する</li>
+<li><code>python ranker.py</code>　ハイブリッドにセマンティックランカーを付ける（ランカーを 1 回使う）</li>
+<li><code>python compare_methods.py</code>　同じ質問の正解の順位を、4つの方式で並べる（ランカーを 1 回使う）</li>
+</ul>
+<p>質問は、<code>QUESTION = None</code> のとき、<code>data/sengoku/selection.json</code> で選んだ山場の質問（q53）を使う。自分の質問は <code>--q "…"</code>。</p>
+<p>Notebook でも、同じファイルを上から順にセルで実行できます。<code>--q</code> などの引数に当たるものは、先頭の「変えてよい値」のセルの変数（<code>QUESTION</code> など）で指定します。</p>
+<h2 id="何を見ればよいか">何を見ればよいか</h2>
+<ul>
+<li><code>rrf.py</code>：自分の計算の順位と、Azure の列（AI Search の順位）が合うか</li>
+<li><code>ranker.py</code>：ランカーなしのハイブリッドと、ランカーありの正解の順位</li>
+<li><code>compare_methods.py</code>：4つの方式の表。「方式を変えれば必ず良くなる」わけではない</li>
+</ul>
+<h2 id="演習">演習</h2>
+<ul>
+<li><code>rrf.py</code> の <code>RRF_K = 60</code> を <code>10</code> にする：自分の計算の順位と AI Search の順位が合わなくなる。AI Search は定数 60 を使っている</li>
+<li>発展：<code>rrf_table()</code> を自分で書き直す。<code>K</code>（ベクトル側の候補数）を変える</li>
+</ul>
+<h2 id="次のトピック">次のトピック</h2>
+<ul>
+<li><code>../06-answer-from-results</code></li>
+</ul>
+</article>
+</main>
+<footer class="bar"><a class="home" href="../index.html">← 入口に戻る</a><a class="source" href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/basic/topics/04-hybrid-ranker/README.md">元の Markdown（GitHub）</a></footer>
+</body>
+</html>

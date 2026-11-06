@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>応用編で使う採用の文書 | データに着目した RAG の研修</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="bar"><a class="home" href="../index.html">← 入口に戻る</a><a class="source" href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/applied/data/README.md">元の Markdown（GitHub）</a></header>
+<main>
+<article class="doc">
+<h1 id="応用編で使う採用の文書">応用編で使う採用の文書</h1>
+<nav class="toc"><details><summary>このページの目次</summary>
+<ul>
+<li class="l2"><a href="#入っているもの23-ファイル">入っているもの（23 ファイル）</a></li>
+<li class="l2"><a href="#番号でつながる">番号でつながる</a></li>
+<li class="l2"><a href="#求人ごとの応募">求人ごとの応募</a></li>
+<li class="l2"><a href="#注意">注意</a></li>
+<li class="l2"><a href="#作り直し方">作り直し方</a></li>
+</ul>
+</details></nav>
+
+<p>このフォルダーのデータは、すべて<strong>研修用の架空データ</strong>です。会社（サンプルテック）、人物、メールアドレス（<code>*.example</code>）、電話番号は実在のものと関係ありません。</p>
+<p>応用編では、形式の違う文書をまとめて取り込み（インデクサーとスキルセット、OCR）、求人・応募・評価をまたいで探します。件数は少なく、同じ人・同じ求人の番号で書類どうしがつながっていることを大事にしています。</p>
+<h2 id="入っているもの23-ファイル">入っているもの（23 ファイル）</h2>
+<ul>
+<li><code>jobs/</code>：求人票 PDF 3 件。文字が入っている PDF<ul>
+<li><code>JOB-REQ042-v3.pdf</code>（バックエンドエンジニア（プロダクト開発））、<code>JOB-REQ043-v1.pdf</code>（バックエンドエンジニア（決済基盤））、<code>JOB-REQ047-v2.pdf</code>（SRE エンジニア）</li>
+</ul>
+</li>
+<li><code>resumes/</code>：職務経歴書 Word（.docx）6 件。<code>CV-APP-&lt;応募番号&gt;.docx</code></li>
+<li><code>evaluations/</code>：面接の評価 Excel 1 件。<code>EVAL-INTERVIEWS-2026-10.xlsx</code><ul>
+<li>シート：面接評価（12 行）、選考状況、選考履歴、評価基準、注記</li>
+</ul>
+</li>
+<li><code>mail/</code>：面接の連絡メール（.eml）10 件。<code>MAIL-&lt;通し番号&gt;_&lt;求人番号&gt;_&lt;応募番号&gt;.eml</code></li>
+<li><code>scans/</code>：スキャンした書類 3 件。<strong>画像だけ</strong>で文字の情報は入っていない（OCR が必要）<ul>
+<li><code>SCAN-MEMO-APP-0391-2ND.pdf</code>：面接官の手書きメモ</li>
+<li><code>SCAN-OFFER-APP-0386.pdf</code>：内定承諾書（押印あり）</li>
+<li><code>SCAN-COVER-APP-0471.png</code>：紹介会社の書類送付状（FAX 風）</li>
+</ul>
+</li>
+<li><code>manifest.json</code>：全ファイルの種類、対象の求人・応募・人物の番号、元にしたデータ、応募ごとの書類の一覧</li>
+<li><code>updates/</code>：トピック 17（更新と削除）だけで使う、求人票の旧い版。<code>JOB-REQ042-v1.pdf</code>（REQ-042 の v1。現行は v3）。上の 23 ファイルには数えない。manifest にも入れず、<code>build_hr_index.py</code> も Storage に置かない。17 が、チームの <code>jobs/JOB-REQ042-v3.pdf</code> を一時的にこの v1 の中身で上書きし、v3 で上書きして戻す</li>
+<li><code>_build/</code>：このフォルダーを作ったスクリプトと、その入力</li>
+</ul>
+<h2 id="番号でつながる">番号でつながる</h2>
+<ul>
+<li>求人番号 <code>REQ-nnn</code>：求人票・職務経歴書・面接の評価・メール・スキャンに共通</li>
+<li>応募番号 <code>APP-nnnn</code>：1 回の応募。職務経歴書・面接の評価・メール・スキャンに共通</li>
+<li>人物キー <code>C-nnn</code>：同じ人の別の応募をつなぐ番号（Excel の「人物キー」列、manifest）</li>
+<li>評価番号 <code>EV-nnn</code>：Excel「面接評価」シートの 1 行</li>
+<li>面接官など社内の人は <code>U-nnnn</code>（Excel の「面接官ID」）</li>
+</ul>
+<h2 id="求人ごとの応募">求人ごとの応募</h2>
+<ul>
+<li>REQ-042（現行は v3。応募した時点の版は応募ごとに違う）<ul>
+<li>APP-0391、APP-0392、APP-0417：経歴書・評価・メールがある</li>
+<li>APP-0439：面接の評価（下書き）だけ。経歴書はない</li>
+<li>APP-0471：書類選考中。経歴書とメール、スキャン（送付状）がある。面接はまだ</li>
+</ul>
+</li>
+<li>REQ-043：APP-0386（経歴書・評価・メール・スキャン）</li>
+<li>REQ-047：APP-0603（経歴書・評価・メール）</li>
+</ul>
+<p>たとえば REQ-042 の APP-0391 は、<code>resumes/CV-APP-0391.docx</code> → 評価 <code>EV-001</code>〜<code>EV-003</code>（Excel）→ メール <code>MAIL-05</code>・<code>MAIL-06</code> → <code>scans/SCAN-MEMO-APP-0391-2ND.pdf</code> とたどれます。</p>
+<h2 id="注意">注意</h2>
+<ul>
+<li>選考の日付・段階・状況は、manifest の <code>applications</code> と Excel の「選考状況」「選考履歴」が基準です。評価の実施日時は選考履歴の「面接実施」と同じです。</li>
+<li>Excel の「提出状況」が「下書き（未提出）」の行は、確定した評価ではありません。</li>
+<li><code>jobs/</code> の求人票の PDF は現行の版だけです。応募には応募時の版（<code>req_version</code>）が付いています。旧い版は <code>updates/</code> にある REQ-042 の v1 だけです（台帳 <code>_build/content/source_ats.json</code> の REQ-042 v1。有効期間 2026-09-01 〜 2026-10-13）。<ul>
+<li>v1 と v3 は、検索で見分けられる違いがあります。年収（v1 は 500万円から700万円、v3 は 600万円から800万円）、勤務（v1 は週4日出社・リモート週1日まで、v3 は週2日出社・リモート週3日まで）、「試用期間」「入社後の流れ」（v1 にだけある）、歓迎条件（v3 に「障害対応の一次切り分けの経験」が加わる）。v1 は文章が長く、取り込むとチャンクが 3 件、v3 は 2 件になります。</li>
+</ul>
+</li>
+<li>このフォルダーのファイルは、Azure に何も登録していません。構築する人が <code>applied/tools/build_hr_index.py</code> で Storage に置き、インデックス <code>hr-docs</code> に取り込みます。</li>
+</ul>
+<h2 id="作り直し方">作り直し方</h2>
+<p>入力はすべて <code>_build/content/</code>（求人票の旧い版は <code>_build/content/updates/</code>）にあります。仮想環境（Python 3.12）に <code>_build/requirements.txt</code> を入れて実行します。<strong>作り直すには macOS が要ります</strong>（下の注意）。文書そのものは、作り直さなくても、この Repo にあります。作り直すのは、教材を直す人だけです。</p>
+<pre><code>python _build/build_all.py            # 作り直して manifest.json を書き、検査する
+python _build/build_all.py --verify   # 2 回作って、全ファイルが同じバイト列になることを確かめる
+python _build/check_all.py --ocr      # 検査だけ。tesseract があればスキャンの OCR も試す
+python _build/selftest_check.py       # 検査の自己試験。既知の誤りを 1 つずつ入れて、検査が見つけることを確かめる
+</code></pre>
+<ul>
+<li>
+<p><code>check_all.py</code>（<code>build_all.py</code> と <code>selftest_check.py</code> も）は、使ってはいけない語（固有名）の一覧を、環境変数 <code>PUBLIC_CHECK_BANNED</code> が指すファイルから読みます（Repo 直下の <code>tools/check_public.py</code> と同じ形。1行1語、UTF-8）。一覧はこの Repo に置きません。変数がない・ファイルがない・空のときは、説明を出して終了コード 2 で止まります。見つけたときは、語そのものは出さず、「禁止語の一覧の 3 番目」のように番号で知らせます。自己試験は、架空の語の一時の一覧を自分で作って使います</p>
+</li>
+<li>
+<p>検査（check_all.py、中身は check_identity.py）は、全ファイルと <code>updates/</code> の旧い版の求人票を読み直して、応募番号・氏名・求人番号・宛先・日付・担当者が台帳（<code>_build/content/source_ats.json</code>）と食い違っていないかを調べます。メールの宛先と本文、経歴書、評価、スキャンの書類が別の応募のものになっていれば NG にします。</p>
+</li>
+<li>時計・ネットワークは使いません。乱数は seed を固定しています。</li>
+<li>日本語の PDF は reportlab の CID フォント、スキャンの手書き風の文字は macOS のフォント（ヒラギノ、Klee）で描いています。macOS 以外では描画に使うフォントが見つからず、作り直せません。</li>
+<li>職務経歴書（Word）のフォントは「游明朝」です。</li>
+</ul>
+</article>
+</main>
+<footer class="bar"><a class="home" href="../index.html">← 入口に戻る</a><a class="source" href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/applied/data/README.md">元の Markdown（GitHub）</a></footer>
+</body>
+</html>

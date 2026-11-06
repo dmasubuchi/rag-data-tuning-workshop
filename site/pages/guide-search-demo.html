@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>検索デモ：条件を変えると、検索結果が変わる | データに着目した RAG の研修</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="bar"><a class="home" href="../index.html">← 入口に戻る</a><a class="source" href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/guide/search-demo.md">元の Markdown（GitHub）</a></header>
+<main>
+<article class="doc">
+<h1 id="検索デモ条件を変えると検索結果が変わる">検索デモ：条件を変えると、検索結果が変わる</h1>
+<nav class="toc"><details><summary>このページの目次</summary>
+<ul>
+<li class="l2"><a href="#前提">前提</a></li>
+<li class="l2"><a href="#1-python-で動かす">1. Python で動かす</a></li>
+<li class="l2"><a href="#2-ポータルで同じ検索をする">2. ポータルで同じ検索をする</a></li>
+<li class="l2"><a href="#3-何が変わったか">3. 何が変わったか</a></li>
+<li class="l2"><a href="#つまずいたとき">つまずいたとき</a></li>
+</ul>
+</details></nav>
+
+<p>AI Search だけを使う、短いデモです。人事の採用の文書（インデックス <code>hr-docs</code>）を、同じ質問のまま条件だけ変えて検索します。Python の標準ライブラリだけで動きます。pip も az のサインインも要りません。</p>
+<h2 id="前提">前提</h2>
+<ul>
+<li>Repo 直下に <code>.env.local</code> がある（検索だけのキーのメンバーの設定でよい。<a href="guide-setup-azure-setup.html#4-接続の設定を作る">Azure の準備の 4</a>）</li>
+<li>構築する人が、インデックス <code>hr-docs</code> を作ってある（<a href="guide-hr.html">応用（人事）</a>の「最初に1回」）</li>
+</ul>
+<h2 id="1-python-で動かす">1. Python で動かす</h2>
+<p>PowerShell で、Repo の直下で実行します。Enter を押すたびに、次の段へ進みます。</p>
+<pre><code class="language-powershell">python tools/search_demo.py
+</code></pre>
+<ol>
+<li>キーワード検索「Python の経験」</li>
+<li>欄で絞る（職務経歴書だけ）：件数が減る</li>
+<li>見せてよい人で絞る（採用担当）：全部見える。1と同じ件数</li>
+<li>見せてよい人で絞る（一般社員）：求人票だけ</li>
+<li>並べ直す（セマンティック ランカー）：件数は1と同じで、順番が変わる</li>
+</ol>
+<p>各段に、件数と上位5件（文書の名前、種類、点、チャンクの先頭）が出ます。同じ文書が複数回出るのは、検索の単位がチャンクだからです。</p>
+<p>自分の質問で試すとき：</p>
+<pre><code class="language-powershell">python tools/search_demo.py --q "面接の評価"
+</code></pre>
+<p>止まらずに全部表示するとき：<code>--no-pause</code></p>
+<ul>
+<li><code>python</code> が見つからないときは、<code>py</code> に替えます。</li>
+<li>検索するだけです。何も作らず、何も変えません。</li>
+<li>5 は、セマンティック ランカーを 1 回使います。無料枠は月ごとで、チームの AI Search 全体で使います。</li>
+<li>接続先とキーは、Repo 直下の <code>.env.local</code> だけから読みます。</li>
+</ul>
+<h2 id="2-ポータルで同じ検索をする">2. ポータルで同じ検索をする</h2>
+<p>各段に出る JSON を、ポータルに貼ると、同じ結果になります。</p>
+<ol>
+<li class="task"><input type="checkbox"> Azure ポータルで、AI Search <code>srch-&lt;org&gt;-&lt;team&gt;</code> を開く</li>
+<li class="task"><input type="checkbox"> 左メニュー「検索管理」の「インデックス」を開き、<code>hr-docs</code> を選ぶ</li>
+<li class="task"><input type="checkbox"> 「検索エクスプローラー」を開き、「表示」で「JSON ビュー」を選ぶ</li>
+<li class="task"><input type="checkbox"> Python の画面に出た JSON を貼って、「検索」を選ぶ</li>
+</ol>
+<h2 id="3-何が変わったか">3. 何が変わったか</h2>
+<ul>
+<li>2：<code>filter</code> に <code>kind eq 'resume'</code>。欄の値で絞る</li>
+<li>3・4：<code>filter</code> に <code>allowed/any(...)</code>。見てよい人で絞る（権限）。一般社員に見せてよいのは、求人票のチャンクだけ（<code>hr-docs</code> 全体で6チャンク）</li>
+<li>5：<code>queryType</code> が <code>semantic</code>。意味の近さで並べ直す</li>
+</ul>
+<p>見せてはいけないものは、LLM に渡す前に、検索の絞り込みで外します（<a href="applied-topics-16-security-filter-README.html">応用編のトピック 16</a>）。</p>
+<h2 id="つまずいたとき">つまずいたとき</h2>
+<ul>
+<li>「.env.local が読めません」と出る：Repo の直下で実行しているか、<code>.env.local</code> があるかを確かめます。</li>
+<li>「インデックス hr-docs がありません」と出る：構築する人が、文書の取り込み（<code>python applied/tools/build_hr_index.py</code>）を終えているか確かめます。</li>
+<li>「キーが合いません」と出る：キーが古くなっています。構築する人が <code>python tools/team.py env --role member --out member.local.env</code> で書き出し直します。</li>
+</ul>
+</article>
+</main>
+<footer class="bar"><a class="home" href="../index.html">← 入口に戻る</a><a class="source" href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/guide/search-demo.md">元の Markdown（GitHub）</a></footer>
+</body>
+</html>

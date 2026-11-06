@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>応用編：採用の文書で、業務の検索を体験する | データに着目した RAG の研修</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="bar"><a class="home" href="../index.html">← 入口に戻る</a><a class="source" href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/applied/README.md">元の Markdown（GitHub）</a></header>
+<main>
+<article class="doc">
+<h1 id="応用編採用の文書で業務の検索を体験する">応用編：採用の文書で、業務の検索を体験する</h1>
+<nav class="toc"><details><summary>このページの目次</summary>
+<ul>
+<li class="l2"><a href="#前提">前提</a></li>
+<li class="l2"><a href="#構築する人とメンバー">構築する人とメンバー</a></li>
+<li class="l2"><a href="#スクリプトと-notebook">スクリプトと Notebook</a></li>
+<li class="l2"><a href="#トピック">トピック</a></li>
+<li class="l2"><a href="#中身">中身</a></li>
+<li class="l2"><a href="#構築する人向け">構築する人向け</a></li>
+<li class="l2"><a href="#試験">試験</a></li>
+</ul>
+</details></nav>
+
+<p>架空の会社「サンプルテック」の採用の文書（求人票、職務経歴書、面接の評価、連絡メール、スキャンした書類）を使います。
+基礎編で学んだ検索を、形式の違う文書・見せてよい人・更新と削除・関係・エージェント型検索・答えの評価といった、業務で起きる場面に広げます。</p>
+<p>データはすべて研修用の架空データです（<code>data/README.md</code>）。</p>
+<h2 id="前提">前提</h2>
+<ul>
+<li>Azure の接続先とキーは、Repo 直下の <code>.env.local</code> に入っています。Repo 直下で <code>python tools/team.py env --role builder</code>（メンバーは <code>--role member</code>）を実行すると作れます。ほかの人に渡しません（Git にも入りません）</li>
+<li>接続先とキーは、いつも <code>.env.local</code> の中身を使います（パソコンに残っている <code>AZURE_*</code> の環境変数は読みません）</li>
+<li>Python 3.11 か 3.12。仮想環境に、Repo 直下で一度だけ：</li>
+</ul>
+<pre><code>pip install -r applied/requirements.txt
+</code></pre>
+<ul>
+<li>20（答えを評価する）の組み込みの評価器を使うときだけ、追加で <code>pip install -r applied/requirements-eval.txt</code>（約 150MB。入れなくても自前の採点は動く）</li>
+<li>コマンドは PowerShell でも bash でも同じです。パスの区切りは <code>/</code> で書いてあります（PowerShell でも動きます）</li>
+</ul>
+<h2 id="構築する人とメンバー">構築する人とメンバー</h2>
+<p>チームは、自分たちの AI Search・Foundry・Storage を持ちます。人事の文書は、構築する人が1回だけ取り込みます（OCR を含むので、数分かかります）。名前は固定です。</p>
+<ul>
+<li>インデックス <code>hr-docs</code>（チャンク単位）</li>
+<li>データソース <code>hr-docs-ds</code>、スキルセット <code>hr-docs-ss</code>、インデクサー <code>hr-docs-ixr</code></li>
+<li>知識ソース <code>hr-docs-ks</code>、知識ベース <code>hr-docs-kb</code>（19・20）</li>
+<li>文書の置き場：Storage の入れ物（<code>.env.local</code> の <code>AZURE_STORAGE_CONTAINER</code>、既定は <code>hr-docs</code>）。文書は manifest の相対パスのまま、入れ物の直下に置きます（例 <code>jobs/JOB-REQ042-v3.pdf</code>）</li>
+</ul>
+<p>役割ごとに、できることが違います。</p>
+<ul>
+<li>構築する人（<code>--role builder</code>）：AI Search の管理者キーと Storage の接続文字列を使います。次を動かせます<ul>
+<li><code>tools/build_hr_index.py</code>：Storage に文書を置き、インデックスなどを作り、取り込む</li>
+<li><code>tools/build_hr_kb.py</code>：知識ソースと知識ベースを作る</li>
+<li>17（更新と削除）の3本：チームの本物の文書を直して、最後に元に戻す。<strong>動かしているあいだ、チームの検索の結果も変わります</strong></li>
+</ul>
+</li>
+<li>メンバー（<code>--role member</code>）：検索だけのキーを使います。Storage の接続文字列は持ちません。構築する人が作ったものを、検索して読みます（14・15・16・18・19・20）。17 は構築する人の画面で見ます</li>
+<li>メンバーの設定で、作る・変える・文書を直す手順を実行すると、不透明なエラーになる前に「この手順は構築する人の設定（--role builder）で実行します」と止まります</li>
+<li>Storage の項目が要るのは、<code>build_hr_index.py</code> と 17 だけです。ほかのスクリプトは、Storage の項目がなくても動きます</li>
+</ul>
+<h2 id="スクリプトと-notebook">スクリプトと Notebook</h2>
+<p>各トピックのフォルダで <code>python &lt;スクリプト&gt;.py</code> と実行します。スクリプトは <code># %%</code> で区切ったセルの形で、同じフォルダに同じ名前の Notebook（<code>.ipynb</code>）があります。どちらで動かしても同じ中身です。
+質問や役割は、先頭近くの「変えてよい値」のセルで変えます。スクリプトでは引数でも変えられます。
+中身を直すときは <code>.py</code> を直します。Notebook は <code>.py</code> から作ったものです（教材を直す人用の <code>tools/make_notebooks.py</code>）。</p>
+<h2 id="トピック">トピック</h2>
+<ul>
+<li><code>topics/14-mixed-documents/</code>：種類の違う文書をまとめて取り込む（手元の Python で読む。Azure は使わない）<ul>
+<li><code>read_documents.py</code></li>
+</ul>
+</li>
+<li><code>topics/15-azure-indexer/</code>：Azure の仕組みに置き換える（インデクサーとスキルセット、OCR）<ul>
+<li><code>show_pipeline.py</code>：取り込みの設計図と結果を読む</li>
+<li><code>search_documents.py</code>：14 で当たらなかった語を、インデックス <code>hr-docs</code> で探す</li>
+</ul>
+</li>
+<li><code>topics/16-security-filter/</code>：見せてよい人で絞る<ul>
+<li><code>search_by_role.py</code>：採用担当／面接官／一般社員で同じ質問を検索し、結果を並べる</li>
+<li><code>leak_demo.py</code>：悪い例。全部を LLM に渡してプロンプトで頼むだけだと漏れる（架空のデータ）</li>
+</ul>
+</li>
+<li><code>topics/17-update-delete/</code>：更新と削除（チームの本物の文書を直して、最後に元に戻す。構築する人の画面で見る）<ul>
+<li><code>withdraw_application.py</code>：応募の取り下げ。blob を消すだけでは残る → 削除の印を付けて消す</li>
+<li><code>revise_job_posting.py</code>：求人票の改訂（v1 → v3）</li>
+<li><code>cleanup.py</code>：元に戻す（途中で止めたとき、<code>--keep</code> を付けたとき）</li>
+</ul>
+</li>
+<li><code>topics/18-relations/</code>：関係で探す（紹介）<ul>
+<li><code>trace_relations.py</code>：求人 → 応募 → 経歴書 → 面接評価を ID でたどる</li>
+</ul>
+</li>
+<li><code>topics/19-agentic-retrieval/</code>：エージェント型検索のデモ（LLM を使う機能はプレビューの API）<ul>
+<li><code>compare_search.py</code>：普通の検索＋LLM と、エージェント型検索＋LLM を並べる</li>
+<li><code>effort_levels.py</code>：考える量（minimal・low・medium・auto）の違い</li>
+<li><code>make_answers.py</code>：（進行役）10問 × 2方式 × 3回の答えを作って保存する</li>
+</ul>
+</li>
+<li>
+<p><code>topics/20-answer-evaluation/</code>：答えを評価する</p>
+<ul>
+<li><code>score_one.py</code>：1つの答えを、自前の採点と組み込みの評価器で採点する</li>
+<li><code>score_all.py</code>：（進行役）19 の答えをまとめて採点し、点のぶれを見る</li>
+</ul>
+</li>
+<li>
+<p><code>assistant/</code>：採用アシスタント（Streamlit の画面。LLM が検索の道具を選んで、候補を段ごとに絞る。検索と LLM だけを使うので、メンバーの設定で動く。<code>assistant/README.md</code>）</p>
+<ul>
+<li>動かす：Repo 直下で <code>pip install -r applied/assistant/requirements.txt</code> のあと <code>streamlit run applied/assistant/app.py</code></li>
+</ul>
+</li>
+</ul>
+<h2 id="中身">中身</h2>
+<ul>
+<li><code>data/</code>：採用の文書 23 ファイルと、その一覧（<code>manifest.json</code>）。<code>data/updates/</code> は 17 だけで使う求人票の旧版（v1）。<code>data/_build/</code> は、文書を作り直す道具（教材を直す人用。macOS の字体が要る。<code>data/README.md</code>）</li>
+<li><code>lib/</code>：共通の部品<ul>
+<li>設定と接続：<code>config.py</code>（<code>.env.local</code> の読み取りと、固定の名前）、<code>clients.py</code></li>
+<li>文書の読み取り <code>readers.py</code>、取り込みの設計図 <code>pipeline.py</code>、見てよい人 <code>acl.py</code></li>
+<li>17 の道具 <code>docops.py</code>（Storage の文書とインデックスを直す。元に戻す <code>restore</code>）</li>
+<li>エージェント型検索 <code>agentic.py</code>、採点 <code>evaluation.py</code>、表示 <code>show.py</code>、エラーの表示 <code>errors.py</code></li>
+</ul>
+</li>
+<li><code>tools/</code>：構築する人用（<code>build_hr_index.py</code>、<code>build_hr_kb.py</code>）</li>
+<li><code>tests/</code>：通信しない試験（採用アシスタントの試験は <code>test_assistant_*.py</code>）</li>
+<li><code>requirements.txt</code>、<code>requirements-eval.txt</code>（20 の組み込みの評価器だけ）</li>
+</ul>
+<h2 id="構築する人向け">構築する人向け</h2>
+<p>Repo 直下で、構築する人の <code>.env.local</code> で実行します。</p>
+<pre><code>python applied/tools/build_hr_index.py             # 作る（あれば更新して実行し直す）
+python applied/tools/build_hr_index.py --status    # いまの状態を見る（何も変えない）
+python applied/tools/build_hr_index.py --recreate  # 全部消してから作り直す
+python applied/tools/build_hr_index.py --delete    # 全部消す（Storage の入れ物の中の、manifest の文書も）
+
+python applied/tools/build_hr_kb.py                # 知識ソースと知識ベースを作る（hr-docs が先に要る）
+python applied/tools/build_hr_kb.py --status
+python applied/tools/build_hr_kb.py --recreate
+python applied/tools/build_hr_kb.py --delete
+</code></pre>
+<ul>
+<li><code>build_hr_index.py</code> は、Storage の入れ物（<code>AZURE_STORAGE_CONTAINER</code>）がなければ非公開で作ります。置くのは、manifest の 23 文書だけです。インデクサーの後に、全部のチャンクに「見てよい人」を付けます。取り込み直している間は、見てよい人が空になり、検索の結果が空になります</li>
+<li><code>build_hr_kb.py</code> は、<code>.env.local</code> の <code>AZURE_OPENAI_CHAT_MODEL</code>（モデル名。既定 <code>gpt-5-mini</code>）と <code>AZURE_OPENAI_CHAT_DEPLOYMENT</code>（デプロイ名）を読んで、知識ベースの LLM にキーでつなぎます。プレビューの API（<code>2026-08-01-preview</code>）を使います。このモデルで動くかは、実機で確かめてください</li>
+<li>17 が途中で止まったときは、<code>topics/17-update-delete/cleanup.py</code> で元に戻します（data/ のとおりにして、インデクサーを動かし、見てよい人を付け直します。何度実行しても同じです）</li>
+</ul>
+<h2 id="試験">試験</h2>
+<p>通信しない試験です（偽の Azure）。仮想環境に入れて、applied フォルダで流します。</p>
+<pre><code>python3 -m venv .venv
+.venv/bin/pip install -r applied/requirements.txt
+cd applied
+../.venv/bin/python -m unittest discover -s tests
+</code></pre>
+<p>Windows（PowerShell）では <code>.venv\Scripts\python</code> を使います。Notebook の試験（<code>tests/test_layout.py</code> の最後の1本）は、jupytext が入っているときだけ動きます（<code>requirements-dev.txt</code>）。
+<code>azure-ai-evaluation</code>（<code>requirements-eval.txt</code>）が入っていないときは、1本が飛ばされます。
+採用アシスタントの画面の試験（<code>tests/test_assistant_app.py</code> の <code>ScreenTest</code>）は、streamlit が入っているときだけ動きます（<code>pip install -r applied/assistant/requirements.txt</code>）。入っていなければ飛ばされます。</p>
+</article>
+</main>
+<footer class="bar"><a class="home" href="../index.html">← 入口に戻る</a><a class="source" href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/applied/README.md">元の Markdown（GitHub）</a></footer>
+</body>
+</html>

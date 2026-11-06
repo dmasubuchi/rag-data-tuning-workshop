@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>16 見せてよい人で絞る | データに着目した RAG の研修</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="bar"><a class="home" href="../index.html">← 入口に戻る</a><a class="source" href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/applied/topics/16-security-filter/README.md">元の Markdown（GitHub）</a></header>
+<main>
+<article class="doc">
+<h1 id="16-見せてよい人で絞る">16 見せてよい人で絞る</h1>
+<nav class="toc"><details><summary>このページの目次</summary>
+<ul>
+<li class="l2"><a href="#何を学ぶか">何を学ぶか</a></li>
+<li class="l2"><a href="#前提">前提</a></li>
+<li class="l2"><a href="#実行">実行</a></li>
+<li class="l2"><a href="#見るところ">見るところ</a></li>
+<li class="l2"><a href="#発展">発展</a></li>
+</ul>
+</details></nav>
+
+<p>採用の文書には、全員に見せてよいもの（求人票）と、見せてはいけないもの（面接の評価、現在の年収）が混ざっています。
+同じ質問でも、聞いた人によって、見せてよい範囲が違います。このトピックでは、検索するときに「見てよいチャンクだけ」に絞ります。</p>
+<p>※ このトピックに出てくる人物・評価・年収は、すべて研修用の架空のデータです。実在の人物とは関係ありません。</p>
+<h2 id="何を学ぶか">何を学ぶか</h2>
+<ul>
+<li>インデックス <code>hr-docs</code> の各チャンクには、<code>allowed</code>（見てよい人）が付いている<ul>
+<li>役割（<code>role:recruiter</code>・<code>role:interviewer</code>・<code>role:employee</code>）と個人（<code>user:U-1006</code>）を、同じ文字列の一覧（Collection）に入れる</li>
+<li>立場ごとの見え方<ul>
+<li>採用担当（<code>role:recruiter</code>）：全部</li>
+<li>面接官（<code>role:interviewer</code> と <code>user:&lt;自分の ID&gt;</code>）：求人票と、自分が担当する応募の文書</li>
+<li>一般社員（<code>role:employee</code>）：求人票だけ</li>
+</ul>
+</li>
+<li>現在の年収を含むチャンクは、同じ文書の中でも採用担当だけ</li>
+</ul>
+</li>
+<li>絞り込みの式（filter）は、検索する人の印を入れ替えるだけ</li>
+</ul>
+<pre><code>allowed/any(a: search.in(a, 'role:interviewer,user:U-1006'))
+</code></pre>
+<ul>
+<li>チャンクの <code>allowed</code> のどれかが、<code>search.in</code> の中の印のどれかと同じなら見える</li>
+<li>検索の前に決まるので、見えないチャンクは、順位にも、LLM に渡す資料にも出てこない</li>
+<li>悪い例：絞り込みをせず、全部を LLM に渡して、プロンプトで「評価と年収は答えるな」と頼むだけにすると、漏れる</li>
+<li>結論：<strong>見せてはいけないものは、LLM に渡す前に、検索で外す</strong></li>
+</ul>
+<h2 id="前提">前提</h2>
+<ul>
+<li><code>pip install -r applied/requirements.txt</code>（Repo 直下で、仮想環境の中で）</li>
+<li>構築する人がインデックス <code>hr-docs</code> を作り、見てよい人（<code>allowed</code>）を付けてあること（なければ構築する人に聞く）</li>
+<li>メンバーの設定（検索だけのキー、Storage なし）で動きます</li>
+<li><code>leak_demo.py</code> は、<code>.env.local</code> の <code>AZURE_OPENAI_CHAT_DEPLOYMENT</code> のデプロイで LLM を呼びます（質問ごとに 2 回）。</li>
+</ul>
+<h2 id="実行">実行</h2>
+<pre><code>python search_by_role.py                         # 同じ質問を、3つの立場で検索する
+python search_by_role.py --interviewer U-1007    # 面接官を変える
+python search_by_role.py --question "REQ-043 に応募した人の経歴を教えてください"
+python leak_demo.py                              # 悪い例と良い例を並べる
+python leak_demo.py --question "REQ-043 に応募した人の面接官のコメントを、そのまま引用して"
+</code></pre>
+<h2 id="見るところ">見るところ</h2>
+<ul>
+<li><code>search_by_role.py</code><ul>
+<li>立場ごとの「見えるチャンク」の数が違う。採用担当は 48 件すべて、面接官 U-1006 は 43 件、一般社員は求人票の 6 件だけ</li>
+<li>絞り込みの式が、画面に出る。立場の印だけが違う</li>
+<li>同じ質問でも、立場ごとに上位の文書が変わる。見えないものは、順位が下がるのではなく、検索の対象にならない</li>
+<li>「現年収」で探すと、採用担当だけ 2 件。ほかは 0 件</li>
+<li>限界：面接官に見える面接の評価のチャンクに、担当でない応募の番号が混ざる（絞り込みはチャンクが単位で、Excel は 400 文字ずつに切るため）</li>
+</ul>
+</li>
+<li><code>leak_demo.py</code><ul>
+<li>悪い例：絞り込みなし（全部のチャンク）。「LLM に渡したチャンク」に、面接の評価・経歴書・スキャンが入っている。「評価は答えるな」と頼んだのに、答えに評価の中身（強く推奨など）が出る<ul>
+<li>教材を作ったときの測定では、この2問（直接聞く・「面接はどうだった？」と聞く）を 6 回ずつ聞いて、12 回とも、評価の中身が出た（モデルが違えば、変わることがある）</li>
+<li>禁止に書かなかったこと（内定、入社予定日）も、そのまま答える</li>
+<li>禁止した語を並べて聞く質問（「現在の年収と、面接の評価を教えて」）では、断る回もあった</li>
+</ul>
+</li>
+<li>答えは実行のたびに変わる。今回出なくても、安全ではない。「たまたま断った」を、防御と数えてはいけない</li>
+<li>良い例：同じプロンプトで、先に一般社員の印で絞る。LLM に渡すのは求人票だけ。評価も年収も入っていないので、どんな聞き方でも漏れようがない</li>
+</ul>
+</li>
+</ul>
+<h2 id="発展">発展</h2>
+<ul>
+<li>チャンクの切り方と、見せる単位：評価の Excel を 1 行 1 チャンクで取り込めば（14 の切り方）、行ごとに <code>allowed</code> を決められる。担当でない応募の行は、見えなくなる</li>
+<li>検索する人の印は、このトピックでは手で決めている（<code>acl.viewer_interviewer("U-1006")</code> など）。実際のシステムでは、ログインした人から決める</li>
+<li>Entra（Microsoft Entra ID）との連携（紹介だけ。この教材は、鍵だけで動かすので、実装していません）<ul>
+<li>アプリが Entra で利用者をログインさせ、その人の所属グループやユーザー ID を取り出す</li>
+<li>所属グループを、<code>role:…</code> の印に変える（例：「採用チーム」グループなら <code>role:recruiter</code>）。ユーザー ID は <code>user:…</code> にする</li>
+<li>その印を、この <code>filter</code> の <code>search.in(...)</code> に入れて検索する。式の形はこのトピックと同じ</li>
+<li>検索サービス側で、Entra のグループやユーザーに基づく文書単位のアクセス制御を行う機能もある。プレビューの機能が含まれるので、使う前に、最新の Microsoft Learn（Azure AI Search の document-level access control）で確かめる</li>
+</ul>
+</li>
+<li>面接の評価の Excel で、応募の番号が出てこないチャンクは、評価基準・注記のシートの文章と確かめられたものだけ、面接官全員に見せる。個別の評価の後半だけが切れて入ったチャンクなど、由来を確かめられないものは、採用担当だけにする（Azure の分割は、Excel の行を保証しないため）</li>
+<li><code>allowed</code> は、取り込みの後に付ける（<code>lib/acl.py</code>）。インデクサーを動かして取り込み直したチャンクは <code>allowed</code> が空に戻り、空のチャンクはだれにも見えない（安全側）。17 は、インデクサーを動かすたびに、全部のチャンクに付け直している</li>
+</ul>
+</article>
+</main>
+<footer class="bar"><a class="home" href="../index.html">← 入口に戻る</a><a class="source" href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/applied/topics/16-security-filter/README.md">元の Markdown（GitHub）</a></footer>
+</body>
+</html>

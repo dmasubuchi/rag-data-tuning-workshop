@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>05 検索の良し悪しを数字で測る | データに着目した RAG の研修</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="bar"><a class="home" href="../index.html">← 入口に戻る</a><a class="source" href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/basic/topics/05-measure-search/README.md">元の Markdown（GitHub）</a></header>
+<main>
+<article class="doc">
+<h1 id="05-検索の良し悪しを数字で測る">05 検索の良し悪しを数字で測る</h1>
+<nav class="toc"><details><summary>このページの目次</summary>
+<ul>
+<li class="l2"><a href="#何を学ぶか">何を学ぶか</a></li>
+<li class="l2"><a href="#前提">前提</a></li>
+<li class="l2"><a href="#実行するコマンドこのフォルダで">実行するコマンド（このフォルダで）</a></li>
+<li class="l2"><a href="#何を見るか">何を見るか</a></li>
+<li class="l2"><a href="#自分の質問を足す">自分の質問を足す</a></li>
+<li class="l2"><a href="#azure-の使い方">Azure の使い方</a></li>
+</ul>
+</details></nav>
+
+<h2 id="何を学ぶか">何を学ぶか</h2>
+<ul>
+<li>検索の良し悪しは、正解を決めた質問をたくさん用意し、指標の平均で比べる。1問だけでは、方式の優劣は決められない。</li>
+<li>指標は3つ。<ul>
+<li>nDCG@10：正解が上にあるほど点が高い（0〜1）。順位が下がるほど点を割り引き（k 位は 1 / log2(k + 1) 倍）、その合計（DCG）を、正解を全部上から並べたときの合計（IDCG）で割る。</li>
+<li>再現率@10：正解のうち、上位10件に入った割合（何位かは問わない）。</li>
+<li>1位の割合：1位が正解（のどれか）だった質問の割合。</li>
+</ul>
+</li>
+<li>正解が1人のとき（用意した60問はすべてそう）は、IDCG = 1.00 なので、nDCG@10 は 1位 1.0、2位 0.63、3位 0.50、11位以下は 0。再現率@10 は、入れば 1、入らなければ 0。</li>
+<li>正解が複数のときは、IDCG が1位から min(正解の数, 10) 位までの割り引きの和になる。正解が2人なら IDCG = 1.00 + 0.63 = 1.63。1人だけ1位に入って、もう1人が上位10件にないと、nDCG@10 は 0.61、再現率@10 は 0.5（1位かは 1）。全員が上位にそろって初めて 1.0 になる。</li>
+<li>平均では差があっても、1問ずつ見ると方式の勝ち負けは入れ替わる（キーワードが勝つ質問、ベクトルが勝つ質問、ハイブリッドでかえって下がる質問がある）。</li>
+<li>ここで測るのは検索だけ。答えの文章の良し悪し（生成 AI による採点）は、応用編で扱う。</li>
+</ul>
+<h2 id="前提">前提</h2>
+<ul>
+<li>03-vector-search を終えている（武将のインデックスに、ベクトルとセマンティックの設定がある）。04 のあとに行うと、4方式の意味がわかりやすい。
+    なければ、各スクリプトが「どうすればよいか」を出して止まる。先頭の <code>REBUILD = True</code> にすると作り直す。</li>
+</ul>
+<h2 id="実行するコマンドこのフォルダで">実行するコマンド（このフォルダで）</h2>
+<pre><code>python ndcg_by_hand.py
+python measure_methods.py
+</code></pre>
+<p>Notebook でも、同じファイルを上から順にセルを実行すれば動く。</p>
+<h2 id="何を見るか">何を見るか</h2>
+<ul>
+<li><code>ndcg_by_hand.py</code>：山場の質問（藤堂高虎）で、上位10件の1件ずつの点と割り引き、DCG・IDCG・nDCG の計算。4方式で、この1問の指標がどう違うか（ハイブリッド＋ランカーは2位で 0.63、ハイブリッドだけだと上位10件の外で 0）。最後に、正解が2人のときの例（Azure を使わない計算）。</li>
+<li><code>measure_methods.py</code>：60問×4方式の平均の表と、方式によって勝ち負けが入れ替わる質問（種類ごとに2問）。</li>
+</ul>
+<h2 id="自分の質問を足す">自分の質問を足す</h2>
+<p>ハンズオンでは、進行役が1回見せる。チームでは何度も実行しない（実行のたびに、セマンティックランカーを質問の数だけ使い、月の無料枠をチームの AI Search 全体で使うため）。</p>
+<p><code>measure_methods.py</code> の先頭の <code>MY_QUESTIONS</code> に、（質問, 正解の武将の名前）を1〜3問書いて、もう一度実行する。</p>
+<pre><code class="language-python">MY_QUESTIONS = [
+    ("鉄砲を3段に構えて武田の騎馬隊を破った戦いで、織田と組んだ大名は誰ですか。", "徳川家康"),
+]
+</code></pre>
+<ul>
+<li>名前は <code>basic/data/sengoku/bushou.json</code> の <code>name</code> と同じに書く（一覧にない名前の質問は飛ばして知らせる）。</li>
+<li>正解が複数いるときは、名前を <code>["織田信長", "徳川家康"]</code> のように並べる。このときの nDCG・再現率の見方は、上の「何を学ぶか」の正解が複数のときを読む。</li>
+<li>結果の「自分の質問の順位」と「自分の質問を足した平均」を見る。正解を決めた質問を作る手間が、検索を測るときのいちばんの手間になる。</li>
+</ul>
+<h2 id="azure-の使い方">Azure の使い方</h2>
+<ul>
+<li><code>measure_methods.py</code> は、質問の埋め込み（数回）と検索 240 回を行い、セマンティックランカーを質問の数だけ使う（月ごとの無料枠を、チームの AI Search 全体で使う。1回で約240回）。</li>
+</ul>
+</article>
+</main>
+<footer class="bar"><a class="home" href="../index.html">← 入口に戻る</a><a class="source" href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/basic/topics/05-measure-search/README.md">元の Markdown（GitHub）</a></footer>
+</body>
+</html>

@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Azure の準備 | データに着目した RAG の研修</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="bar"><a class="home" href="../index.html">← 入口に戻る</a><a class="source" href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/guide/setup/azure-setup.md">元の Markdown（GitHub）</a></header>
+<main>
+<article class="doc">
+<h1 id="azure-の準備">Azure の準備</h1>
+<nav class="toc"><details><summary>このページの目次</summary>
+<ul>
+<li class="l2"><a href="#作るもの">作るもの</a></li>
+<li class="l2"><a href="#0-進行役から受け取る値を書く">0. 進行役から受け取る値を書く</a></li>
+<li class="l2"><a href="#1-azure-に入る">1. Azure に入る</a></li>
+<li class="l2"><a href="#2-チームの名前を決める">2. チームの名前を決める</a></li>
+<li class="l2"><a href="#3-リソースを作る">3. リソースを作る</a></li>
+<li class="l3"><a href="#3-1-リソース-グループ">3-1. リソース グループ</a></li>
+<li class="l3"><a href="#3-2-ストレージ-アカウント">3-2. ストレージ アカウント</a></li>
+<li class="l3"><a href="#3-3-ai-search">3-3. AI Search</a></li>
+<li class="l3"><a href="#3-4-cosmos-dbnosql">3-4. Cosmos DB（NoSQL）</a></li>
+<li class="l3"><a href="#3-5-foundry-とプロジェクト">3-5. Foundry とプロジェクト</a></li>
+<li class="l3"><a href="#3-6-モデルのデプロイ">3-6. モデルのデプロイ</a></li>
+<li class="l3"><a href="#3-7-確認">3-7. 確認</a></li>
+<li class="l2"><a href="#4-接続の設定を作る">4. 接続の設定を作る</a></li>
+<li class="l3"><a href="#構築する人">構築する人</a></li>
+<li class="l3"><a href="#メンバー">メンバー</a></li>
+<li class="l3"><a href="#古くなったとき">古くなったとき</a></li>
+<li class="l2"><a href="#5-補助az-で作る">5. 補助：az で作る</a></li>
+<li class="l2"><a href="#6-つまずいたとき">6. つまずいたとき</a></li>
+<li class="l2"><a href="#次の手順">次の手順</a></li>
+</ul>
+</details></nav>
+
+<p>チームの AI Search と Foundry などを、Azure に作ります。操作するのは、チームの構築する人（1人）です。ほかのメンバーは、手順を読み上げて確かめます。</p>
+<p>画面の名前が書いてあるものと違うときは、進行役に聞きます（Azure の画面は変わることがあります）。</p>
+<p>手順は、画面（ポータル）で作ることを中心に書いてあります。az のコマンドは、画面で作れないときや確かめるときの補助として、<a href="#5-補助az-で作る">5</a> にまとめてあります。</p>
+<h2 id="作るもの">作るもの</h2>
+<p>チームの名前を決めると、リソースの名前が決まります（<code>&lt;org&gt;</code> は組織の名前、<code>&lt;team&gt;</code> はチームの名前）。</p>
+<ul>
+<li>リソース グループ：<code>rg-&lt;org&gt;-&lt;team&gt;</code></li>
+<li>ストレージ アカウント：<code>st&lt;org&gt;&lt;team&gt;</code></li>
+<li>AI Search：<code>srch-&lt;org&gt;-&lt;team&gt;</code>（価格レベルは Basic）</li>
+<li>Cosmos DB：<code>cosmos-&lt;org&gt;-&lt;team&gt;</code>（<a href="guide-hotel.html">ホテル</a>の 4〜5 章だけで使う）</li>
+<li>Foundry：<code>ai-&lt;org&gt;-&lt;team&gt;</code> と、プロジェクト <code>proj-default</code></li>
+<li>モデルのデプロイ：<code>text-embedding-3-small</code>（埋め込み）、<code>gpt-5-mini</code>（チャット）</li>
+</ul>
+<p>例：組織が <code>acme</code>、チームが <code>red</code> のとき、<code>rg-acme-red</code>、<code>stacmered</code>、<code>srch-acme-red</code>、<code>cosmos-acme-red</code>、<code>ai-acme-red</code> です。</p>
+<h2 id="0-進行役から受け取る値を書く">0. 進行役から受け取る値を書く</h2>
+<p>進行役から、次の4つの値を受け取ります。</p>
+<ul>
+<li>Azure のサブスクリプション ID</li>
+<li>リソースを作る場所（例：<code>japaneast</code>）</li>
+<li>組織の短い名前（小文字の英字と数字、3〜6文字、英字で始める。例：<code>acme</code>）</li>
+<li>Azure のテナント（テナントのドメイン名か ID）</li>
+</ul>
+<ol>
+<li class="task"><input type="checkbox"> <code>config/workshop.example.config</code> をコピーして、Repo 直下に <code>workshop.config</code> という名前で置く<ul>
+<li>PowerShell：<code>Copy-Item config/workshop.example.config workshop.config</code></li>
+</ul>
+</li>
+<li class="task"><input type="checkbox"> <code>workshop.config</code> を VS Code で開き、4つの値を書いて保存する（引用符はつけない）</li>
+</ol>
+<ul>
+<li><code>workshop.config</code> は Git に入りません。ほかの人に渡す必要もありません（値は進行役が全員に伝えます）。</li>
+<li>以降、<code>&lt;テナント&gt;</code> は <code>AZURE_TENANT</code> の値、<code>&lt;サブスクリプション ID&gt;</code> は <code>AZURE_SUBSCRIPTION_ID</code> の値、<code>&lt;場所&gt;</code> は <code>AZURE_LOCATION</code> の値、<code>&lt;org&gt;</code> は <code>WORKSHOP_ORG</code> の値に置き換えます。</li>
+</ul>
+<h2 id="1-azure-に入る">1. Azure に入る</h2>
+<p>進行役（または組織の管理者）が、構築する人を Azure に招待し、サブスクリプションの「所有者」にしています。</p>
+<ol>
+<li class="task"><input type="checkbox"> 招待メールの「招待を承諾する」を選び、「承諾」を選ぶ<ul>
+<li>メールが届かないとき：<code>https://portal.azure.com/&lt;テナント&gt;</code> に、招待されたアドレスでサインインして承諾する</li>
+</ul>
+</li>
+<li class="task"><input type="checkbox"> <code>https://portal.azure.com/&lt;テナント&gt;</code> を開いてサインインする</li>
+<li class="task"><input type="checkbox"> 上の検索ボックスに「サブスクリプション」と入れ、進行役に聞いたサブスクリプションが一覧にある</li>
+<li class="task"><input type="checkbox"> そのサブスクリプションを開き、「アクセス制御 (IAM)」の「アクセスの確認」で、自分が「所有者」になっている<ul>
+<li>所有者でないとき：進行役に伝える</li>
+</ul>
+</li>
+</ol>
+<h2 id="2-チームの名前を決める">2. チームの名前を決める</h2>
+<p>リソースの名前は、すべて組織の名前とチームの名前から決まります。チームの名前は、小文字の英字と数字だけ、3〜8文字、英字で始めます。<code>shared</code> で始めてはいけません（例 <code>red</code>）。ほかのチームと同じにしません。</p>
+<ol>
+<li class="task"><input type="checkbox"> チームの名前を決める（以下、<code>&lt;team&gt;</code>）</li>
+<li class="task"><input type="checkbox"> PowerShell を開き、Repo のフォルダーに移って、Azure にサインインする（ブラウザが開く）<ul>
+<li><code>az login --tenant &lt;テナント&gt;</code></li>
+<li>「Select a subscription」と出たら、そのまま Enter を押す</li>
+</ul>
+</li>
+<li class="task"><input type="checkbox"> 名前を表示する：<code>python tools/team.py names --team &lt;team&gt;</code></li>
+<li class="task"><input type="checkbox"> 表示された <code>$env:WORKSHOP_TEAM = "&lt;team&gt;"</code> の行を、PowerShell に貼って実行する<ul>
+<li>このウィンドウの間だけ有効。PowerShell を開き直したら、もう一度貼る</li>
+<li>貼ったあとの <code>team.py</code> では、<code>--team</code> を省略できる</li>
+<li>bash では、<code>export WORKSHOP_TEAM=&lt;team&gt;</code></li>
+</ul>
+</li>
+<li class="task"><input type="checkbox"> 名前が使えるかを確かめる（Azure には何も作りません）：<code>python tools/team.py check-names</code></li>
+<li class="task"><input type="checkbox"> 5つの名前がすべて「使える」になる<ul>
+<li>「ほかで使われている」が出たら、チームの名前を変えて 3 からやり直す</li>
+</ul>
+</li>
+<li class="task"><input type="checkbox"> 3 で表示された名前のとおりに、次から作る</li>
+</ol>
+<h2 id="3-リソースを作る">3. リソースを作る</h2>
+<p>作る順番：リソース グループ、ストレージ、AI Search、Cosmos DB、Foundry。</p>
+<p>どの画面でも、「サブスクリプション」は 1 で確かめたものを選びます。「リージョン」は、<code>&lt;場所&gt;</code> に当たるものを選びます（<code>japaneast</code> なら「Japan East」）。</p>
+<h3 id="3-1-リソース-グループ">3-1. リソース グループ</h3>
+<ol>
+<li>上の検索ボックスに <code>リソース グループ</code> と入れ、「リソース グループ」を選びます。</li>
+<li>「作成」を選びます。</li>
+<li>「サブスクリプション」を選びます。</li>
+<li>「リソース グループ」に <code>rg-&lt;org&gt;-&lt;team&gt;</code> と入れます。</li>
+<li>「リージョン」を選びます。</li>
+<li>「確認および作成（Review + create）」を選び、「作成」を選びます。</li>
+</ol>
+<p>確認：</p>
+<ul>
+<li class="task"><input type="checkbox"> リソース グループの一覧に <code>rg-&lt;org&gt;-&lt;team&gt;</code> がある。</li>
+</ul>
+<h3 id="3-2-ストレージ-アカウント">3-2. ストレージ アカウント</h3>
+<ol>
+<li>検索ボックスに <code>ストレージ アカウント</code> と入れ、「ストレージ アカウント」を選びます。</li>
+<li>「作成」を選びます。</li>
+<li>「サブスクリプション」を選びます。</li>
+<li>「リソース グループ」で <code>rg-&lt;org&gt;-&lt;team&gt;</code> を選びます。</li>
+<li>「ストレージ アカウント名」に <code>st&lt;org&gt;&lt;team&gt;</code> と入れます。</li>
+<li>「リージョン」を選びます。</li>
+<li>「パフォーマンス」で「Standard」を選びます。</li>
+<li>「冗長性」で「ローカル冗長ストレージ (LRS)」を選びます。</li>
+<li>ほかの項目は、そのままにします。</li>
+<li>「確認および作成（Review + create）」を選び、「作成」を選びます。</li>
+<li>完了したら「リソースに移動」を選びます。</li>
+</ol>
+<ul>
+<li>文書を置く入れ物（コンテナー）は、使う手順で作ります。<a href="guide-hotel.html">ホテル</a>は <code>hotels</code> を手順で作り、<a href="guide-hr.html">応用（人事）</a>の <code>hr-docs</code> は取り込みの道具が作ります。</li>
+</ul>
+<p>確認：</p>
+<ul>
+<li class="task"><input type="checkbox"> 「概要」で、パフォーマンス（Performance）が「Standard」になっている。</li>
+<li class="task"><input type="checkbox"> 「概要」で、レプリケーション（Replication）が「ローカル冗長ストレージ (LRS)」になっている。</li>
+<li class="task"><input type="checkbox"> 「概要」で、アカウントの種類（Account kind）が「StorageV2」になっている。</li>
+</ul>
+<h3 id="3-3-ai-search">3-3. AI Search</h3>
+<ol>
+<li>検索ボックスに <code>Azure AI Search</code> と入れ、「Azure AI 検索（Azure AI Search）」を選びます。</li>
+<li>「作成」を選びます。</li>
+<li>「サブスクリプション」を選びます。</li>
+<li>「リソース グループ」で <code>rg-&lt;org&gt;-&lt;team&gt;</code> を選びます。</li>
+<li>「サービス名（Service name）」に <code>srch-&lt;org&gt;-&lt;team&gt;</code> と入れます。</li>
+<li>「場所（Location）」を選びます。</li>
+<li>「価格レベル（Pricing tier）」の「価格レベルを変更（Change pricing tier）」を選び、「価格レベルの選択」で「Basic」を選びます。</li>
+<li>「確認および作成（Review + create）」を選び、「作成」を選びます。</li>
+<li>完了したら「リソースに移動」を選びます。</li>
+<li>左メニューの「設定」の「セマンティック ランカー」（画面によっては「Premium features」）を開き、「Free」が選ばれていることを確かめます。違えば「Free」を選んで、保存します。</li>
+</ol>
+<ul>
+<li>種類は「Search Service (Foundry IQ)」と表示されることがあります。</li>
+<li>Basic は、リソースがあるあいだ料金がかかります。料金は <a href="https://azure.microsoft.com/ja-jp/pricing/details/search/">Azure の料金ページ</a>で確かめます。不要になったら、リソース グループごと削除します（<a href="guide-facilitator.html">進行役の手引き</a>の「終わったあと」）。</li>
+<li>セマンティック ランカーの Free には、月ごとの上限があります。チームの AI Search 全体で使います（<a href="basic-README.html">基礎編 README</a>）。</li>
+</ul>
+<p>確認：</p>
+<ul>
+<li class="task"><input type="checkbox"> <code>srch-&lt;org&gt;-&lt;team&gt;</code> が作られ、価格レベルが「Basic」になっている。</li>
+<li class="task"><input type="checkbox"> 「セマンティック ランカー」が「Free」になっている。</li>
+</ul>
+<h3 id="3-4-cosmos-dbnosql">3-4. Cosmos DB（NoSQL）</h3>
+<p><a href="guide-hotel.html">ホテル</a>の 4〜5 章（Cosmos DB のベクトル検索）を行わないときは、作らなくてもかまいません。</p>
+<ol>
+<li>検索ボックスに <code>Azure Cosmos DB</code> と入れ、「Azure Cosmos DB」を選びます。</li>
+<li>「作成」を選び、「Azure Cosmos DB for NoSQL」を選びます。</li>
+<li>「サブスクリプション」を選びます。</li>
+<li>「リソース グループ」で <code>rg-&lt;org&gt;-&lt;team&gt;</code> を選びます。</li>
+<li>「アカウント名」に <code>cosmos-&lt;org&gt;-&lt;team&gt;</code> と入れます。</li>
+<li>「場所」を選びます。</li>
+<li>「容量モード（Capacity mode）」で「プロビジョニング済みスループット（Provisioned throughput）」を選びます。</li>
+<li>ほかの項目は、そのままにします。</li>
+<li>「レビュー + 作成（Review + create）」を選び、「作成」を選びます。</li>
+</ol>
+<ul>
+<li>ベクトル検索の機能は、ホテルの 4 章で有効にします。</li>
+</ul>
+<p>確認：</p>
+<ul>
+<li class="task"><input type="checkbox"> <code>cosmos-&lt;org&gt;-&lt;team&gt;</code> が作られた。</li>
+</ul>
+<h3 id="3-5-foundry-とプロジェクト">3-5. Foundry とプロジェクト</h3>
+<ol>
+<li>検索ボックスに <code>Foundry</code> と入れ、「Foundry」を選びます。</li>
+<li>「作成」を選びます。</li>
+<li>「サブスクリプション」を選びます。</li>
+<li>「リソース グループ」で <code>rg-&lt;org&gt;-&lt;team&gt;</code> を選びます。</li>
+<li>「名前」に <code>ai-&lt;org&gt;-&lt;team&gt;</code> と入れます。</li>
+<li>「リージョン」を選びます。</li>
+<li>プロジェクト名の欄があれば、<code>proj-default</code> と入れます。</li>
+<li>「確認および作成（Review + create）」を選び、「作成」を選びます。</li>
+<li>作成できたら、Foundry のポータル（<code>https://ai.azure.com</code>）を開き、「新しいファウンドリー（New Foundry）」のトグルがオンであることを確かめます。</li>
+<li>プロジェクト <code>proj-default</code> があることを確認します。</li>
+</ol>
+<ul>
+<li>プロジェクトがないときは、Foundry のポータルで右上の「管理（Manage）」を選び、左の「リソースの詳細」の「プロジェクトの追加」で <code>proj-default</code> を作ります。</li>
+</ul>
+<p>確認：</p>
+<ul>
+<li class="task"><input type="checkbox"> <code>ai-&lt;org&gt;-&lt;team&gt;</code> とプロジェクト <code>proj-default</code> がある。</li>
+</ul>
+<h3 id="3-6-モデルのデプロイ">3-6. モデルのデプロイ</h3>
+<ol>
+<li>Foundry のポータルで、プロジェクト <code>proj-default</code> を開きます。</li>
+<li>右上の「検出（Discover）」を選び、左の「モデル（Models）」を選びます。</li>
+<li>埋め込みのモデル <code>text-embedding-3-small</code> を選びます。</li>
+<li>「デプロイ」の「カスタム設定」を選び、「デプロイの種類」で「グローバル標準（Global Standard）」を選びます。</li>
+<li>容量（1 分あたりのトークン数。千単位）を <code>50</code> にします。</li>
+<li>「デプロイ」を選びます。</li>
+<li>もう一度「検出」の「モデル」を開き、チャットのモデル <code>gpt-5-mini</code> を選びます。</li>
+<li>「デプロイ」の「カスタム設定」を選び、「デプロイの種類」で「グローバル標準（Global Standard）」を選びます。</li>
+<li>容量を <code>20</code> にします。</li>
+<li>「デプロイ」を選びます。</li>
+</ol>
+<ul>
+<li>「標準（Standard）」は、割り当ての枠が足りないことがあるので選びません。</li>
+<li>埋め込みの容量は 50 以下にします。画面の初期値が 50 より大きいときは、50 に下げます。</li>
+<li>デプロイの画面が見つからないときは、進行役に聞きます。</li>
+</ul>
+<p>確認：</p>
+<ul>
+<li class="task"><input type="checkbox"> 右上の「ビルド（Build）」を選び、左の「モデル」の一覧で、<code>text-embedding-3-small</code> が「グローバル標準（Global Standard）」、状態が「成功（Succeeded）」になっている。</li>
+<li class="task"><input type="checkbox"> 同じ一覧で、<code>gpt-5-mini</code> が「グローバル標準（Global Standard）」、容量 20、状態が「成功」になっている。</li>
+</ul>
+<h3 id="3-7-確認">3-7. 確認</h3>
+<ol>
+<li>リソース グループ <code>rg-&lt;org&gt;-&lt;team&gt;</code> を開きます。</li>
+<li>「概要」の「リソース」を見ます。</li>
+<li>PowerShell で、Repo のフォルダーから <code>python tools/team.py health</code> を実行します（読み取りだけで、何も変えません）。</li>
+</ol>
+<p>確認：</p>
+<ul>
+<li class="task"><input type="checkbox"> 「ストレージ アカウント」の <code>st&lt;org&gt;&lt;team&gt;</code> がある。</li>
+<li class="task"><input type="checkbox"> 「Search Service (Foundry IQ)」の <code>srch-&lt;org&gt;-&lt;team&gt;</code> がある。</li>
+<li class="task"><input type="checkbox"> 「Azure Cosmos DB アカウント」の <code>cosmos-&lt;org&gt;-&lt;team&gt;</code> がある（ホテルの 4〜5 章を行うとき）。</li>
+<li class="task"><input type="checkbox"> 「Foundry」の <code>ai-&lt;org&gt;-&lt;team&gt;</code> がある。</li>
+<li class="task"><input type="checkbox"> 「Foundry プロジェクト」の <code>proj-default</code> がある。</li>
+<li class="task"><input type="checkbox"> <code>health</code> の8行がすべて「OK」で、最後の行が <code>OK 8・まだ 0・NG 0</code> になっている。</li>
+</ul>
+<p><code>health</code> は、次のように表示します（容量などは、作ったとおりに出ます）。</p>
+<pre><code>チーム red の状態（読み取りだけ）
+OK    リソース グループ rg-acme-red（Succeeded）
+OK    Storage stacmered（Standard_LRS・StorageV2）
+OK    AI Search srch-acme-red（running）
+OK    AI Search 価格レベル（Basic）
+OK    AI Search セマンティック ランカー（Free）
+OK    Foundry ai-acme-red
+OK    デプロイ text-embedding-3-small（GlobalStandard・容量50・Succeeded）
+OK    デプロイ gpt-5-mini（GlobalStandard・容量20・Succeeded）
+OK 8・まだ 0・NG 0
+</code></pre>
+<ul>
+<li>「OK」はそのままです。「NG」は、かっこの中の理由を読んで直します。「まだ」は、まだ作っていないものです。</li>
+<li><code>health</code> は Cosmos DB を調べません。ポータルで確かめます。</li>
+</ul>
+<h2 id="4-接続の設定を作る">4. 接続の設定を作る</h2>
+<p><code>.env.local</code> は、チームの AI Search と Foundry の接続先とキーを書いたファイルです。すべてのスクリプトが、Repo 直下のこのファイルを読みます。キーが入るので、Git には入りません。</p>
+<h3 id="構築する人">構築する人</h3>
+<ol>
+<li class="task"><input type="checkbox"> Repo 直下で、構築する人用の設定を作る：<code>python tools/team.py env --role builder</code><ul>
+<li>AI Search の管理者キーと、Storage の接続文字列が入ります。人に渡しません</li>
+<li>Storage を作ってから実行します（接続文字列を読むため）</li>
+</ul>
+</li>
+<li class="task"><input type="checkbox"> メンバーがいるとき：AI Search に、検索用のキー（クエリ キー）があることを確かめる<ul>
+<li><code>srch-&lt;org&gt;-&lt;team&gt;</code> の「設定」の「キー」を開き、「クエリ キーの管理」にキーが1つ以上ある</li>
+<li>ないとき：「追加」で作る</li>
+</ul>
+</li>
+<li class="task"><input type="checkbox"> メンバー用の設定を書き出す：<code>python tools/team.py env --role member --out member.local.env</code><ul>
+<li>検索だけのキーが入ります。Storage の接続文字列は入りません</li>
+</ul>
+</li>
+<li class="task"><input type="checkbox"> <code>member.local.env</code> を、チームのメンバーに渡す（チームの外には渡しません）</li>
+<li class="task"><input type="checkbox"> つながることを確かめる：<a href="guide-sengoku.html">武将</a>の 01 のフォルダー（<code>basic/topics/01-keyword-search</code>）で、<code>python create_index.py</code> を実行し、エラーが出ない</li>
+</ol>
+<h3 id="メンバー">メンバー</h3>
+<ol>
+<li class="task"><input type="checkbox"> 構築する人から受け取った <code>member.local.env</code> の名前を <code>.env.local</code> に変えて、Repo 直下に置く</li>
+<li class="task"><input type="checkbox"> つながることを確かめる：構築する人が<a href="guide-sengoku.html">武将</a>の 01 の <code>upload.py</code> まで終えたあとで、<code>basic/topics/01-keyword-search</code> フォルダーで <code>python keyword_search.py</code> を実行し、エラーが出ない</li>
+</ol>
+<h3 id="古くなったとき">古くなったとき</h3>
+<p>キーを作り直したときや、AI Search・Foundry を作り直したときは、<code>team.py env</code> をもう一度実行します（構築する人）。メンバーには、書き出し直したファイルを渡します。</p>
+<h2 id="5-補助az-で作る">5. 補助：az で作る</h2>
+<p>画面で作れないときや、作ったものを確かめるときに使います。PowerShell で実行します。名前は、組織の名前（<code>workshop.config</code> の <code>WORKSHOP_ORG</code>）と、チームの名前（環境変数 <code>WORKSHOP_TEAM</code>）から組み立てます。</p>
+<p>サインインと、名前の変数（PowerShell を開き直したら、もう一度）：</p>
+<pre><code class="language-powershell">az login --tenant &lt;テナント&gt;
+az account set --subscription &lt;サブスクリプション ID&gt;
+az account show --query name -o tsv
+$org = "&lt;org&gt;"
+$loc = "&lt;場所&gt;"
+$t = $env:WORKSHOP_TEAM
+$rg = "rg-$org-$t"
+</code></pre>
+<p>リソース グループと Storage：</p>
+<pre><code class="language-powershell">az group create -n $rg -l $loc
+az storage account create -n "st$org$t" -g $rg -l $loc --sku Standard_LRS --kind StorageV2
+</code></pre>
+<p>AI Search（Basic、マネージド ID あり、セマンティック ランカー Free）：</p>
+<pre><code class="language-powershell">az search service create -n "srch-$org-$t" -g $rg -l $loc --sku basic --identity-type SystemAssigned --semantic-search free
+</code></pre>
+<p>Cosmos DB（NoSQL、ベクトル検索を有効に）：</p>
+<pre><code class="language-powershell">az cosmosdb create -n "cosmos-$org-$t" -g $rg --locations regionName=$loc --capabilities EnableNoSQLVectorSearch
+</code></pre>
+<p>Foundry：リソースとプロジェクトは画面で作ります（az では作れない部分があります）。モデルのデプロイは az でもできます。</p>
+<pre><code class="language-powershell">az cognitiveservices account deployment create -n "ai-$org-$t" -g $rg --deployment-name text-embedding-3-small --model-name text-embedding-3-small --model-version 1 --model-format OpenAI --sku-name GlobalStandard --sku-capacity 50
+az cognitiveservices account deployment create -n "ai-$org-$t" -g $rg --deployment-name gpt-5-mini --model-name gpt-5-mini --model-version 2025-08-07 --model-format OpenAI --sku-name GlobalStandard --sku-capacity 20
+</code></pre>
+<p>メンバーに渡す検索用のキー（クエリ キー）を作る：</p>
+<pre><code class="language-powershell">az search query-key create --service-name "srch-$org-$t" -g $rg -n member
+</code></pre>
+<p>確かめる：</p>
+<pre><code class="language-powershell">az resource list -g $rg --query "[].{name:name,type:type}" -o table
+python tools/team.py health
+</code></pre>
+<h2 id="6-つまずいたとき">6. つまずいたとき</h2>
+<ul>
+<li>「ほかで使われている」と出る：チームの名前を変えて、2 からやり直します。</li>
+<li><code>team.py</code> が「サブスクリプションが見えません」と出る：サインインしていないか、<code>workshop.config</code> の <code>AZURE_SUBSCRIPTION_ID</code> が違います。<code>az login --tenant &lt;テナント&gt;</code> を実行して、値を確かめます。</li>
+<li>モデルのデプロイで、枠が足りない：「グローバル標準（Global Standard）」を選んでいるか確かめます。容量を、決めた値以下にします。それでも足りないときは、進行役に伝えます。</li>
+<li>ポータルの画面の読み込みが遅い：待ち続けず、ページを読み込み直します。</li>
+<li><code>health</code> に「NG」が出る：かっこの中の理由を読みます。「価格レベル」が Basic でなければ作り直し、「セマンティック ランカー」が Free でなければ 3-3 の 10 をやり直します。</li>
+</ul>
+<h2 id="次の手順">次の手順</h2>
+<ul>
+<li><a href="guide-hotel.html">ホテル</a>：Azure AI Search を、画面で作って試す</li>
+<li><a href="guide-sengoku.html">武将</a>：基礎編</li>
+<li><a href="guide-hr.html">応用（人事）</a>：応用編</li>
+</ul>
+</article>
+</main>
+<footer class="bar"><a class="home" href="../index.html">← 入口に戻る</a><a class="source" href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/guide/setup/azure-setup.md">元の Markdown（GitHub）</a></footer>
+</body>
+</html>

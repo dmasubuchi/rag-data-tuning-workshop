@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>ハンズオン資料の原稿（検索と RAG の仕組み） | データに着目した RAG の研修</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="bar"><a class="home" href="../index.html">← 入口に戻る</a><a class="source" href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/docs/lecture/README.md">元の Markdown（GitHub）</a></header>
+<main>
+<article class="doc">
+<h1 id="ハンズオン資料の原稿検索と-rag-の仕組み">ハンズオン資料の原稿（検索と RAG の仕組み）</h1>
+<nav class="toc"><details><summary>このページの目次</summary>
+<ul>
+<li class="l2"><a href="#ファイル">ファイル</a></li>
+<li class="l2"><a href="#図の描き方の決まり">図の描き方の決まり</a></li>
+<li class="l2"><a href="#作り方">作り方</a></li>
+<li class="l2"><a href="#公開の出力に出さないもの">公開の出力に出さないもの</a></li>
+<li class="l2"><a href="#本文の根拠にした-microsoft-learn2026年11月に読んだ版">本文の根拠にした Microsoft Learn（2026年11月に読んだ版）</a></li>
+</ul>
+</details></nav>
+
+<p>HTML のスライド（<code>site/lecture/</code>）と Markdown（<code>docs/lecture/md/</code>）の原稿と、作るための道具です。</p>
+<ul>
+<li>スライドは仕組みの説明（手法、Azure のリソース、検索の考え方）に集中する。検索の結果や順位は、各ページの下の「確かめる」が指すトピック（<code>basic/topics/…</code>、<code>applied/topics/…</code>）のスクリプトと Notebook で確かめる</li>
+<li>進行は部の順（はじめに → 第1部 検索方法 → 第2部 取り込み → 第3部 関係とエージェント型検索 → 評価 → 比較と締め）。トピックの番号は、データと前提の順で、進行の順とは別</li>
+</ul>
+<h2 id="ファイル">ファイル</h2>
+<ul>
+<li><code>keywords.md</code>：キーワードのページ（全52ページ）。<strong>本文を直すときはここを直す</strong></li>
+<li><code>decks.json</code>：デッキ（部）の構成。ページの並び、節、各ページの「確かめる」トピック、新しく足したページ（はじめに、順位の調整、うまくいかない場面など）、トピックの表</li>
+<li><code>deck.html</code>：描画のひな形。部品 <code>kw</code>（2段組みの3層の箇条書き。文字は枠に収まるよう 26px から 17px まで縮む）と <code>diagram</code>（図）、全ページ共通の「確かめる」の欄がある</li>
+<li><code>player.js</code>：スライドのプレイヤー（slide-player の <code>player/player.js</code> の写し。MIT License）</li>
+<li><code>catalog.css</code>：目次のページの見た目</li>
+<li><code>diagrams/</code>：図。<code>pNN.json</code>（題、キャプション、SVG、ノート）は <code>figures.py</code> が <code>figs_*.py</code> から書き出す。どのページにも図がある</li>
+<li><code>tools/build.py</code>：<code>site/lecture/</code>（HTML のスライド）と <code>docs/lecture/md/</code>（Markdown）を作る</li>
+<li><code>md/</code>：Markdown 版。部ごとの <code>.md</code>（節・ページ・本文・図・「確かめる」のリンク・ノート）と <code>index.md</code>、図の SVG（<code>img/pNN.svg</code>）。<code>build.py --md</code> が作る生成物なので、直接は直さない</li>
+<li><code>tools/check.py</code>：全スライドを静止画にして、はみ出しと JS のエラーを調べる。プレイヤーの操作も確かめる</li>
+<li><code>tools/svgparts.py</code>：図の部品（色、人・索引の箱・書棚・文書のアイコン、矢印、文字の大きさ）。どの図もこれだけを使う</li>
+</ul>
+<p>「確かめる」が指すトピックのフォルダは、<code>decks.json</code> の <code>topics</code> に書いてある。基礎編は 01〜06、応用編は 14〜20。</p>
+<h2 id="図の描き方の決まり">図の描き方の決まり</h2>
+<ul>
+<li>図はスライドの真ん中の箱と矢印の部分だけを、SVG で描く。外枠、題、副題、線は描かない。段階ごとに出す部分に <code>data-step</code> を付ける</li>
+<li>題はスライドの題に、副題はキャプションに、注はノートか本文に書く</li>
+<li>色の数とアイコンの種類は、全部の図でそろえる（<code>tools/svgparts.py</code>）</li>
+<li>中身は <code>keywords.md</code> の本文に合わせる。本文にない数字や機能名は足さない</li>
+<li>図の中に「未確認」「TODO」「（下書き）」などの制作のメモを描かない</li>
+<li>1枚の箱と矢印は6つまで、段階は4つまで。箇条は1ページ8つまで</li>
+<li>ノートには、段階ごとに話すことを書く（狙い／話すこと（段階ごと）／補足／注意）</li>
+<li>図の中の文字は、画像にせず SVG の文字（text）として入れる</li>
+</ul>
+<p>図を直すときは、<code>figs_*.py</code> を直して <code>python3 docs/lecture/diagrams/figures.py</code> で <code>pNN.json</code> を書き出し、<code>build.py</code> で作り直す（ページ番号を渡すと、そのページだけ書き出す）。</p>
+<h2 id="作り方">作り方</h2>
+<p>Repo の直下で実行します。<code>build.py</code> は Python 3.10 以上の標準ライブラリだけで動きます。確認の <code>check.py</code> には <code>playwright</code>（Chromium）が要ります（作る人の道具で、参加者は要りません）。</p>
+<pre><code>python3 docs/lecture/tools/build.py
+python3 docs/lecture/tools/build.py --md docs/lecture/md
+python3 docs/lecture/tools/check.py --out &lt;静止画の置き場&gt;
+</code></pre>
+<ul>
+<li><code>build.py --decks &lt;JSON&gt; --out &lt;書き出し先&gt;</code>：デッキの構成と書き出し先を変えられる</li>
+<li><code>build.py --md docs/lecture/md</code>：同じ原稿から Markdown を作る（<code>--md</code> だけのときは HTML を作らない）。図は <code>img/pNN.svg</code> に、xmlns・字体・白い背景つきの1枚のファイルで書く（段ごとの <code>data-step</code> は外し、全部の段が見える）。両方を作り直すときは <code>build.py --out site/lecture --md docs/lecture/md</code></li>
+<li>原稿（<code>keywords.md</code>・<code>decks.json</code>・<code>diagrams/</code>）を直したら、<code>site/lecture/</code> と <code>docs/lecture/md/</code> を作り直して、いっしょにコミットする（試験が、作り直したものと同じかを確かめる）</li>
+<li>できたものは <code>site/lecture/index.html</code> をブラウザで開きます（目次 → カードを選ぶ。→ キーで進む、N でノート、H で目次）</li>
+<li><code>check.py</code> は、<code>site/lecture/</code> を調べます。静止画の一覧（<code>contact.png</code>）は ffmpeg があるときだけ作ります</li>
+<li>試験（通信なし）：<code>python3 -m unittest discover -s tests</code></li>
+</ul>
+<h2 id="公開の出力に出さないもの">公開の出力に出さないもの</h2>
+<p><code>site/lecture/</code> と <code>docs/lecture/md/</code> は参加者に公開します。次のものは <code>keywords.md</code>・<code>decks.json</code>・<code>diagrams/</code> に書きません（<code>build.py</code> も出しません）。</p>
+<ul>
+<li>制作のメモ（未確認、記憶にもとづく、あったはず、確かめる必要がある）</li>
+<li>内部の呼び名、別の講座や別の教材の名前</li>
+<li>編集の履歴（「追加 ○ 枚」など）</li>
+</ul>
+<p>作り直したあとの確認（図の中の文字は対象外）：</p>
+<pre><code>grep -rnE "未確認|記憶|あったはず|シリーズ|第[0-9]+回" site/lecture docs/lecture/md
+</code></pre>
+<h2 id="本文の根拠にした-microsoft-learn2026年11月に読んだ版">本文の根拠にした Microsoft Learn（2026年11月に読んだ版）</h2>
+<ul>
+<li>BM25・点数の変動：<code>azure/search/index-similarity-and-scoring</code>、<code>azure/search/index-ranking-similarity</code></li>
+<li>RRF・ハイブリッド：<code>azure/search/hybrid-search-ranking</code>、<code>azure/search/hybrid-search-how-to-query</code></li>
+<li>セマンティックランカー：<code>azure/search/semantic-search-overview</code>、<code>azure/search/semantic-how-to-enable-scoring-profiles</code>、<code>azure/search/semantic-how-to-enable-disable</code>、<code>azure/search/semantic-how-to-query-rewrite</code></li>
+<li>アナライザー・同義語：<code>azure/search/search-analyzers</code>、<code>azure/search/index-add-language-analyzers</code>、<code>azure/search/search-synonyms</code></li>
+<li>ベクトル：<code>azure/search/vector-search-ranking</code>、<code>azure/search/vector-search-how-to-create-index</code>、<code>azure/search/vector-search-how-to-query</code>、<code>azure/search/vector-search-filters</code>、<code>azure/search/vector-search-how-to-storage-options</code>、<code>azure/search/vector-search-how-to-quantization</code></li>
+<li>スキル：<code>azure/search/cognitive-search-skill-document-intelligence-layout</code>、<code>azure/search/cognitive-search-skill-ocr</code>、<code>azure/search/cognitive-search-skill-textsplit</code>、<code>azure/search/search-how-to-semantic-chunking</code></li>
+<li>インデクサー：<code>azure/search/search-how-to-index-azure-blob-changed-deleted</code>、<code>azure/search/search-blob-metadata-properties</code>、<code>azure/search/search-how-to-define-index-projections</code></li>
+<li>エージェント型検索：<code>azure/search/agentic-retrieval-overview</code>、<code>azure/search/agentic-retrieval-how-to-set-retrieval-reasoning-effort</code>、<code>azure/search/agentic-knowledge-source-overview</code>、<code>azure/search/agentic-knowledge-source-how-to-web</code>、<code>azure/search/agentic-retrieval-how-to-retrieve</code></li>
+<li>権限：<code>azure/search/search-document-level-access-overview</code></li>
+<li>評価器：<code>python/api/azure-ai-evaluation/azure.ai.evaluation.&lt;評価器名&gt;</code></li>
+<li>上限・料金：<code>azure/search/search-limits-quotas-capacity</code></li>
+</ul>
+<p>（すべて <code>https://learn.microsoft.com/en-us/</code> の下）</p>
+</article>
+</main>
+<footer class="bar"><a class="home" href="../index.html">← 入口に戻る</a><a class="source" href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/docs/lecture/README.md">元の Markdown（GitHub）</a></footer>
+</body>
+</html>

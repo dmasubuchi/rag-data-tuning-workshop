@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>進行役の手引き | データに着目した RAG の研修</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="bar"><a class="home" href="../index.html">← 入口に戻る</a><a class="source" href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/guide/facilitator.md">元の Markdown（GitHub）</a></header>
+<main>
+<article class="doc">
+<h1 id="進行役の手引き">進行役の手引き</h1>
+<nav class="toc"><details><summary>このページの目次</summary>
+<ul>
+<li class="l2"><a href="#人">人</a></li>
+<li class="l2"><a href="#開始前の準備">開始前の準備</a></li>
+<li class="l3"><a href="#渡す値を決める">渡す値を決める</a></li>
+<li class="l3"><a href="#azure招待と所有者の割り当て">Azure：招待と所有者の割り当て</a></li>
+<li class="l3"><a href="#githubrepo-の招待">GitHub：Repo の招待</a></li>
+<li class="l3"><a href="#進行役の-pc">進行役の PC</a></li>
+<li class="l2"><a href="#パート1-pc-の設定">パート1 PC の設定</a></li>
+<li class="l2"><a href="#パート2-azure-の接続とリソース作成">パート2 Azure の接続とリソース作成</a></li>
+<li class="l2"><a href="#パート3-基礎編ホテルと武将">パート3 基礎編：ホテルと武将</a></li>
+<li class="l3"><a href="#ホテル">ホテル</a></li>
+<li class="l3"><a href="#武将">武将</a></li>
+<li class="l2"><a href="#パート4-応用編人事">パート4 応用編：人事</a></li>
+<li class="l2"><a href="#締め">締め</a></li>
+<li class="l2"><a href="#終わったあと">終わったあと</a></li>
+<li class="l2"><a href="#つまずきやすい所">つまずきやすい所</a></li>
+</ul>
+</details></nav>
+
+<p>研修を進める人（進行役）向けです。開始前の準備、パートの順、各パートで見せるもの、つまずきやすい所をまとめます。時刻は決めていません。人数やパートの長さに合わせて組みます。</p>
+<h2 id="人">人</h2>
+<ul>
+<li>進行役：全体を進める。組織の設定の値を渡し、Azure の権限を付ける。複数いるときは、チームごとに担当を決める</li>
+<li>チーム：構築する人（1人）と、メンバー（人数は自由）。構築する人が画面を操作し、ほかの人は手順を読み上げて確かめる</li>
+<li>チームの名前を決めたあとは、その名前（<code>&lt;team&gt;</code>）でチームを呼ぶ</li>
+</ul>
+<p>流れ：パート1 PC、パート2 Azure、パート3 基礎編（ホテルと武将）、パート4 応用編（人事）、締め</p>
+<h2 id="開始前の準備">開始前の準備</h2>
+<h3 id="渡す値を決める">渡す値を決める</h3>
+<p>次の4つを決めて、参加者に伝えます（参加者は <code>workshop.config</code> に書きます）。</p>
+<ul>
+<li class="task"><input type="checkbox"> Azure のサブスクリプション ID</li>
+<li class="task"><input type="checkbox"> リソースを作る場所（例：<code>japaneast</code>）</li>
+<li class="task"><input type="checkbox"> 組織の短い名前（小文字の英字と数字、3〜6文字、英字で始める）</li>
+<li class="task"><input type="checkbox"> Azure のテナント</li>
+</ul>
+<h3 id="azure招待と所有者の割り当て">Azure：招待と所有者の割り当て</h3>
+<p>進行役、または組織の管理者が行います。構築する人の数だけくり返します。</p>
+<ol>
+<li class="task"><input type="checkbox"> Entra 管理センター（<code>https://entra.microsoft.com</code>）に、テナントでサインインする</li>
+<li class="task"><input type="checkbox"> 左の「Entra ID」の「ユーザー」を開き、「新しいユーザー」の「外部ユーザーの招待」を選ぶ</li>
+<li class="task"><input type="checkbox"> 「電子メール」と「表示名」を入れ、「招待メッセージの送信」にチェックを入れて、「確認と招待」、「招待」を選ぶ</li>
+<li class="task"><input type="checkbox"> Azure ポータルで、使うサブスクリプションを開き、「アクセス制御 (IAM)」の「追加」から「ロールの割り当ての追加」を選ぶ</li>
+<li class="task"><input type="checkbox"> 「特権管理者ロール」の「所有者」を選び、「次へ」を選ぶ</li>
+<li class="task"><input type="checkbox"> 「メンバーの選択」で、招待した人を選び、「選択」、「次へ」を選ぶ</li>
+<li class="task"><input type="checkbox"> 「条件」タブでは、（推奨）の選択肢を選び、「次へ」を選ぶ</li>
+<li class="task"><input type="checkbox"> 「割り当ての種類」が出たら、「アクティブ」と「永続的」を選び、「次へ」を選ぶ</li>
+<li class="task"><input type="checkbox"> 「確認と割り当て」を選ぶ</li>
+<li class="task"><input type="checkbox"> 招待された人が、招待メールを承諾し、<code>https://portal.azure.com/&lt;テナント&gt;</code> でサインインし直して、サブスクリプションが見えることを確かめる</li>
+</ol>
+<ul>
+<li>所有者にするのは、ロールの割り当て（AI Search にストレージを読む権限を付けるなど）を、構築する人が行うためです。研修のあとに、いつ外すかも決めておきます。</li>
+</ul>
+<h3 id="githubrepo-の招待">GitHub：Repo の招待</h3>
+<p>Repo が非公開のときだけです。</p>
+<ol>
+<li class="task"><input type="checkbox"> 参加者の GitHub のアカウントを聞く</li>
+<li class="task"><input type="checkbox"> Repo の「Settings」の「Collaborators」で、「Add people」から招待する</li>
+<li class="task"><input type="checkbox"> 招待を承諾して、Repo を開けることを確かめる</li>
+</ol>
+<h3 id="進行役の-pc">進行役の PC</h3>
+<ul>
+<li class="task"><input type="checkbox"> Repo を clone し、<code>pip install -r basic/requirements.txt</code> を実行する</li>
+<li class="task"><input type="checkbox"> <code>workshop.config</code> を書く（チームごとの状態確認に使う）</li>
+<li class="task"><input type="checkbox"> az にサインインする：<code>az login --tenant &lt;テナント&gt;</code>、<code>az account show</code></li>
+<li class="task"><input type="checkbox"> Foundry のモデルの枠を確かめる：チームの数だけ、埋め込み <code>text-embedding-3-small</code>（容量 50）と、チャット <code>gpt-5-mini</code>（容量 20）が、「グローバル標準（Global Standard）」で足りること</li>
+<li class="task"><input type="checkbox"> 画面に映すもの（スライド）を開いておく：<a href="../lecture/intro/slides.html">ハンズオン資料</a></li>
+</ul>
+<h2 id="パート1-pc-の設定">パート1 PC の設定</h2>
+<p>手順：<a href="guide-setup-windows-pc.html">Windows PC の設定</a></p>
+<ul>
+<li class="task"><input type="checkbox"> ネットワークにつなぐ</li>
+<li class="task"><input type="checkbox"> 各 PC で、Git・Python・az・VS Code を確かめ、<code>pip install -r basic/requirements.txt</code> まで済ませる</li>
+<li class="task"><input type="checkbox"> チームを分け、各チームの構築する人を決める</li>
+<li>映す：<a href="../lecture/intro/slides.html">はじめに</a></li>
+<li>確かめる：git・python・az・code のコマンドがすべて動く。VS Code の Markdown のプレビュー（<code>Ctrl+Shift+V</code>）に図が出る</li>
+</ul>
+<h2 id="パート2-azure-の接続とリソース作成">パート2 Azure の接続とリソース作成</h2>
+<p>手順：<a href="guide-setup-azure-setup.html">Azure の準備</a></p>
+<ul>
+<li class="task"><input type="checkbox"> 各チームが、チームの名前を決める（例 <code>red</code>）。小文字の英字と数字だけ、3〜8文字、英字で始める、<code>shared</code> で始めない。チームどうしで同じにしない</li>
+<li class="task"><input type="checkbox"> 各チームが、<code>python tools/team.py check-names --team &lt;team&gt;</code> で確かめ、すべて「使える」になってから作り始める</li>
+<li class="task"><input type="checkbox"> チームごとに、<code>names</code> の表示どおりに作る：リソース グループ、Storage、AI Search（Basic）、Cosmos DB、Foundry とモデル2つ</li>
+<li class="task"><input type="checkbox"> 各チームの構築する人が、<code>.env.local</code> を作り、メンバー用の <code>member.local.env</code> をメンバーに渡す</li>
+<li>確かめる（進行役の PC で、チームごとに）：<code>python tools/team.py health --team &lt;team&gt;</code>。8行がすべて「OK」で、<code>OK 8・まだ 0・NG 0</code><ul>
+<li>「NG」は理由を読んで直す。「まだ」は、まだ作っていないもの</li>
+<li>Cosmos DB は <code>health</code> が調べないので、ポータルで見る</li>
+</ul>
+</li>
+</ul>
+<h2 id="パート3-基礎編ホテルと武将">パート3 基礎編：ホテルと武将</h2>
+<h3 id="ホテル">ホテル</h3>
+<p>手順：<a href="guide-hotel.html">ホテル</a>（章1〜3が中心。章4〜5は、Cosmos DB を使う続き）</p>
+<ul>
+<li class="task"><input type="checkbox"> 章2：Blob のホテルを AI Search に取り込む（マネージド ID、Blob を読む権限、JSON を置く、インデックス、データソース、インデクサー、5分ごとの取り込み）</li>
+<li class="task"><input type="checkbox"> 章3：6つの機能を検索エクスプローラーで試す（自動取り込み、キーワード、フィルター、地理、ファセット、並べ替え）</li>
+<li>映す：<a href="../lecture/part2-ingestion/slides.html#p16">p.16 取り込みの順番</a>、<a href="../lecture/part2-ingestion/slides.html#p27">p.27 インデクサーとスキルセット</a>、<a href="../lecture/part1-search/slides.html#p01">p.1 BM25</a>、<a href="../lecture/part1-search/slides.html#p07">p.7 アナライザーと日本語の形態素解析</a>、<a href="../lecture/part1-search/slides.html#p11">p.11 フィルターとファセット</a>、<a href="../lecture/part2-ingestion/slides.html#p29">p.29 差分の更新と削除の検出</a></li>
+<li>確かめる（章2のあと、各チームのポータルで）：インデクサー <code>hotels-blob-indexer</code> の最初の実行が「成功」で、処理50・失敗0。インデックス <code>hotels-blob</code> のドキュメント数が50</li>
+<li>確かめる（章3のあと）：beach 4件、pool 18件、wifi 22件。ビーチ・プールで日本語の名前のホテルが出る。ファセットの件数が出る。地理検索で近い順に3件</li>
+</ul>
+<h3 id="武将">武将</h3>
+<p>手順：<a href="guide-sengoku.html">武将</a>（トピック 01〜06）</p>
+<ul>
+<li class="task"><input type="checkbox"> 各チームの構築する人が、01 から順に進める。AI Search に <code>sengoku</code> ができる</li>
+<li class="task"><input type="checkbox"> メンバーは、構築する人が進めたところまで、検索のスクリプトを動かす</li>
+<li>確かめる：01 のあと、ポータルで <code>sengoku</code> のドキュメント数が 150</li>
+<li>01・02：キーワード検索と、同義語で順位が変わるのを見る<ul>
+<li>映す：<a href="../lecture/part1-search/slides.html#p13">p.13 同義語マップ</a></li>
+<li>確かめる：02 の同義語の1行で、q28 の順位が上がる</li>
+</ul>
+</li>
+<li>03：ベクトル検索で、言い換えの質問が当たるのを見る<ul>
+<li>映す：<a href="../lecture/part1-search/slides.html#p02">p.2 ベクトル検索</a></li>
+<li>確かめる：言い換えの質問で、ベクトル検索の1位が正解</li>
+</ul>
+</li>
+<li>04：ハイブリッドとランカー<ul>
+<li>映す：<a href="../lecture/part1-search/slides.html#p03">p.3 ハイブリッド検索</a>、<a href="../lecture/part1-search/slides.html#p04">p.4 RRF</a>、<a href="../lecture/part1-search/slides.html#p05">p.5 セマンティックランカー</a></li>
+<li>確かめる：4つの方式の順位が並ぶ。方式を変えれば必ず良くなるわけではない</li>
+</ul>
+</li>
+<li>05・06：測る、答えを作る<ul>
+<li>映す：<a href="../lecture/part4-evaluation/slides.html#p42">p.42 NDCG と再現率</a>、<a href="../lecture/part5-wrapup/slides.html#p48">p.48 RAG の基本の流れ</a>、<a href="../lecture/part5-wrapup/slides.html#p50">p.50 ハルシネーション</a></li>
+<li>確かめる：05 の60問の測定は、進行役が1回見せる（チームで何度も実行しない）。06 で検索ありの答えが正解、検索なしは外れる</li>
+</ul>
+</li>
+</ul>
+<h2 id="パート4-応用編人事">パート4 応用編：人事</h2>
+<p>手順：<a href="guide-hr.html">応用（人事）</a></p>
+<ul>
+<li class="task"><input type="checkbox"> 構築する人が、<code>hr-docs</code> を取り込んでおく（数分。パート3の途中で始めておくと、待たない）</li>
+<li class="task"><input type="checkbox"> 14〜20 を、進行役のデモで見せる（17 は構築する人の画面で）</li>
+<li class="task"><input type="checkbox"> <a href="applied-assistant-README.html">採用アシスタント</a>を見せる</li>
+<li>映す：<a href="../lecture/part2-ingestion/slides.html#p30">p.30 権限：誰に何を見せるか</a>、<a href="../lecture/part2-ingestion/slides.html#p29">p.29 差分の更新と削除の検出</a>、<a href="../lecture/part3-relations-agentic/slides.html#p31">p.31 文書同士の関係性を検索する</a>、<a href="../lecture/part3-relations-agentic/slides.html#p32">p.32 エージェント型検索</a>、<a href="../lecture/part3-relations-agentic/slides.html#p36">p.36 ナレッジソースとナレッジベース</a>、<a href="../lecture/part4-evaluation/slides.html#p44">p.44 生成 AI による採点のぶれ</a></li>
+<li>短く見せるとき：<a href="guide-search-demo.html">検索デモ</a>（AI Search だけ。5段で、絞る・見せてよい人・並べ直す）</li>
+</ul>
+<h2 id="締め">締め</h2>
+<ul>
+<li class="task"><input type="checkbox"> 作り方の比較と料金を振り返る<ul>
+<li>映す：<a href="../lecture/part5-wrapup/slides.html#p46">p.46 作り方の比較</a>、<a href="../lecture/part5-wrapup/slides.html#p52">p.52 料金の構造</a></li>
+</ul>
+</li>
+<li class="task"><input type="checkbox"> 続きの手順を伝える：ホテルの章4〜5（Cosmos DB）、ハンズオン資料と各トピックの README</li>
+<li class="task"><input type="checkbox"> 質問の窓口を伝える（チャットなど、決めた場所）</li>
+</ul>
+<h2 id="終わったあと">終わったあと</h2>
+<ul>
+<li class="task"><input type="checkbox"> 各チームのリソース グループ <code>rg-&lt;org&gt;-&lt;team&gt;</code> を、残すか消すか決める<ul>
+<li>続きの手順を進めるなら残す。AI Search の Basic は、残しているあいだ料金がかかる（料金は <a href="https://azure.microsoft.com/ja-jp/pricing/details/search/">Azure の料金ページ</a>で確かめる）</li>
+<li>消すとき：ポータルでリソース グループを開き、「リソース グループの削除」を選ぶ。リソース グループの名前を入力して確認する</li>
+<li>az では：<code>az group delete -n rg-&lt;org&gt;-&lt;team&gt;</code>（リソース グループの中身が全部消える）</li>
+</ul>
+</li>
+<li class="task"><input type="checkbox"> 所有者の割り当てを、いつ外すか決める</li>
+<li class="task"><input type="checkbox"> 試しに作ったリソースがあれば、消す</li>
+</ul>
+<h2 id="つまずきやすい所">つまずきやすい所</h2>
+<ul>
+<li>モデルのデプロイで枠が足りない：「グローバル標準（Global Standard）」を選んでいるか、容量が 50・20 以下か確かめる</li>
+<li>チームの名前が使えない：<code>check-names</code> の「ほかで使われている」。名前を変える</li>
+<li>ロールの割り当てが効かない：付けた直後は、反映に時間がかかる。5分ほど待って、インデクサーの次の実行を見る</li>
+<li>画面の名前が違う：Azure の画面は変わる。メニューの名前を探し、見つからなければ、進行役が確かめて伝える</li>
+<li>セマンティック ランカーの無料枠：チームの AI Search 全体で、月ごとに使う。05 の <code>measure_methods.py</code> は、1回の実行で質問の数（60回）使う</li>
+<li>17 は本物の文書を直す：動かしているあいだ、チームの検索の結果も変わる。メンバーが 15・16・18・19 を動かしていないときに、構築する人が実行する</li>
+<li>キーが古くなった：構築する人が <code>python tools/team.py env --role builder</code> と <code>--role member --out member.local.env</code> を実行し直し、メンバーに渡し直す</li>
+<li>Azure OpenAI が「呼びすぎ（429）」と返す：自動で待って再試行する。続くときは、1分ほど待つ</li>
+</ul>
+</article>
+</main>
+<footer class="bar"><a class="home" href="../index.html">← 入口に戻る</a><a class="source" href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/guide/facilitator.md">元の Markdown（GitHub）</a></footer>
+</body>
+</html>

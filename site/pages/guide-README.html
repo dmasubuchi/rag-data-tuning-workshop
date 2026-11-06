@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>手順書 | データに着目した RAG の研修</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="bar"><a class="home" href="../index.html">← 入口に戻る</a><a class="source" href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/guide/README.md">元の Markdown（GitHub）</a></header>
+<main>
+<article class="doc">
+<h1 id="手順書">手順書</h1>
+
+<p>研修を進めるための手順書です。仕組みの説明は<a href="docs-lecture-md-index.html">ハンズオン資料</a>（スライド）、トピックごとの手順は<a href="basic-README.html">基礎編</a>と<a href="applied-README.html">応用編</a>の README にあります。</p>
+<h2 id="呼び方">呼び方</h2>
+<ul>
+<li>進行役：研修を進める人。組織の設定の値を渡し、Azure の権限を付ける</li>
+<li>参加者：研修に出る人。チームで進める</li>
+<li>構築する人：チームで1人。Azure のリソースを作り、データを入れる。<code>.env.local</code> は <code>--role builder</code> で作る</li>
+<li>メンバー：チームのほかの人。検索と読み取りをする。<code>.env.local</code> は <code>--role member</code> で作る</li>
+</ul>
+<h2 id="順番">順番</h2>
+<ol>
+<li><a href="guide-setup-windows-pc.html">Windows PC の設定</a>：Git・Python・az・VS Code を確かめる</li>
+<li><a href="guide-setup-azure-setup.html">Azure の準備</a>：チームの名前を決め、ポータルでリソースを作り、接続の設定 <code>.env.local</code> を作る</li>
+<li><a href="guide-hotel.html">ホテル</a>：ホテルのデータで、Azure AI Search をポータルで作って試す。Cosmos DB のベクトル検索も</li>
+<li><a href="guide-sengoku.html">武将</a>：基礎編（01〜06）。キーワード検索からベクトル検索、ハイブリッド、答えの生成まで</li>
+<li><a href="guide-hr.html">応用（人事）</a>：応用編（14〜20）と採用アシスタント。採用の文書で、業務の検索を見る</li>
+<li><a href="guide-search-demo.html">検索デモ</a>：条件を変えると結果が変わるのを、AI Search だけで見る</li>
+<li><a href="guide-facilitator.html">進行役の手引き</a>：開始前の準備、パートの順、各パートで見せるもの、つまずきやすい所</li>
+</ol>
+<h2 id="道具">道具</h2>
+<ul>
+<li><code>python tools/team.py names</code>：チームの名前から、リソースの名前を表示する</li>
+<li><code>python tools/team.py check-names</code>：作る前に、名前が使えるかを確かめる（何も作らない）</li>
+<li><code>python tools/team.py health</code>：作ったものの状態を見る（読み取りだけ）</li>
+<li><code>python tools/team.py env --role builder</code>（メンバーは <code>--role member</code>）：接続の設定 <code>.env.local</code> を作る</li>
+<li><code>python tools/search_demo.py</code>：条件を変えると結果が変わるのを見る（<a href="guide-search-demo.html">検索デモ</a>）</li>
+<li><code>python tools/hotel_vectors.py</code>：ホテルのデータにベクトルを足す（<a href="guide-hotel.html">ホテル</a>の 4 章）</li>
+</ul>
+</article>
+</main>
+<footer class="bar"><a class="home" href="../index.html">← 入口に戻る</a><a class="source" href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/guide/README.md">元の Markdown（GitHub）</a></footer>
+</body>
+</html>

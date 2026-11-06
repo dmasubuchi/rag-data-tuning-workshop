@@ -13,7 +13,6 @@ import os
 import re
 import sys
 import tempfile
-import unicodedata
 import unittest
 import urllib.error
 import urllib.parse
@@ -27,6 +26,7 @@ sys.path.insert(0, str(REPO_DIR / "tools"))
 import hotel_vectors  # noqa: E402
 import search_demo  # noqa: E402
 import team  # noqa: E402
+from githubmd import GithubSlugger, github_anchor  # noqa: E402
 from teamlib.names import make_names  # noqa: E402
 
 GUIDE_FILES = ["README.md", "setup/windows-pc.md", "setup/azure-setup.md", "hotel.md", "sengoku.md", "hr.md",
@@ -49,23 +49,12 @@ def code_blocks(text, language):
     return re.findall(rf"^```{language}\n(.*?)^```", text, re.S | re.M)
 
 
-def github_anchor(heading: str) -> str:
-    """GitHub の見出しの飛び先：小文字にして、文字・数字・ハイフン・下線・空白だけ残し、空白をハイフンにする。"""
-    text = re.sub(r"!?\[([^\]]*)\]\([^)]*\)", r"\1", heading).replace("`", "").strip().lower()
-    kept = "".join(c for c in text
-                   if c in " -_" or unicodedata.category(c)[0] in "LMN" or unicodedata.category(c) == "Pc")
-    return kept.replace(" ", "-")
-
-
 def anchors_of(path: Path) -> set:
-    seen, found = {}, set()
+    slugger, found = GithubSlugger(), set()
     for _, line in outside_fences(path.read_text(encoding="utf-8")):
         m = re.match(r"^#{1,6}\s+(.*?)\s*#*\s*$", line)
         if m:
-            base = github_anchor(m.group(1))
-            count = seen.get(base, 0)
-            seen[base] = count + 1
-            found.add(base if count == 0 else f"{base}-{count}")
+            found.add(slugger.slug(m.group(1)))
     return found
 
 

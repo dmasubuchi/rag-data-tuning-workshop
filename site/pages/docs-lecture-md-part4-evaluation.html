@@ -1,0 +1,563 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>評価 | データに着目した RAG の研修</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="bar"><a class="home" href="../index.html">← 入口に戻る</a><a class="source" href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/docs/lecture/md/part4-evaluation.md">元の Markdown（GitHub）</a></header>
+<main>
+<article class="doc">
+<h1 id="評価">評価</h1>
+<nav class="toc"><details><summary>このページの目次</summary>
+<ul>
+<li class="l2"><a href="#a評価の流れ">A 評価の流れ</a></li>
+<li class="l3"><a href="#p39-評価rag-の回答の評価">p.39 評価（RAG の回答の評価）</a></li>
+<li class="l3"><a href="#p40-組み込み評価器">p.40 組み込み評価器</a></li>
+<li class="l3"><a href="#p40-評価器は何と何を比べるかで整理する">p.40 評価器は、何と何を比べるかで整理する</a></li>
+<li class="l2"><a href="#b検索の評価">B 検索の評価</a></li>
+<li class="l3"><a href="#p41-正解データグラウンドトゥルース">p.41 正解データ（グラウンドトゥルース）</a></li>
+<li class="l3"><a href="#p42-ndcg-と再現率">p.42 NDCG と再現率</a></li>
+<li class="l3"><a href="#p43-検索の評価と回答の評価の分け方">p.43 検索の評価と回答の評価の分け方</a></li>
+<li class="l2"><a href="#c回答の評価">C 回答の評価</a></li>
+<li class="l3"><a href="#p44-生成-ai-による採点のぶれ">p.44 生成 AI による採点のぶれ</a></li>
+<li class="l3"><a href="#p45-キャリブレーション">p.45 キャリブレーション</a></li>
+</ul>
+</details></nav>
+
+<!-- この Markdown は docs/lecture/tools/build.py --md が、keywords.md・decks.json・diagrams/ から作る。直すときは原稿を直す -->
+
+<p>検索の評価と回答の評価を分けて測る</p>
+<p><em>ハンズオン資料 p.39〜45　／　確かめるトピック：05・20</em></p>
+<p><a href="docs-lecture-md-index.html">目次に戻る</a></p>
+<h2 id="a評価の流れ">A　評価の流れ</h2>
+<h3 id="p39-評価rag-の回答の評価">p.39 評価（RAG の回答の評価）</h3>
+<p><em>検索の評価と回答の評価を分けて見る</em></p>
+<ul>
+<li><strong>一般的な説明</strong><ul>
+<li><strong>何を評価するか</strong><ul>
+<li>検索の評価：正しい文書が上位に来ているかを見ます（NDCG、再現率など）。</li>
+<li>回答の評価：検索結果をもとに作った回答がよいかを見ます。</li>
+<li>2つを分けておくと、悪い答えが検索のせいか生成のせいかを切り分けられます。</li>
+</ul>
+</li>
+<li><strong>評価の流れ</strong><ul>
+<li>正解データ：質問と、期待する答えの組を用意します。</li>
+<li>回答の取得：同じ質問を自分の RAG アプリに投げ、回答と、そのとき検索で取れた文書（コンテキスト）を集めます。</li>
+<li>採点：回答と正解を、生成 AI（GPT など）に採点させるか、プログラムで数えます。</li>
+</ul>
+</li>
+<li><strong>指標の種類</strong><ul>
+<li>生成 AI による指標：coherence（話の筋が通っているか）、groundedness（検索結果に基づいているか）、relevance（質問に合っているか）。1〜5 の点数です。</li>
+<li>プログラムで数える指標：回答の長さ、F1 スコア（回答と正解で重なる単語の割合）、出典の記号が付いているか（自分で書く判定）。</li>
+<li>注意点：生成 AI の採点はぶれるので、同じ設定で何度か比べるか、人の判断と突き合わせます（p.44、p.45）。</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><strong>Azure での説明</strong><ul>
+<li><strong>評価の道具</strong><ul>
+<li>azure-ai-evaluation SDK：groundedness、relevance、coherence などの評価器を持っています。</li>
+<li><code>evaluate()</code> 関数に、データのファイルと評価器の一覧を渡して、まとめて採点します。</li>
+<li>Foundry の評価：ポータルやクラウドで評価を動かし、結果を並べて比べられます。</li>
+</ul>
+</li>
+<li><strong>検索側の評価</strong><ul>
+<li>Azure AI Search には NDCG や再現率を計算する機能はありません。検索の結果のキーと正解のキーを、自分のコードで比べます（p.42）。</li>
+<li>検索方式ごとの NDCG の比べ方の例として、Microsoft が公開した測定があります（p.3。顧客企業のデータセット4つ、NDCG@3）。</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p><img alt="評価は3段で行い、検索と回答を分けて点を付ける" src="img/p39.svg"></p>
+<p><em>検索の評価と回答の評価を分けておくと、悪い答えが検索のせいか生成のせいかを切り分けられる</em></p>
+<p><strong>確かめる</strong>：<a href="basic-topics-05-measure-search-README.html">基礎 05 検索の良し悪しを数字で測る</a>／<a href="applied-topics-20-answer-evaluation-README.html">応用 20 答えを評価する</a></p>
+<details>
+<summary>ノート</summary>
+<ul>
+<li>位置：検索と取り込みのページのあと、「よくなったかをどう確かめるか」に移るページです。p.40 の組み込み評価器の前置きになります。</li>
+<li>言いたいこと：検索の評価と回答の評価は別物です。分けておけば、悪い答えの原因を検索側か生成側かに切り分けられます。</li>
+<li>気をつけること：<ul>
+<li>評価に使う SDK は azure-ai-evaluation です。</li>
+<li>生成 AI の採点はぶれます。点数を1回だけ見せて結論を言わないようにします。</li>
+<li>評価を実際に動かすと料金がかかります。</li>
+</ul>
+</li>
+</ul>
+<p><strong>図のノート</strong></p>
+<p>狙い：検索の評価と回答の評価は別物で、分けておけば悪い答えの原因を検索側か生成側かに切り分けられると言える。</p>
+<p>話すこと：</p>
+<ul>
+<li>段階0：評価の流れの1段目は正解データ（質問と、期待する答えの組）。同じ質問を自分の RAG アプリに投げる</li>
+<li>段階1：回答と、そのとき検索で取れた文書（コンテキスト）を集める。それを採点する。採点は、生成 AI（GPT など）に採点させるか、プログラムで数える</li>
+<li>段階2：採点を2つに分ける。検索の評価は、正しい文書が上位に来ているかを見る（NDCG、再現率など）。回答の評価は、検索結果をもとに作った回答がよいかを見る（groundedness、relevance など）</li>
+<li>段階3：2つを分けておくと、悪い答えが検索のせいか生成のせいかを切り分けられる</li>
+</ul>
+<p>補足：生成 AI による指標は coherence、groundedness、relevance（1〜5 の点数）。プログラムで数える指標は、回答の長さ、F1 スコア、出典の記号が付いているか（自分で書く判定）。生成 AI の採点はぶれるので、同じ設定で何度か比べるか、人の判断と突き合わせる（p.44、p.45）。Azure では、azure-ai-evaluation SDK の評価器と evaluate() 関数、Foundry の評価（ポータルやクラウドで評価を動かし、結果を並べて比べる）を使う。Azure AI Search には NDCG や再現率を計算する機能はなく、検索の結果のキーと正解のキーを自分のコードで比べる（p.42）。検索方式ごとの NDCG の比べ方の例として、Microsoft が公開した測定がある（p.3。顧客企業のデータセット4つ、NDCG@3）</p>
+<p>注意：評価に使う SDK は azure-ai-evaluation。点数を1回だけ見せて結論を言わない。評価を実際に動かすと料金がかかる</p>
+</details>
+<h3 id="p40-組み込み評価器">p.40 組み込み評価器</h3>
+<p><em>質問、コンテキスト、回答、グラウンドトゥルースのどれとどれを比べるか</em></p>
+<ul>
+<li><strong>一般的な説明</strong><ul>
+<li><strong>評価に使う4つの材料</strong><ul>
+<li>質問：利用者が聞いたことです。</li>
+<li>コンテキスト：検索で取ってきた文書の中身です。</li>
+<li>回答とグラウンドトゥルース：回答は RAG が作った答え、グラウンドトゥルースは人が用意した正解です。</li>
+</ul>
+</li>
+<li><strong>どの材料を比べるか</strong><ul>
+<li>回答とコンテキストを比べます：回答が検索結果に基づいているかを見ます（groundedness）。</li>
+<li>質問と回答を比べます：質問に合っているか（relevance）、話の筋が通っているか（coherence）を見ます。</li>
+<li>回答だけを見ます：文が自然か、文法に合っているかを見ます（fluency）。</li>
+<li>回答とグラウンドトゥルースを比べます：正解にどれだけ近いかを見ます。正解データがあるときだけ使えます。</li>
+<li>質問とコンテキストを比べます：検索が、答えの根拠になる文書を上位に出せたかを見ます（retrieval）。回答ではなく検索の側の物差しです。</li>
+</ul>
+</li>
+<li><strong>採点のしかた</strong><ul>
+<li>生成 AI に採点させるもの：groundedness、relevance、coherence、fluency、similarity、retrieval。1〜5 の点数です。</li>
+<li>計算するもの：F1 スコア（0〜1）。回答と正解で重なる単語の割合です。</li>
+<li>生成 AI の採点はぶれます。計算で出す点数はぶれませんが、言い換えを見逃します。</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><strong>Azure での説明</strong><ul>
+<li><strong>azure-ai-evaluation SDK の評価器</strong><ul>
+<li><code>GroundednessEvaluator</code>：回答とコンテキストを使います（質問は付けても付けなくてもよい）。</li>
+<li><code>RelevanceEvaluator</code>、<code>CoherenceEvaluator</code>：質問と回答を使います。<code>FluencyEvaluator</code> は回答だけを使います。</li>
+<li><code>SimilarityEvaluator</code>：質問、回答、グラウンドトゥルースを使います。<code>F1ScoreEvaluator</code>：回答とグラウンドトゥルースを使います。</li>
+<li><code>RetrievalEvaluator</code>：質問とコンテキスト（検索結果）を使います。</li>
+</ul>
+</li>
+<li><strong>ほかの評価器と使い方</strong><ul>
+<li><code>GroundednessProEvaluator</code>（Azure の評価サービスで、根拠に沿っているかを真偽で判定）や、安全性の評価器などもあります。</li>
+<li><code>evaluate()</code> 関数に、データのファイルと評価器の一覧を渡してまとめて動かします。</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p><img alt="評価器の違いは、何と何を比べるかの違い" src="img/p40.svg"></p>
+<p><em>質問、コンテキスト、回答、グラウンドトゥルースのどれとどれを比べるか。名前より、比べる組で整理する</em></p>
+<p><strong>確かめる</strong>：<a href="applied-topics-20-answer-evaluation-README.html">応用 20 答えを評価する</a></p>
+<details>
+<summary>ノート</summary>
+<ul>
+<li>位置：p.39 の評価の流れのうち、「採点」の部分を詳しく見るページです。</li>
+<li>言いたいこと：評価器の違いは、4つの材料のどれとどれを比べるかの違いです。名前を覚えるより、比べる組で整理します。</li>
+<li>気をつけること：<ul>
+<li>グラウンドトゥルースが要る評価器（similarity、F1）と要らない評価器（groundedness、relevance）を分けて話してください。</li>
+<li>動かすと料金がかかる点は、このページでも言います。</li>
+</ul>
+</li>
+</ul>
+<p><strong>図のノート</strong></p>
+<p>狙い：評価器の違いは、4つの材料（質問、コンテキスト、回答、グラウンドトゥルース）のどれとどれを比べるかの違いで、名前を覚えるより、比べる組で整理すると言える。</p>
+<p>話すこと：</p>
+<ul>
+<li>段階0：4つの材料。質問は利用者が聞いたこと、コンテキストは検索で取ってきた文書の中身、回答は RAG が作った答え、グラウンドトゥルースは人が用意した正解。回答だけを見る評価器もある（fluency：文が自然か、文法に合っているか）</li>
+<li>段階1：質問と回答を比べる。質問に合っているか（relevance）、話の筋が通っているか（coherence）</li>
+<li>段階2：回答とコンテキストを比べて、回答が検索結果に基づいているかを見る（groundedness）。質問とコンテキストを比べて、検索が答えの根拠になる文書を上位に出せたかを見る（retrieval）。retrieval は、回答ではなく検索の側の物差し</li>
+<li>段階3：回答とグラウンドトゥルースを比べて、正解にどれだけ近いかを見る（similarity、F1）。正解データがあるときだけ使える</li>
+</ul>
+<p>補足：生成 AI に採点させるもの（groundedness、relevance、coherence、fluency、similarity、retrieval）は 1〜5 の点数。計算するもの（F1 スコア）は 0〜1 で、回答と正解で重なる単語の割合。生成 AI の採点はぶれる。計算で出す点数はぶれないが、言い換えを見逃す。azure-ai-evaluation SDK の評価器は、GroundednessEvaluator（回答とコンテキスト。質問は付けても付けなくてもよい）、RelevanceEvaluator と CoherenceEvaluator（質問と回答）、FluencyEvaluator（回答だけ）、SimilarityEvaluator（質問、回答、グラウンドトゥルース）、F1ScoreEvaluator（回答とグラウンドトゥルース）、RetrievalEvaluator（質問とコンテキスト）。GroundednessProEvaluator（Azure の評価サービスで、根拠に沿っているかを真偽で判定）や、安全性の評価器もある。evaluate() 関数に、データのファイルと評価器の一覧を渡してまとめて動かす</p>
+<p>注意：グラウンドトゥルースが要る評価器（similarity、F1）と要らない評価器（groundedness、relevance）を分けて話す。動かすと料金がかかる</p>
+</details>
+<h3 id="p40-評価器は何と何を比べるかで整理する">p.40 評価器は、何と何を比べるかで整理する</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>比べる材料</th>
+<th>見ること</th>
+<th>評価器</th>
+<th>正解データ</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>回答とコンテキスト</td>
+<td>回答が検索結果に基づいているか</td>
+<td>groundedness</td>
+<td>要らない</td>
+</tr>
+<tr>
+<td>質問と回答</td>
+<td>質問に合っているか、話の筋が通っているか</td>
+<td>relevance<br>coherence</td>
+<td>要らない</td>
+</tr>
+<tr>
+<td>回答だけ</td>
+<td>文が自然か、文法に合っているか</td>
+<td>fluency</td>
+<td>要らない</td>
+</tr>
+<tr>
+<td>回答と正解</td>
+<td>正解にどれだけ近いか</td>
+<td>similarity（質問も使う）<br>F1 スコア</td>
+<td>要る</td>
+</tr>
+<tr>
+<td>質問とコンテキスト</td>
+<td>検索が、答えの根拠になる文書を上位に出せたか（回答ではなく検索の側の物差し）</td>
+<td>retrieval</td>
+<td>要らない</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>確かめる</strong>：<a href="applied-topics-20-answer-evaluation-README.html">応用 20 答えを評価する</a></p>
+<details>
+<summary>ノート</summary>
+<p>p.40 の表。名前を覚えるより、比べる組で整理する。</p>
+<ul>
+<li>正解データが要るのは、similarity と F1 スコア。</li>
+<li>生成 AI に採点させるものは 1〜5 の点数、F1 スコアは計算で出す 0〜1 の点数。</li>
+</ul>
+</details>
+<h2 id="b検索の評価">B　検索の評価</h2>
+<h3 id="p41-正解データグラウンドトゥルース">p.41 正解データ（グラウンドトゥルース）</h3>
+<p><em>質問、期待する答え、根拠の場所を組にして用意する</em></p>
+<ul>
+<li><strong>一般的な説明</strong><ul>
+<li><strong>1件の形</strong><ul>
+<li>質問：利用者が実際に聞きそうな文です。</li>
+<li>期待する答え：人が確かめた答えです。回答の評価で使います。</li>
+<li>根拠の文書と場所：答えが書かれている文書とチャンクです。検索の評価で使います。</li>
+</ul>
+</li>
+<li><strong>集め方</strong><ul>
+<li>実際の問い合わせや、利用者から出た質問から集めます。</li>
+<li>生成 AI に文書を読ませて、質問と答えの下書きを作らせる方法もあります。</li>
+<li>下書きは、人が読んで直すか、外します。</li>
+</ul>
+</li>
+<li><strong>気をつける点</strong><ul>
+<li>質問の種類（名前で聞く、言い換える、複数の文書にまたがる）を混ぜます（p.14）。</li>
+<li>答えが文書にない質問も入れておくと、「分からない」と言えるかを確かめられます。</li>
+<li>文書が変わったら、正解データも直します。</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><strong>Azure AI Search での説明</strong><ul>
+<li><strong>検索の評価に使う形</strong><ul>
+<li>質問ごとに、正解のチャンクのキー（id）を持たせます。</li>
+<li>検索の結果のキーと比べて、NDCG や再現率を計算します（p.42）。</li>
+<li>出典の欄（p.26）があると、正解の場所を書きやすくなります。</li>
+</ul>
+</li>
+<li><strong>回答の評価に使う形</strong><ul>
+<li>Foundry の評価や azure-ai-evaluation SDK では、質問、回答、コンテキスト、正解を1行にした JSONL を使います（列名の例：<code>query</code>、<code>response</code>、<code>context</code>、<code>ground_truth</code>）。</li>
+<li>正解を使う評価器と、使わない評価器があります（p.40）。</li>
+<li>azure-ai-evaluation SDK のシミュレーター（プレビュー）は、文章から質問と答えの組を作れます。</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p><img alt="正解データは、質問・期待する答え・根拠の場所を組にして用意する" src="img/p41.svg"></p>
+<p><em>生成 AI に下書きさせても、最後は人が確かめる</em></p>
+<p><strong>確かめる</strong>：<a href="basic-topics-05-measure-search-README.html">基礎 05 検索の良し悪しを数字で測る</a></p>
+<details>
+<summary>ノート</summary>
+<ul>
+<li>位置：p.39 の評価の流れのうち、最初の「正解データ」の段を詳しく見るページです。</li>
+<li>言いたいこと：正解データは、質問、期待する答え、根拠の場所の組です。生成 AI で下書きを作っても、最後は人が確かめます。</li>
+<li>気をつけること：<ul>
+<li>生成 AI で下書きを作ると料金がかかります。</li>
+</ul>
+</li>
+</ul>
+<p><strong>図のノート</strong></p>
+<p>狙い：正解データは、質問、期待する答え、根拠の場所の組で、生成 AI で下書きを作っても、最後は人が確かめると言える。</p>
+<p>話すこと：</p>
+<ul>
+<li>段階0：実際の問い合わせや、利用者から出た質問から集める</li>
+<li>段階1：生成 AI に文書を読ませて、質問と答えの下書きを作らせる方法もある</li>
+<li>段階2：下書きは、人が読んで直すか、外す</li>
+<li>段階3：1件は、質問（利用者が実際に聞きそうな文）、期待する答え（人が確かめた答え。回答の評価で使う）、根拠の文書と場所（答えが書かれている文書とチャンク。検索の評価で使う）の組</li>
+</ul>
+<p>補足：気をつける点は、質問の種類（名前で聞く、言い換える、複数の文書にまたがる）を混ぜる（p.14）、答えが文書にない質問も入れて「分からない」と言えるかを確かめる、文書が変わったら正解データも直す、の3つ。Azure AI Search では、質問ごとに正解のチャンクのキー（id）を持たせ、検索の結果のキーと比べて NDCG や再現率を計算する（p.42）。出典の欄（p.26）があると、正解の場所を書きやすい。Foundry の評価や azure-ai-evaluation SDK では、質問、回答、コンテキスト、正解を1行にした JSONL を使う（列名の例：query、response、context、ground_truth）。シミュレーター（プレビュー）は、文章から質問と答えの組を作れる</p>
+<p>注意：生成 AI で下書きを作ると料金がかかる</p>
+</details>
+<h3 id="p42-ndcg-と再現率">p.42 NDCG と再現率</h3>
+<p><em>順位まで見るか、拾えたかだけを見るか</em></p>
+<ul>
+<li><strong>一般的な説明</strong><ul>
+<li><strong>再現率（Recall@k）</strong><ul>
+<li>正解の文書のうち、上位 k 件に入った割合です。</li>
+<li>例：正解が2件で、上位3件に2件とも入れば、再現率@3 は 2 ÷ 2 ＝ 1.00 です。</li>
+<li>上位 k 件の中で何位だったかは見ません。</li>
+</ul>
+</li>
+<li><strong>NDCG（NDCG@k）</strong><ul>
+<li>正解が上位にあるほど重く数える指標です。順位 i の正解は 1 / log2(i+1) で数えます。</li>
+<li>例：1位と3位が正解なら、1.00 ＋ 0.50 ＝ 1.50 です。理想の並び（1位と2位が正解）は 1.00 ＋ 0.63 ＝ 1.63 なので、NDCG@3 は 1.50 ÷ 1.63 ＝ 約0.92 です。</li>
+<li>正解に段階（とても合う、少し合う）を付けて数えることもできます。</li>
+</ul>
+</li>
+<li><strong>使い分けの考え方</strong><ul>
+<li>生成 AI に渡すのが上位の数件なら、その中の順位が答えに効くので、NDCG が合います。</li>
+<li>多めに取ってから並べ直す段（ランカー）の前では、拾えたかどうかを見る再現率が合います。</li>
+<li>どちらも、正解データ（p.41）がないと計算できません。</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><strong>Azure AI Search での説明</strong><ul>
+<li><strong>公式の測定の例</strong><ul>
+<li>Microsoft が公開した測定（2023年。顧客企業のデータセット4つ、NDCG@3）では、キーワード 40.6、ベクトル（Ada-002）43.8、ハイブリッド 48.4、セマンティックランカー付き 60.1 でした。</li>
+</ul>
+</li>
+<li><strong>ランカーと再現率</strong><ul>
+<li>セマンティックランカーは、上位 50 件を並べ直します（p.5）。</li>
+<li>50 件の中に正解が入っていないと、ランカーでは上げられません。</li>
+<li>そのため、ランカーの前の段では、再現率@50 を見ることがあります。</li>
+</ul>
+</li>
+<li><strong>計算する場所</strong><ul>
+<li>Azure AI Search には、NDCG や再現率を計算する機能はありません。</li>
+<li>検索の結果のキーと正解のキーを、自分のコードで比べて計算します。</li>
+<li>azure-ai-evaluation の <code>RetrievalEvaluator</code> は、質問と検索結果から検索の質を1〜5で採点します（p.40）。NDCG や再現率とは別の物差しです。</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p>出典：Microsoft Tech Community「Azure AI Search: Outperforming vector search with hybrid retrieval and reranking」（2023年9月）</p>
+<p><img alt="NDCG は順位まで見て、再現率は拾えたかだけを見る" src="img/p42.svg"></p>
+<p><em>計算の例は説明用。下の数字は Microsoft が公開した測定で、教材のデータの結果ではない</em></p>
+<p><strong>確かめる</strong>：<a href="basic-topics-05-measure-search-README.html">基礎 05 検索の良し悪しを数字で測る</a></p>
+<details>
+<summary>ノート</summary>
+<ul>
+<li>出典の URL：<a href="https://techcommunity.microsoft.com/t5/azure-ai-foundry-blog/azure-ai-search-outperforming-vector-search-with-hybrid/ba-p/3929167">https://techcommunity.microsoft.com/t5/azure-ai-foundry-blog/azure-ai-search-outperforming-vector-search-with-hybrid/ba-p/3929167</a></li>
+<li>位置：p.39 の評価の流れのうち、検索の評価の物差しを見るページです。</li>
+<li>言いたいこと：再現率は拾えたかだけ、NDCG は順位まで見ます。生成 AI に渡す件数で、見る指標が変わります。</li>
+<li>気をつけること：<ul>
+<li>計算の例は説明用です。</li>
+<li>この数字は Microsoft が公開した測定（顧客企業のデータセット4つ、NDCG@3）で、教材のデータの結果ではない、と言ってください。</li>
+<li>どの検索方法がよいかの結論にはしません。</li>
+</ul>
+</li>
+</ul>
+<p><strong>図のノート</strong></p>
+<p>狙い：再現率は拾えたかだけ、NDCG は順位まで見る。生成 AI に渡す件数で、見る指標が変わると言える。</p>
+<p>話すこと：</p>
+<ul>
+<li>段階0：検索の結果の上位3件のうち、1位と3位が正解（正解は2件）という例</li>
+<li>段階1：再現率@3は、正解のうち上位3件に入った割合。2 ÷ 2 ＝ 1.00。上位3件の中で何位だったかは見ない</li>
+<li>段階2：NDCG@3は、正解が上位にあるほど重く数える。順位 i の正解は 1 / log2(i+1) で数える。1位は 1.00、3位は 0.50 で、合計 1.50。理想の並び（1位と2位が正解）は 1.00 ＋ 0.63 ＝ 1.63 なので、NDCG@3 ＝ 1.50 ÷ 1.63 ＝ 約0.92</li>
+<li>段階3：Microsoft が公開した測定（2023年。顧客企業のデータセット4つ、NDCG@3）では、キーワード 40.6、ベクトル（Ada-002）43.8、ハイブリッド 48.4、セマンティックランカー付き 60.1。出典：Azure AI Search: Outperforming vector search with hybrid retrieval and reranking（Microsoft Tech Community、2023年9月）</li>
+</ul>
+<p>補足：使い分けは、生成 AI に渡すのが上位の数件なら、その中の順位が答えに効くので NDCG が合う。多めに取ってから並べ直す段（ランカー）の前では、拾えたかどうかを見る再現率が合う。セマンティックランカーは上位 50 件を並べ直す（p.5）ので、50 件の中に正解が入っていないと上げられない。そのため、ランカーの前の段では再現率@50 を見ることがある。どちらも、正解データ（p.41）がないと計算できない。Azure AI Search には、NDCG や再現率を計算する機能はなく、検索の結果のキーと正解のキーを自分のコードで比べる。azure-ai-evaluation の RetrievalEvaluator は、質問と検索結果から検索の質を1〜5で採点する、NDCG や再現率とは別の物差し（p.40）</p>
+<p>注意：計算の例は説明用。最後の数字は Microsoft が公開した測定（顧客企業のデータセット4つ、NDCG@3）で、教材のデータの結果ではない、と言う。どの検索方法がよいかの結論にはしない</p>
+</details>
+<h3 id="p43-検索の評価と回答の評価の分け方">p.43 検索の評価と回答の評価の分け方</h3>
+<p><em>どちらが悪いかで、直す場所が変わる</em></p>
+<ul>
+<li><strong>一般的な説明</strong><ul>
+<li><strong>4つの組み合わせ</strong><ul>
+<li>検索がよく、回答もよい：そのままです。</li>
+<li>検索がよく、回答が悪い：生成の側（プロンプト、モデル）を見ます。</li>
+<li>検索が悪く、回答が悪い：検索の側（取り込み、検索方法）を見ます。</li>
+</ul>
+</li>
+<li><strong>見落としやすい組み合わせ</strong><ul>
+<li>検索が悪いのに、回答がよいことがあります。</li>
+<li>モデルがもともと知っていた知識で、たまたま当たった可能性があります。</li>
+<li>根拠のない回答なので、文書が変わったときに間違えるおそれがあります。</li>
+</ul>
+</li>
+<li><strong>分けるための準備</strong><ul>
+<li>回答だけでなく、検索の結果（どのチャンクを渡したか）を残しておきます。</li>
+<li>検索の結果には検索の物差し（p.42）、回答には回答の物差しで点を付けます。</li>
+<li>同じ質問の2つの点を並べて、4つの組み合わせのどれかを見ます。</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><strong>Azure AI Search での説明</strong><ul>
+<li><strong>検索の側の記録</strong><ul>
+<li>検索の結果のキー、点数（@search.score、@search.rerankerScore）を残します。</li>
+<li>ナレッジベースを使う場合は、返る記録（アクティビティ）で、何を探したかも残せます。</li>
+<li>残した結果と正解データ（p.41）で、検索の点を計算します。</li>
+<li>検索の質を生成 AI で採点する <code>RetrievalEvaluator</code>（質問と検索結果を渡し、1〜5の点数）もあります（p.40）。</li>
+</ul>
+</li>
+<li><strong>回答の側の物差し</strong><ul>
+<li>azure-ai-evaluation の評価器：Groundedness（回答が根拠に沿っているか。回答と検索結果を渡す）、Relevance（回答が質問に合っているか）、Coherence と Fluency（回答の読みやすさ）。</li>
+<li>Groundedness は、検索の結果を「コンテキスト」として渡して測ります。</li>
+<li>「たまたま当たった」回答は、Groundedness が低く出ることで見分けられる場合があります。</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p><img alt="検索と回答に別々に点を付けると、直す場所が分かる" src="img/p43.svg"></p>
+<p><em>検索の結果を残しておき、回答とは別に点を付ける。同じ質問の2つの点を並べて、4つの組み合わせのどれかを見る</em></p>
+<p><strong>確かめる</strong>：<a href="basic-topics-05-measure-search-README.html">基礎 05 検索の良し悪しを数字で測る</a>／<a href="applied-topics-20-answer-evaluation-README.html">応用 20 答えを評価する</a></p>
+<details>
+<summary>ノート</summary>
+<ul>
+<li>言いたいこと：検索と回答に別々に点を付けると、悪い答えの原因が検索か生成かを分けられます。</li>
+<li>気をつけること：<ul>
+<li>「たまたま当たった」の組み合わせを、必ず取り上げてください。</li>
+<li>評価を実際に動かすと料金がかかります。</li>
+</ul>
+</li>
+</ul>
+<p><strong>図のノート</strong></p>
+<p>狙い：検索と回答に別々に点を付けると、悪い答えの原因が検索か生成かを分けられると言える。</p>
+<p>話すこと：</p>
+<ul>
+<li>段階0：検索がよく、回答もよい：そのまま</li>
+<li>段階1：検索がよく、回答が悪い：生成の側（プロンプト、モデル）を見る</li>
+<li>段階2：検索が悪く、回答も悪い：検索の側（取り込み、検索方法）を見る</li>
+<li>段階3：見落としやすい組み合わせ。検索が悪いのに、回答がよいことがある。モデルがもともと知っていた知識で、たまたま当たった可能性がある。根拠のない回答なので、文書が変わったときに間違えるおそれがある</li>
+</ul>
+<p>補足：分けるための準備として、回答だけでなく、検索の結果（どのチャンクを渡したか）を残しておく。検索の結果には検索の物差し（p.42）、回答には回答の物差しで点を付け、同じ質問の2つの点を並べる。Azure AI Search では、検索の結果のキー、点数（@search.score、@search.rerankerScore）を残す。ナレッジベースを使う場合は、返る記録（アクティビティ）で、何を探したかも残せる。残した結果と正解データ（p.41）で、検索の点を計算する。検索の質を生成 AI で採点する RetrievalEvaluator（質問と検索結果を渡し、1〜5の点数）もある（p.40）。回答の側は、azure-ai-evaluation の Groundedness（回答が根拠に沿っているか。回答と検索結果を渡す）、Relevance、Coherence と Fluency。「たまたま当たった」回答は、Groundedness が低く出ることで見分けられる場合がある</p>
+<p>注意：「たまたま当たった」の組み合わせを、必ず取り上げる。評価を実際に動かすと料金がかかる</p>
+</details>
+<h2 id="c回答の評価">C　回答の評価</h2>
+<h3 id="p44-生成-ai-による採点のぶれ">p.44 生成 AI による採点のぶれ</h3>
+<p><em>同じ回答でも、点数が変わる</em></p>
+<ul>
+<li><strong>一般的な説明</strong><ul>
+<li><strong>何が起きるか</strong><ul>
+<li>生成 AI に回答を採点させると、同じ質問と同じ回答でも、回ごとに点数が変わることがあります。</li>
+<li>1〜5 の点数では、1点の違いが、ぶれなのか差なのかを見分けにくくなります。</li>
+<li>1回の点数だけで、2つの設定のどちらがよいかを決めると、ぶれを差と見誤ることがあります。</li>
+</ul>
+</li>
+<li><strong>ぶれの元</strong><ul>
+<li>採点のプロンプトの書き方と、点数の基準の言葉。</li>
+<li>採点に使うモデルとその版、温度などの設定。</li>
+<li>回答の長さや、並べる順番（2つを比べるときに、先に出したほうが有利になる「位置の偏り」。Zheng ら、2023、MT-Bench の論文）。</li>
+</ul>
+</li>
+<li><strong>抑え方</strong><ul>
+<li>同じ設定で何回か採点し、平均と幅を見ます。</li>
+<li>質問の数を増やして、1問の違いに左右されにくくします。</li>
+<li>一部を人が採点し、生成 AI の点数と突き合わせます（p.45）。</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><strong>Azure AI Search での説明</strong><ul>
+<li><strong>どこで起きるか</strong><ul>
+<li>検索の点数（BM25、RRF、rerankerScore）も、まったく動かないわけではありません。インデックスの更新、レプリカごとの統計の差、同点の並びの不定で、順位や点数がわずかに変わります。セマンティックランカーの点数も、基盤側の条件やモデルの更新で、分布が少し変わります。</li>
+<li>ぶれが大きいのは、Foundry の評価器や azure-ai-evaluation SDK のように、生成 AI で採点する段です。同じ入力でも、回ごとに点数が変わります。</li>
+<li>NDCG や再現率（p.42）は、保存した検索結果と正解から計算式で決まる指標なので、同じ結果なら同じ値です。ただし検索結果そのものは変わりえるので、比べるときは条件（インデックスの状態、時期）をそろえ、検索結果を保存しておきます。</li>
+</ul>
+</li>
+<li><strong>評価器の設定</strong><ul>
+<li>評価器には、採点に使うモデルを指定します。</li>
+<li>モデルを変えると、同じ回答でも点数が変わることがあります。</li>
+<li>比べる2つの設定では、採点のモデルと版をそろえます。</li>
+</ul>
+</li>
+<li><strong>記録に残すもの</strong><ul>
+<li>採点のモデル、版、日付を、点数と一緒に残します。</li>
+<li>点数の理由の文（評価器が返すもの）も残すと、ぶれた理由を後で読めます。</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p><img alt="生成 AI の採点は、同じ回答でも回ごとにぶれる" src="img/p44.svg"></p>
+<p><em>点数（4、3、4）は説明用の例。1回の点数で比べず、何回か採点して幅を見てから比べる</em></p>
+<p><strong>確かめる</strong>：<a href="applied-topics-20-answer-evaluation-README.html">応用 20 答えを評価する</a></p>
+<details>
+<summary>ノート</summary>
+<ul>
+<li>位置：p.40 の組み込み評価器で、生成 AI に採点させるときの注意のページです。p.45 のキャリブレーションにつながります。</li>
+<li>言いたいこと：生成 AI の採点はぶれます。1回の点数で比べず、何回か採点して幅を見ます。</li>
+<li>気をつけること：<ul>
+<li>図の点数（4、3、4）は説明用の例です。</li>
+<li>検索の点数も、インデックスの更新、レプリカの差、ランカーのモデルの更新で変わり、同点の順位は決まっていません。そのことも添えてください。</li>
+</ul>
+</li>
+</ul>
+<p><strong>図のノート</strong></p>
+<p>狙い：生成 AI の採点はぶれる。1回の点数で比べず、何回か採点して幅を見ると言える。</p>
+<p>話すこと：</p>
+<ul>
+<li>段階0：同じ質問と同じ回答を、生成 AI に採点させる</li>
+<li>段階1：3回採点させると、点数が回ごとに変わることがある（図は4、3、4の例）。1〜5 の点数では、1点の違いが、ぶれなのか差なのかを見分けにくい。1回の点数だけで、2つの設定のどちらがよいかを決めると、ぶれを差と見誤ることがある</li>
+<li>段階2：ぶれの元は、採点のプロンプトと点数の基準の言葉、採点に使うモデルとその版、温度などの設定、回答の長さ、並べる順番。並べる順番は、2つを比べるときに、先に出したほうが有利になる「位置の偏り」（Zheng ら、2023、MT-Bench の論文）</li>
+<li>段階3：抑え方は、同じ設定で何回か採点して平均と幅を見る、質問の数を増やして1問の違いに左右されにくくする、一部を人が採点して生成 AI の点数と突き合わせる（p.45）</li>
+</ul>
+<p>補足：Azure AI Search の検索の点数（BM25、RRF、rerankerScore）も、まったく動かないわけではない。インデックスの更新、レプリカごとの統計の差、同点の並びの不定で、順位や点数がわずかに変わる。セマンティックランカーの点数も、基盤側の条件やモデルの更新で、分布が少し変わる。ぶれが大きいのは、Foundry の評価器や azure-ai-evaluation SDK のように、生成 AI で採点する段。NDCG や再現率（p.42）は、保存した検索結果と正解から計算式で決まる指標なので、同じ結果なら同じ値。ただし検索結果そのものは変わりえるので、比べるときは条件（インデックスの状態、時期）をそろえ、検索結果を保存しておく。評価器には、採点に使うモデルを指定する。モデルを変えると、同じ回答でも点数が変わることがあるので、比べる2つの設定では採点のモデルと版をそろえる。採点のモデル、版、日付を、点数と一緒に残す。点数の理由の文（評価器が返すもの）も残すと、ぶれた理由を後で読める</p>
+<p>注意：図の点数（4、3、4）は説明用の例。検索の点数も、インデックスの更新、レプリカの差、ランカーのモデルの更新で変わり、同点の順位は決まっていない。そのことも添える</p>
+</details>
+<h3 id="p45-キャリブレーション">p.45 キャリブレーション</h3>
+<p><em>採点する側どうしの物差しをそろえる</em></p>
+<ul>
+<li><strong>一般的な説明</strong><ul>
+<li><strong>何をそろえるか</strong><ul>
+<li>人と人、または人と生成 AI が、同じ回答に付ける点数のずれをそろえます。</li>
+<li>点数そのものではなく、点数の基準（何があれば4点か）の言葉をそろえます。</li>
+<li>ずれは、基準がそれぞれの頭の中にあって、言葉になっていないときに起きやすくなります。</li>
+</ul>
+</li>
+<li><strong>進め方</strong><ul>
+<li>回答の一部を見本にして、人と生成 AI の両方が採点します。</li>
+<li>点数がずれた例を並べて、どちらの読み方が基準に合うかを話し合います。</li>
+<li>基準の言葉を直し、直した基準で、もう一度採点します。</li>
+</ul>
+</li>
+<li><strong>見る数字</strong><ul>
+<li>人と生成 AI の点数がどれだけそろったか（一致した割合や相関）を見ます。</li>
+<li>そろうまで、見本の採点と基準の直しをくり返します。</li>
+<li>そろった後も、文書や質問が変わったら、もう一度見本で確かめます。</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><strong>Azure AI Search での説明</strong><ul>
+<li><strong>Azure の中の位置</strong><ul>
+<li>Azure AI Search には、キャリブレーションの機能はありません。</li>
+<li>Foundry の評価器の採点の基準は、評価器のプロンプトの中にあります。</li>
+<li>基準を自分の言葉で書きたいときは、カスタムの評価器を作る方法があります。</li>
+</ul>
+</li>
+<li><strong>RAG の評価での使い方</strong><ul>
+<li>見本の質問で、人の点数と、評価器（Groundedness、Relevance など）の点数を並べます。</li>
+<li>ずれが大きい質問を読んで、評価器のプロンプトか、正解データ（p.41）を直します。</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p><img alt="キャリブレーションは、点数ではなく基準の言葉をそろえる作業" src="img/p45.svg"></p>
+<p><em>採点者が見本の答案で目線をそろえるのと同じ。見本の答案は回答の一部、採点者は人と生成 AI</em></p>
+<p><strong>確かめる</strong>：<a href="applied-topics-20-answer-evaluation-README.html">応用 20 答えを評価する</a></p>
+<details>
+<summary>ノート</summary>
+<ul>
+<li>言いたいこと：キャリブレーションは、点数ではなく基準の言葉をそろえる作業です。ずれた例を並べて、基準を直します。</li>
+</ul>
+<p><strong>図のノート</strong></p>
+<p>狙い：キャリブレーションは、点数ではなく基準の言葉をそろえる作業で、ずれた例を並べて基準を直すと言える。</p>
+<p>話すこと：</p>
+<ul>
+<li>段階0：回答の一部を見本にして、人と生成 AI の両方が、同じ見本を採点する。採点者が見本の答案で目線をそろえるのと同じ</li>
+<li>段階1：点数がずれた例を並べて、どちらの読み方が基準に合うかを話し合う。そろえるのは点数そのものではなく、基準（何があれば4点か）の言葉。ずれは、基準がそれぞれの頭の中にあって、言葉になっていないときに起きやすい</li>
+<li>段階2：基準の言葉を直し、直した基準で、もう一度採点する</li>
+<li>段階3：人と生成 AI の点数がどれだけそろったか（一致した割合や相関）を見る。そろうまで、見本の採点と基準の直しをくり返す。そろった後も、文書や質問が変わったら、もう一度見本で確かめる</li>
+</ul>
+<p>補足：Azure AI Search には、キャリブレーションの機能はない。Foundry の評価器の採点の基準は、評価器のプロンプトの中にある。基準を自分の言葉で書きたいときは、カスタムの評価器を作る方法がある。RAG の評価では、見本の質問で、人の点数と、評価器（Groundedness、Relevance など）の点数を並べ、ずれが大きい質問を読んで、評価器のプロンプトか、正解データ（p.41）を直す</p>
+<p>注意：採点者の目線をそろえる例え話。見本の答案は回答の一部、採点者は人と生成 AI に当たる</p>
+</details>
+</article>
+</main>
+<footer class="bar"><a class="home" href="../index.html">← 入口に戻る</a><a class="source" href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/docs/lecture/md/part4-evaluation.md">元の Markdown（GitHub）</a></footer>
+</body>
+</html>
