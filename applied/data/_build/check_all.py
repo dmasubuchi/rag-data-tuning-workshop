@@ -148,7 +148,8 @@ def main() -> int:
         print("NG ", e)
         return 2
     ats = load_json("source_ats.json")
-    mf = json.load(open(DATA / "manifest.json", encoding="utf-8"))
+    with open(DATA / "manifest.json", encoding="utf-8") as fh:
+        mf = json.load(fh)
     evals = load_json("evaluations.json")["rows"]
     mails = load_json("mail.json")["mails"]
     app_by_id = {a["application_id"]: a for a in ats["applications"]}

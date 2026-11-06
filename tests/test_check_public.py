@@ -177,6 +177,13 @@ class ScanTextTests(unittest.TestCase):
         text = "a@example.com と b@example.jp と C@EXAMPLE.COM"
         self.assertEqual(scan_text("a.txt", text, []), [])
 
+    def test_jprs_reserved_example_domains_pass(self):
+        # JPRS の予約名：example.jp と example.{ac,ad,co,ed,go,gr,lg,ne,or}.jp
+        text = " と ".join(f"a@example.{kind}.jp" if kind else "a@example.jp"
+                           for kind in ("", "ac", "ad", "co", "ed", "go", "gr", "lg", "ne", "or"))
+        text += " と C@EXAMPLE.CO.JP"
+        self.assertEqual(scan_text("a.txt", text, []), [])
+
     def test_reserved_example_domains_are_allowed(self):
         # 予約済みの例用のドメイン（.example .test .invalid .localhost と example.com .net .org）は、個人のメールではない
         text = ("a@" + "sampletech.example と b@" + "x.test と c@" + "host.invalid と d@" + "app.localhost と "
@@ -196,7 +203,9 @@ class ScanTextTests(unittest.TestCase):
             "test の後ろに続く": "a@" + "x.test.corp.net",
             "invalid の後ろに続く": "a@" + "x.invalid.com",
             "example の別の TLD": "a@" + "sampletech.company",
-            "example.co.jp は予約名の一覧にない": "c@" + "example.co.jp",
+            "JPRS の予約名にない example.pref.jp": "c@" + "example.pref.jp",
+            "example.co.jp の下のサブドメイン": "c@" + "mail.example.co.jp",
+            "example.co.jp の後ろに続く": "c@" + "example.co.jp.corp.net",
         }
         for label, text in cases.items():
             with self.subTest(label):

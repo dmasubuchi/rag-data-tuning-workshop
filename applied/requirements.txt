@@ -8,5 +8,7 @@ pypdf==6.21.2
 python-docx==1.2.0
 openpyxl==3.1.5
 python-dotenv==1.2.4
+# agentic.py（19 の AI Search の呼び出し）が使う
+requests==2.34.2
 # Notebook（VS Code など）で動かすとき：
 ipykernel==7.4.0

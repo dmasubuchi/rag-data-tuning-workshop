@@ -518,6 +518,13 @@ class GitignoreTest(unittest.TestCase):
             with self.subTest(name=name):
                 self.assertTrue(self.ignored(name), f"{name} が .gitignore に入っていない")
 
+    def test_member_hand_out_file_is_ignored_by_the_local_env_pattern(self):
+        """メンバーに渡すファイル member.local.env は、*.local.env の1行で .gitignore に入っている（名前を変えても同じ）。"""
+        done = subprocess.run(["git", "check-ignore", "-v", "member.local.env"], cwd=REPO_DIR, capture_output=True, text=True)
+        self.assertEqual(done.returncode, 0, "member.local.env が .gitignore に入っていない")
+        self.assertIn(".gitignore", done.stdout)
+        self.assertEqual(done.stdout.split("\t")[0].split(":")[-1], "*.local.env")
+
     def test_examples_are_not_ignored(self):
         for name in ("config/env.example", "config/workshop.example.config"):
             with self.subTest(name=name):
@@ -581,6 +588,37 @@ class EnvCommandTest(TempCase):
         self.assertIn("member.local.env", out)
         for key in ALL_KEYS:
             self.assertNotIn(key, out)
+
+    def test_out_inside_the_repo_but_not_ignored_gets_a_warning(self):
+        """Repo の中で .gitignore に入っていない場所に書くと、注意が出る。入っている名前・Repo の外・git がないときは出ない。"""
+        repo = self.dir / "repo"
+        repo.mkdir()
+        (repo / ".gitignore").write_text("*.local.env\n", encoding="utf-8")
+        init = subprocess.run(["git", "init", "-q", str(repo)], capture_output=True)
+        self.assertEqual(init.returncode, 0, init.stderr)
+        outside = self.dir / "outside"
+        outside.mkdir()
+        cases = [
+            ("member.txt", True, "Repo の中で入っていない名前"),
+            ("member.local.env", False, "Repo の中で入っている名前"),
+            (outside / "member.txt", False, "Repo の外"),
+        ]
+        for name, warns, label in cases:
+            with self.subTest(label), mock.patch.object(team, "REPO_DIR", repo):
+                target = name if isinstance(name, Path) else repo / name
+                code, out, err = self.run_main("--out", str(target), az=answers(), role="member")
+                self.assertEqual(code, 0, out)
+                self.assertEqual(("注意" in out), warns, out)
+                self.assertEqual(("このファイルは Git に入りません" in out), not warns, out)
+                self.assertTrue(target.exists())               # 注意だけ。書くのは止めない
+                if warns:
+                    self.assertIn("member.txt", out)
+                for key in ALL_KEYS:
+                    self.assertNotIn(key, out)
+        with mock.patch.object(team, "REPO_DIR", repo), mock.patch("team.subprocess.run", side_effect=FileNotFoundError("git")):
+            code, out, _ = self.run_main("--out", str(repo / "member.txt"), az=answers(), role="member")
+        self.assertEqual(code, 0, out)
+        self.assertNotIn("注意", out)                          # git がなければ黙る
 
     def test_out_for_builder_keeps_the_builder_note(self):
         out_path = self.dir / "builder.local.env"

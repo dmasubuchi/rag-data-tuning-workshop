@@ -18,7 +18,7 @@ def github_anchor(heading: str) -> str:
 
 
 class GithubSlugger:
-    """1つの文書の中で見出しの飛び先を作る。同じ飛び先が出たら `-1`・`-2` を付ける（github-slugger と同じ）。"""
+    """1つの文書の中で見出しの飛び先を作る。同じ飛び先が出たら `-1`・`-2` を付ける（github-slugger とほとんど同じ。違いは、冒頭の注記）。"""
 
     def __init__(self):
         self.occurrences = {}

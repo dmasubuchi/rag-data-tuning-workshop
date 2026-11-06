@@ -5,8 +5,9 @@
   python tools/team.py names       --team suika   名前を検査して、リソース名と PowerShell の1行を表示する
   python tools/team.py check-names --team suika   作る前に、名前が使えるかを Azure に聞く（何も作らない）
   python tools/team.py health      --team suika   作ったものの状態を見る（読み取りだけ）
-  python tools/team.py env --role member --team suika   接続の設定 .env.local を作る（--role は builder か member）
-  python tools/team.py env --role member --team suika --out member.local.env   メンバーに渡す設定を別の名前で書き出す
+  python tools/team.py env --team suika --role builder   構築する人の接続の設定 .env.local を作る（人に渡さない）
+  python tools/team.py env --team suika --role member --out member.local.env   メンバー用の設定を別の名前で書き出す（チームの中だけで渡す。
+      メンバーは Repo 直下に .env.local という名前で置く）
 
 --team を省略すると、環境変数 WORKSHOP_TEAM を使う（PowerShell では $env:WORKSHOP_TEAM = "suika"）。
 --config は組織の設定ファイル（既定は Repo 直下の workshop.config。どのフォルダーで実行しても同じ。雛形は
@@ -14,15 +15,18 @@ config/workshop.example.config）。
 
 env は az でキーを読み、設定ファイルに書く（画面には出さない）。書き先は、既定では Repo 直下の .env.local。
 --out PATH を付けると、そこに書く（構築する人が、メンバー用の設定を書き出して渡すとき）。Repo の中に書くなら、
-Git に入らない名前（.env.local、*.local.env）にする。
+Git に入らない名前（.env.local、*.local.env）にする。Repo の中で .gitignore に入っていない場所に書いたときは、
+注意を出す（git check-ignore で調べる。git がない・Repo でないときは、黙る）。
   builder（構築する人）は AI Search の管理者キーと Storage の接続文字列（人に渡さない）、
   member（メンバー）は検索用のキー（チームの外に渡さない。Storage の接続文字列は入らない）。
 
-動かすのは Python の標準ライブラリと az だけ。Azure に何かを作る・変える・消すコマンドは、このファイルに入っていない
+動かすのは Python の標準ライブラリと az だけ（--out の注意のために、git も呼ぶ）。
+Azure に何かを作る・変える・消すコマンドは、このファイルに入っていない
 （az に渡せるコマンドは teamlib/az.py の READ_ONLY の一覧に限る）。
 """
 import argparse
 import os
+import subprocess
 import sys
 from pathlib import Path
 from typing import NamedTuple
@@ -346,6 +350,27 @@ def preflight(az) -> None:
         raise
 
 
+def not_ignored_warning(path: Path) -> str:
+    """path が Repo の中にあり、.gitignore に入っていないとき、注意の文を返す。そうでなければ空。
+
+    git check-ignore で調べる。git がない・Repo でない・調べられないときは、黙る（空を返す）。
+    """
+    try:
+        resolved = Path(path).resolve()
+        resolved.relative_to(Path(REPO_DIR).resolve())
+    except (ValueError, OSError):
+        return ""   # Repo の外
+    try:
+        done = subprocess.run(["git", "-C", str(REPO_DIR), "check-ignore", "-q", "--", str(resolved)],
+                              capture_output=True, timeout=10, stdin=subprocess.DEVNULL)
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    if done.returncode != 1:   # 0＝入っている、128 など＝調べられない
+        return ""
+    return (f"注意  {resolved.name} は Repo の中にあり、.gitignore に入っていません。キーが入っているので、Git に入れないでください。"
+            "名前を *.local.env にするか、Repo の外に書き出してください。")
+
+
 def failure_text(error: CheckError, tenant: str) -> str:
     """az が使えないときの案内。サインイン切れ・サブスクリプションが見えないときは az login --tenant を示す。"""
     if error.kind == "login":
@@ -400,7 +425,8 @@ def main(argv=None, az=None, env_path=None) -> int:
         if args.command == "check-names":
             text, code = check_names_text(n.team, check_names(az, n))
         elif args.command == "env":
-            text, code = write_env(az, n, args.role, args.out or env_path or ENV_FILE), 0
+            warning = not_ignored_warning(args.out) if args.out else ""
+            text, code = write_env(az, n, args.role, args.out or env_path or ENV_FILE, warning=warning), 0
         else:
             text, code = health_text(n.team, health(az, n))
     except CheckError as error:

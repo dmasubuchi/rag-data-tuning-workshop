@@ -1,6 +1,8 @@
-python-docx
-openpyxl
-reportlab
-Pillow
-numpy
-pypdf
+# 文書を作り直す道具（教材を直す人用）が使うライブラリ。動いた環境の版に固定した。
+# インストール：Python 3.12 の仮想環境に  pip install -r applied/data/_build/requirements.txt
+python-docx==1.2.0
+openpyxl==3.1.5
+reportlab==5.1.0
+Pillow==13.0.0
+numpy==2.5.4
+pypdf==6.21.2

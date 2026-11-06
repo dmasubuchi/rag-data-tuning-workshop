@@ -165,7 +165,7 @@ def call(method: str, path: str, body: dict = None, version: str = None, ok: tup
             res = requests.request(method, url, headers=headers, json=body, timeout=timeout)
         except requests.RequestException as e:
             raise SearchApiError(f"AI Search に接続できませんでした（{method} {path}）：{redact(type(e).__name__)}。"
-                                 "ネットワーク（学内の Wi-Fi など）を確かめてください。") from None
+                                 "ネットワーク（社内の回線、プロキシ、VPN）が止めていないかを確かめてください。") from None
         if res.status_code in (429, 502, 503, 504) and attempt < retries:
             wait = 10
             try:

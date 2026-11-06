@@ -147,10 +147,11 @@ def _write_private(path: Path, text: str) -> None:
         raise
 
 
-def write_env(az, names: Names, role: str, path: Path = ENV_FILE) -> str:
+def write_env(az, names: Names, role: str, path: Path = ENV_FILE, warning: str = "") -> str:
     """az でキーを読み、path（既定は Repo 直下の .env.local）を書き直す。画面に出す文を返す。キーは含めない。
 
     キーを全部読めてから書く。読めなかったときも、書けなかったときも、前の設定ファイルはそのまま。
+    warning があるとき（path が Git に入りうる場所のとき）は、「このファイルは Git に入りません」の代わりに、その文を出す。
     """
     if role not in ROLES:
         raise ValueError(f"role は builder か member です（今は {role!r}）")
@@ -164,5 +165,6 @@ def write_env(az, names: Names, role: str, path: Path = ENV_FILE) -> str:
         raise CheckError("other", f"{path.name} を書けません（{path.parent} に書き込めるか確かめます）。"
                                   "前の設定ファイルはそのままです") from None
     shown, handout = ROLES[role][2], ROLES[role][4]
+    git_note = f"{warning}\n      " if warning else "このファイルは Git に入りません。"
     return (f"OK    {path.name} を作りました（チーム {names.team}：{shown}）。キーは表示しません\n"
-            f"      このファイルは Git に入りません。{handout}")
+            f"      {git_note}{handout}")
