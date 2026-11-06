@@ -1,0 +1,637 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>評価</title>
+<style>
+/* 描画先（舞台）。メインの舞台 #stage のほか、縮小一覧などの描画先にも class sp-target が付く。
+   中身の CSS はすべて .sp-target の中だけに効くように書く（CONTRACT §2.5） */
+.sp-target {
+  position: relative; width: 1920px; height: 1080px; overflow: hidden; background: var(--bg);
+  font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif; color: var(--ink);
+  --accent: #0b6bcb; --accent-soft: #e3effb; --ink: #1d2733; --sub: #5b6675; --line: #d3dae3;
+  --bg: #f5f7fa; --card: #ffffff; --warn: #d9480f; --warn-soft: #fff1e6; --ok: #2b8a3e; --ok-soft: #e6f4ea;
+  --gray-soft: #eef1f5; --code-bg: #0f1720;
+}
+@supports (color: color-mix(in srgb, red, blue)) {
+  .sp-target { --accent-soft: color-mix(in srgb, var(--accent) 12%, #fff); }
+}
+.sp-target, .sp-target * { box-sizing: border-box; }
+
+.sp-target .hide { visibility: hidden; }
+.sp-target .em { color: var(--warn); font-weight: 700; }
+.sp-target .em.ok { color: var(--ok); }   /* ++…++：当たり・うまくいく（==…== は外れ・注意の赤） */
+.sp-target .b { font-weight: 700; }
+.sp-target code, .sp-target .mono { font-family: Menlo, Consolas, monospace; }
+/* frame */
+.sp-target header { position: absolute; left: 0; right: 0; top: 0; height: 150px; padding: 26px 64px 0; background: #fff; border-bottom: 2px solid var(--line); }
+.sp-target header .kick { display: flex; gap: 16px; align-items: center; font-size: 24px; color: var(--sub); }
+.sp-target header .chip { background: var(--accent); color: #fff; font-weight: 700; border-radius: 8px; padding: 4px 14px; }
+.sp-target header .ref { margin-left: auto; font-size: 22px; color: var(--sub); }
+.sp-target header h1 { margin: 10px 0 0; font-size: 44px; line-height: 1.25; font-weight: 800; letter-spacing: .01em; }
+.sp-target main { position: absolute; left: 64px; right: 64px; top: 182px; bottom: 92px; display: flex; gap: 40px; }
+.sp-target main.below { flex-direction: column; gap: 24px; }
+.sp-target .visual { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center; }
+.sp-target main.below .visual { flex: 1; min-height: 0; }
+.sp-target .side { flex: 0 0 520px; display: flex; flex-direction: column; justify-content: center; gap: 20px; }
+.sp-target main.below .side { flex: 0 0 auto; flex-direction: row; }
+.sp-target main.below .side .call { flex: 1; }
+.sp-target .call { background: #fff; border-left: 8px solid var(--accent); border-radius: 10px; padding: 18px 24px; font-size: 28px; line-height: 1.5; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+.sp-target .call.warn { border-left-color: var(--warn); }
+.sp-target .call.ok { border-left-color: var(--ok); }
+.sp-target .call ul.cl { margin: 0; padding-left: 1.1em; font-size: 25px; line-height: 1.45; }
+.sp-target .call ul.cl li { margin: 4px 0; }
+.sp-target .call .ct { font-size: 22px; font-weight: 700; color: var(--sub); margin-bottom: 4px; }
+.sp-target footer { position: absolute; left: 0; right: 0; bottom: 0; height: 70px; padding: 0 64px; display: flex; align-items: center; gap: 10px; background: #fff; border-top: 2px solid var(--line); }
+.sp-target footer .sec { flex: 1; text-align: center; font-size: 20px; padding: 8px 4px; border-radius: 6px; background: var(--gray-soft); color: #8a94a3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sp-target footer .sec.done { background: var(--accent-soft); color: var(--accent); }
+.sp-target footer .sec.on { background: var(--accent); color: #fff; font-weight: 700; }
+.sp-target footer .pg { flex: 0 0 110px; text-align: right; font-size: 22px; color: var(--sub); }
+/* cover / section */
+.sp-target .cover { position: absolute; inset: 0; background: var(--accent); color: #fff; padding: 150px 140px; display: flex; flex-direction: column; }
+.sp-target .cover .lab { font-size: 34px; opacity: .85; }
+.sp-target .cover h1 { font-size: 92px; margin: 24px 0 18px; line-height: 1.15; font-weight: 800; }
+.sp-target .cover .lead { font-size: 38px; opacity: .92; line-height: 1.5; }
+.sp-target .cover .meta { margin-top: auto; display: flex; gap: 48px; font-size: 28px; opacity: .85; }
+.sp-target .sectionpg { position: absolute; inset: 0; background: #fff; display: flex; align-items: center; padding: 0 160px; gap: 70px; }
+.sp-target .sectionpg .no { font-size: 240px; font-weight: 800; color: var(--accent); line-height: 1; }
+.sp-target .sectionpg h1 { font-size: 72px; margin: 0 0 22px; }
+.sp-target .sectionpg .lead { font-size: 34px; color: var(--sub); line-height: 1.55; }
+.sp-target .sectionpg .mins { margin-top: 24px; font-size: 26px; color: var(--accent); }
+/* agenda */
+.sp-target .agenda { width: 100%; display: flex; flex-direction: column; gap: 16px; }
+.sp-target .agenda .it { display: flex; align-items: center; gap: 28px; background: #fff; border-radius: 12px; padding: 20px 30px; border: 2px solid var(--line); }
+.sp-target .agenda .it .k { font-size: 40px; font-weight: 800; color: var(--accent); width: 60px; text-align: center; }
+.sp-target .agenda .it .t { font-size: 34px; font-weight: 700; }
+.sp-target .agenda .it .s { font-size: 24px; color: var(--sub); margin-top: 4px; }
+.sp-target .agenda .it .m { margin-left: auto; font-size: 26px; color: var(--sub); white-space: nowrap; }
+/* points */
+.sp-target .points { width: 100%; display: flex; flex-direction: column; gap: 22px; }
+.sp-target .points .p { background: #fff; border-radius: 12px; padding: 22px 30px; font-size: 34px; line-height: 1.45; display: flex; gap: 22px; align-items: flex-start; box-shadow: 0 1px 3px rgba(0,0,0,.05); }
+.sp-target .points .p .dot { flex: 0 0 auto; width: 46px; height: 46px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 24px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin-top: 2px; }
+.sp-target .points .p .sub { display: block; font-size: 26px; color: var(--sub); margin-top: 6px; }
+/* compare */
+.sp-target .compare { width: 100%; height: 100%; display: flex; gap: 28px; align-items: stretch; }
+.sp-target .compare .col { flex: 1; background: #fff; border-radius: 14px; border: 3px solid var(--line); padding: 24px 28px; display: flex; flex-direction: column; gap: 14px; }
+.sp-target .compare .col.accent { border-color: var(--accent); }
+.sp-target .compare .col.warn { border-color: var(--warn); }
+.sp-target .compare .col.ok { border-color: var(--ok); }
+.sp-target .compare .col h2 { margin: 0 0 6px; font-size: 36px; }
+.sp-target .compare .col.accent h2 { color: var(--accent); }
+.sp-target .compare .col.warn h2 { color: var(--warn); }
+.sp-target .compare .row { background: var(--gray-soft); border-radius: 10px; padding: 14px 18px; font-size: 29px; line-height: 1.45; }
+.sp-target .compare .row .lab { display: block; font-size: 21px; color: var(--sub); font-weight: 700; margin-bottom: 2px; }
+.sp-target .cwrap { width: 100%; height: 100%; display: flex; flex-direction: column; gap: 20px; }
+.sp-target .verdict { background: var(--warn-soft); color: var(--warn); border-radius: 10px; padding: 16px 24px; font-size: 30px; font-weight: 700; text-align: center; }
+/* flow */
+.sp-target .flow { width: 100%; display: flex; flex-direction: column; gap: 30px; }
+.sp-target .flow-row { display: flex; align-items: center; gap: 12px; }
+.sp-target .flow-row .rl { flex: 0 0 150px; font-size: 24px; font-weight: 700; color: var(--accent); text-align: center; }
+.sp-target .node { position: relative; flex: 1; min-width: 0; background: #fff; border: 3px solid var(--line); border-radius: 14px; padding: 18px 14px; text-align: center; }
+.sp-target .node.accent { border-color: var(--accent); background: var(--accent-soft); }
+.sp-target .node.warn { border-color: var(--warn); background: var(--warn-soft); }
+.sp-target .node.ok { border-color: var(--ok); background: var(--ok-soft); }
+.sp-target .node.dim { border-style: dashed; background: var(--gray-soft); color: var(--sub); }
+.sp-target .node .t { font-size: 29px; font-weight: 700; line-height: 1.3; }
+.sp-target .node .s { font-size: 22px; color: var(--sub); margin-top: 6px; line-height: 1.4; }
+.sp-target .node .badge { position: absolute; left: -14px; top: -14px; width: 40px; height: 40px; border-radius: 50%; background: var(--warn); color: #fff; font-size: 21px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.sp-target .arrow { flex: 0 0 auto; text-align: center; color: var(--accent); min-width: 56px; max-width: 150px; }
+.sp-target .arrow .ar { font-size: 40px; line-height: 1; }
+.sp-target .arrow .at { font-size: 19px; line-height: 1.3; color: var(--sub); }
+.sp-target .banner { background: var(--warn-soft); color: var(--warn); border-radius: 10px; padding: 16px 24px; font-size: 29px; font-weight: 700; text-align: center; }
+.sp-target .banner.info { background: var(--accent-soft); color: var(--accent); }
+/* diagram */
+.sp-target .diagram { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; }
+.sp-target .diagram svg { width: 100%; height: 100%; max-height: 100%; }
+.sp-target .diagram svg text { font-family: "Hiragino Sans", sans-serif; }
+.sp-target .diagram .cap { font-size: 22px; color: var(--sub); }
+/* code */
+.sp-target .code { width: 100%; height: 100%; display: flex; flex-direction: column; }
+.sp-target .code .file { background: #2a3442; color: #cbd5e1; font-size: 22px; padding: 10px 20px; border-radius: 12px 12px 0 0; font-family: Menlo, monospace; }
+.sp-target .code pre { margin: 0; flex: 1; background: var(--code-bg); color: #e6edf3; border-radius: 0 0 12px 12px; padding: 16px 0; font-size: 23px; line-height: 1.5; overflow: hidden; font-family: Menlo, Consolas, monospace; }
+.sp-target .code .ln { display: block; padding: 0 20px; white-space: pre; }
+.sp-target .code .ln .no { display: inline-block; width: 52px; color: #5f6b7a; text-align: right; margin-right: 18px; }
+.sp-target .code .ln.hl { background: rgba(255, 180, 60, .22); box-shadow: inset 6px 0 0 #ffb43c; }
+.sp-target .code .ln.dim { opacity: .38; }
+/* table */
+.sp-target table.tb { width: 100%; border-collapse: separate; border-spacing: 0; background: #fff; border-radius: 12px; overflow: hidden; border: 2px solid var(--line); }
+.sp-target table.tb th { background: var(--accent); color: #fff; font-size: 25px; text-align: left; padding: 14px 18px; }
+.sp-target table.tb td { font-size: 26px; padding: 13px 18px; border-top: 1px solid var(--line); line-height: 1.4; vertical-align: top; }
+.sp-target table.tb tr.hl td { background: var(--warn-soft); }
+.sp-target table.tb tr.hl td:first-child { box-shadow: inset 6px 0 0 var(--warn); }
+/* stat */
+.sp-target .stat { width: 100%; display: flex; gap: 28px; }
+.sp-target .stat .it { flex: 1; background: #fff; border-radius: 16px; padding: 34px 24px; text-align: center; border: 3px solid var(--line); }
+.sp-target .stat .it.accent { border-color: var(--accent); }
+.sp-target .stat .v { font-size: 92px; font-weight: 800; color: var(--accent); line-height: 1.05; }
+.sp-target .stat .it.warn .v { color: var(--warn); }
+.sp-target .stat .l { font-size: 30px; font-weight: 700; margin-top: 12px; }
+.sp-target .stat .s { font-size: 23px; color: var(--sub); margin-top: 8px; line-height: 1.4; }
+/* bars */
+.sp-target .bars { width: 100%; height: 100%; display: flex; flex-direction: column; }
+.sp-target .bars .area { flex: 1; display: flex; align-items: flex-end; gap: 40px; padding: 0 30px; border-bottom: 3px solid var(--line); }
+.sp-target .bars .bar { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; }
+.sp-target .bars .bar .val { font-size: 52px; font-weight: 800; color: var(--accent); margin-bottom: 8px; }
+.sp-target .bars .bar.warn .val { color: var(--warn); }
+.sp-target .bars .bar .col { width: 70%; background: var(--accent); border-radius: 10px 10px 0 0; }
+.sp-target .bars .bar.warn .col { background: var(--warn); }
+.sp-target .bars .bar.dim .col { background: #b8c2cf; }
+.sp-target .bars .labels { display: flex; gap: 40px; padding: 12px 30px 0; }
+.sp-target .bars .labels div { flex: 1; text-align: center; font-size: 26px; font-weight: 700; }
+.sp-target .bars .labels div small { display: block; font-size: 21px; font-weight: 400; color: var(--sub); }
+/* quote */
+.sp-target .quote { max-width: 1400px; text-align: center; }
+.sp-target .quote .q { font-size: 56px; font-weight: 700; line-height: 1.45; }
+.sp-target .quote .q::before { content: "“"; color: var(--accent); margin-right: 8px; }
+.sp-target .quote .q::after { content: "”"; color: var(--accent); margin-left: 8px; }
+.sp-target .quote .by { margin-top: 30px; font-size: 28px; color: var(--sub); }
+/* quiz */
+.sp-target .quiz { width: 100%; display: flex; flex-direction: column; gap: 22px; }
+.sp-target .quiz .qq { font-size: 40px; font-weight: 800; line-height: 1.4; }
+.sp-target .quiz .qq::before { content: "Q. "; color: var(--accent); }
+.sp-target .quiz .chs { display: flex; flex-direction: column; gap: 14px; }
+.sp-target .quiz .ch { background: #fff; border: 3px solid var(--line); border-radius: 12px; padding: 16px 24px; font-size: 31px; }
+.sp-target .quiz .ch.right { border-color: var(--ok); background: var(--ok-soft); font-weight: 700; }
+.sp-target .quiz .ch .k { color: var(--accent); font-weight: 800; margin-right: 14px; }
+.sp-target .quiz .ex { background: var(--accent-soft); border-radius: 12px; padding: 18px 24px; font-size: 29px; line-height: 1.5; }
+.sp-target .quiz .ex::before { content: "答え  "; font-weight: 800; color: var(--accent); }
+/* steps */
+.sp-target .stepl { width: 100%; display: flex; flex-direction: column; gap: 14px; }
+.sp-target .stepl .it { display: flex; gap: 22px; align-items: center; background: #fff; border-radius: 12px; padding: 14px 22px; border: 2px solid var(--line); }
+.sp-target .stepl .it .n { flex: 0 0 56px; height: 56px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 28px; font-weight: 800; display: flex; align-items: center; justify-content: center; }
+.sp-target .stepl .it .t { font-size: 29px; font-weight: 700; }
+.sp-target .stepl .it .s { font-size: 22px; color: var(--sub); margin-top: 2px; }
+.sp-target .stepl .foot { font-size: 21px; color: var(--sub); padding: 2px 6px; }
+.sp-target .stepl .it .cmd { margin-left: auto; font-family: Menlo, monospace; font-size: 23px; background: var(--code-bg); color: #e6edf3; padding: 8px 14px; border-radius: 8px; white-space: nowrap; }
+/* recap */
+.sp-target .recap { width: 100%; display: flex; flex-direction: column; gap: 18px; }
+.sp-target .recap .p { display: flex; gap: 20px; align-items: flex-start; font-size: 34px; line-height: 1.45; background: #fff; border-radius: 12px; padding: 20px 28px; }
+.sp-target .recap .p::before { content: "✓"; color: var(--ok); font-weight: 800; }
+.sp-target .recap .next { margin-top: 10px; font-size: 30px; color: var(--sub); padding: 0 6px; }
+.sp-target .recap .next b { color: var(--accent); }
+
+/* run（操作）と output（実測の出力） */
+.sp-target .run { width: 100%; max-height: 100%; display: flex; flex-direction: column; gap: 20px; }
+.sp-target .cmdcard { flex: 0 0 auto; background: var(--code-bg); border-radius: 14px; overflow: hidden; }
+.sp-target .cmdcard .rhead { display: flex; align-items: center; gap: 16px; background: #2a3442; color: #cbd5e1; font-size: 22px; padding: 10px 20px; font-family: Menlo, Consolas, monospace; }
+.sp-target .cmdcard .rhead .rfile { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sp-target .lvl { margin-left: auto; flex: 0 0 auto; font-family: "Hiragino Sans", "Meiryo", sans-serif; font-size: 21px; font-weight: 700; line-height: 1.4; border-radius: 999px; padding: 2px 16px; white-space: nowrap; }
+.sp-target .lvl.must { background: #2f9e44; color: #fff; }
+.sp-target .lvl.demo { background: #ffb43c; color: #1d2733; }
+.sp-target .lvl.extra { border: 2px dashed #94a3b8; color: #cbd5e1; padding: 0 14px; }
+.sp-target .cmdcard .rcmd { padding: 26px 30px 30px; color: #fff; font-family: Menlo, Consolas, monospace; font-size: 38px; line-height: 1.35; white-space: pre-wrap; word-break: break-all; }
+.sp-target .cmdcard .rcmd .ps { color: #7dd3a8; margin-right: 20px; }
+.sp-target .term { flex: 0 1 auto; min-height: 0; width: 100%; display: flex; flex-direction: column; background: #0b1118; border-radius: 14px; overflow: hidden; }
+.sp-target .term .thead { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; background: #2a3442; color: #cbd5e1; font-size: 21px; padding: 10px 20px; }
+.sp-target .term .thead .dots i { display: inline-block; width: 14px; height: 14px; border-radius: 50%; margin-right: 8px; background: #ff5f56; }
+.sp-target .term .thead .dots i:nth-child(2) { background: #ffbd2e; }
+.sp-target .term .thead .dots i:nth-child(3) { background: #27c93f; }
+.sp-target .term .thead .tl { margin-left: 8px; }
+.sp-target .term .thead .tr { margin-left: auto; font-family: Menlo, Consolas, monospace; font-size: 20px; opacity: .85; }
+.sp-target .term pre { margin: 0; flex: 1 1 auto; min-height: 0; padding: 16px 0; font-size: 24px; line-height: 1.5; color: #d5dde6; overflow: hidden; font-family: Menlo, Consolas, monospace; }
+.sp-target .term pre.fs-l { font-size: 32px; }
+.sp-target .term pre.fs-m { font-size: 28px; }
+.sp-target .term .ln { display: block; padding: 0 24px; white-space: pre; }
+.sp-target .term .ln.hl { background: rgba(255, 180, 60, .22); box-shadow: inset 6px 0 0 #ffb43c; color: #fff; }
+.sp-target .term .ln.dim { opacity: .55; }
+.sp-target .term .tcap { flex: 0 0 auto; background: #151f2b; color: #aebbc9; font-size: 22px; line-height: 1.4; padding: 10px 24px; border-top: 1px solid #2a3442; }
+.sp-target .term .tcap .em { color: #ffb43c; }
+.sp-target .cmdcard .rwhere { padding: 14px 30px 0; font-size: 20px; color: #8b98a8; }
+.sp-target .cmdcard .rwhere code { color: #b8c4d2; }
+.sp-target .rcheck { flex: 0 0 auto; background: #fff; border-left: 8px solid var(--ok); border-radius: 10px; padding: 14px 24px; font-size: 28px; line-height: 1.5; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+.sp-target .rcheck .rk { display: inline-block; font-size: 21px; font-weight: 700; color: var(--ok); margin-right: 14px; }
+
+/* ハンズオン資料で足した部品：kw（キーワードのページ）、全ページ共通の「確かめる」の欄 */
+.sp-target main.withchk { bottom: 156px; }
+.sp-target main.withsrc { bottom: 124px; }
+.sp-target main.withchk.withsrc { bottom: 188px; }
+.sp-target .srcnote { position: absolute; left: 64px; right: 64px; bottom: 92px; font-size: 16px; line-height: 1.35; color: var(--sub); opacity: .8; }
+.sp-target .srcnote.withchk { bottom: 148px; }
+.sp-target .chkbar { position: absolute; left: 64px; right: 64px; bottom: 84px; height: 58px; display: flex; align-items: center; gap: 18px; padding: 0 22px; background: var(--accent-soft); border-left: 8px solid var(--accent); font-size: 23px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sp-target .chkbar .ck { flex: 0 0 auto; font-weight: 800; color: var(--accent); }
+.sp-target .chkbar .tp { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.sp-target .chkbar .tp b { color: var(--ink); margin-right: 6px; }
+.sp-target .chkbar .tp code { font-size: 20px; color: var(--sub); margin-left: 8px; }
+.sp-target .chkbar .nt { flex: 0 0 auto; color: var(--sub); }
+.sp-target .kw { width: 100%; height: 100%; display: flex; flex-direction: column; gap: 14px; }
+.sp-target .kw .ksub { flex: 0 0 auto; font-size: 28px; color: var(--sub); }
+.sp-target .kw .kcols { flex: 1; min-height: 0; display: flex; gap: 28px; font-size: 26px; }
+.sp-target .kw .kcol { flex: 1; min-width: 0; background: #fff; border: 2px solid var(--line); padding: 16px 24px; overflow: hidden; }
+.sp-target .kw .kcol h2 { margin: 0 0 6px; font-size: 1.15em; color: var(--accent); }
+.sp-target .kw .kcol h3 { margin: .55em 0 .15em; font-size: 1em; font-weight: 800; }
+.sp-target .kw .kcol h2 + h3 { margin-top: .2em; }
+.sp-target .kw .kcol ul { margin: 0; padding-left: 1.1em; line-height: 1.42; }
+.sp-target .kw .kcol li { margin: .1em 0; }
+.sp-target .kw .kcol code { font-size: .88em; background: var(--gray-soft); padding: 0 .2em; }
+
+/* ?render（動画づくり）のとき、舞台を左上に縮小せずに置く（CONTRACT §3.1。プレイヤーに置き換えても残す） */
+.render #stage { left: 0; top: 0; transform: none !important; }
+/* 動画の静止画では舞台を左上 (0,0) に置く（約束 v1.1 §3.1）。閲覧用の CSS を消しても残す */
+html, body { margin: 0; }
+
+</style>
+</head>
+<body>
+<div id="stage" class="sp-target"></div>
+<script>
+/* ============================================================
+   中身（描画）。プレイヤーとの約束（slide-player/CONTRACT.md §2）の形。
+   window.slideDeck を作り、window.renderSlide / window.deckInfo を残す。
+   ============================================================ */
+const DECK = {"meta": {"id": "part4-evaluation", "title": "評価", "short": "評価", "accent": "#008c86", "home": "../index.html", "sections": [{"id": "A", "title": "評価の流れ"}, {"id": "B", "title": "検索の評価"}, {"id": "C", "title": "回答の評価"}]}, "slides": [{"id": "cover", "type": "cover", "label": "検索と RAG の仕組み", "title": "評価", "lead": "検索の評価と回答の評価を分けて測る", "meta": ["ハンズオン資料 p.39〜45", "確かめるトピック：05・20"], "notes": "検索の評価と回答の評価を分けて測る"}, {"id": "p39", "type": "kw", "title": "評価（RAG の回答の評価）", "sub": "検索の評価と回答の評価を分けて見る", "cols": [{"title": "一般的な説明", "groups": [{"h": "何を評価するか", "items": ["検索の評価：正しい文書が上位に来ているかを見ます（NDCG、再現率など）。", "回答の評価：検索結果をもとに作った回答がよいかを見ます。", "2つを分けておくと、悪い答えが検索のせいか生成のせいかを切り分けられます。"]}, {"h": "評価の流れ", "items": ["正解データ：質問と、期待する答えの組を用意します。", "回答の取得：同じ質問を自分の RAG アプリに投げ、回答と、そのとき検索で取れた文書（コンテキスト）を集めます。", "採点：回答と正解を、生成 AI（GPT など）に採点させるか、プログラムで数えます。"]}, {"h": "指標の種類", "items": ["生成 AI による指標：coherence（話の筋が通っているか）、groundedness（検索結果に基づいているか）、relevance（質問に合っているか）。1〜5 の点数です。", "プログラムで数える指標：回答の長さ、F1 スコア（回答と正解で重なる単語の割合）、出典の記号が付いているか（自分で書く判定）。", "注意点：生成 AI の採点はぶれるので、同じ設定で何度か比べるか、人の判断と突き合わせます（p.44、p.45）。"]}]}, {"title": "Azure での説明", "groups": [{"h": "評価の道具", "items": ["azure-ai-evaluation SDK：groundedness、relevance、coherence などの評価器を持っています。", "`evaluate()` 関数に、データのファイルと評価器の一覧を渡して、まとめて採点します。", "Foundry の評価：ポータルやクラウドで評価を動かし、結果を並べて比べられます。"]}, {"h": "検索側の評価", "items": ["Azure AI Search には NDCG や再現率を計算する機能はありません。検索の結果のキーと正解のキーを、自分のコードで比べます（p.42）。", "検索方式ごとの NDCG の比べ方の例として、Microsoft が公開した測定があります（p.3。顧客企業のデータセット4つ、NDCG@3）。"]}]}], "kicker": "p.39", "notes": "位置：検索と取り込みのページのあと、「よくなったかをどう確かめるか」に移るページです。p.40 の組み込み評価器の前置きになります。\n言いたいこと：検索の評価と回答の評価は別物です。分けておけば、悪い答えの原因を検索側か生成側かに切り分けられます。\n気をつけること：\n・評価に使う SDK は azure-ai-evaluation です。\n・生成 AI の採点はぶれます。点数を1回だけ見せて結論を言わないようにします。\n・評価を実際に動かすと料金がかかります。", "section": "A", "check": [{"ed": "基礎", "no": "05", "name": "検索の良し悪しを数字で測る", "dir": "05-measure-search"}, {"ed": "応用", "no": "20", "name": "答えを評価する", "dir": "20-answer-evaluation"}]}, {"id": "p39d", "type": "diagram", "title": "評価は3段で行い、==検索と回答を分けて==点を付ける", "kicker": "p.39", "svg": "<svg viewBox='0 30 1600 560'><g data-step='0'><rect x='40' y='100' width='360' height='180' rx='10' fill='#e7f0fa' stroke='#1864ab' stroke-width='4'/><text x='220' y='154' font-size='34' fill='#1864ab' font-weight='700' text-anchor='middle'>正解データ<\/text><text x='220' y='200' font-size='26' fill='#5b6675' text-anchor='middle'>質問と<\/text><text x='220' y='236' font-size='26' fill='#5b6675' text-anchor='middle'>期待する答えの組<\/text><circle cx='740' cy='130' r='38' fill='#1864ab'/><path d='M674 290 Q674 190 740 190 Q806 190 806 290 Z' fill='#1864ab'/><circle cx='728' cy='130' r='10' fill='none' stroke='#fff' stroke-width='4'/><circle cx='752' cy='130' r='10' fill='none' stroke='#fff' stroke-width='4'/><line x1='738' y1='130' x2='742' y2='130' stroke='#fff' stroke-width='4'/><text x='740' y='70' font-size='34' fill='#1864ab' font-weight='700' text-anchor='middle'>RAG アプリ<\/text><path d='M402 190 L646 190' fill='none' stroke='#1864ab' stroke-width='7' stroke-linejoin='round'/><polygon points='668,190 646,202 646,178' fill='#1864ab'/><text x='535' y='124' font-size='28' fill='#1864ab' font-weight='700' text-anchor='middle'>① 同じ質問を<\/text><text x='535' y='158' font-size='28' fill='#1864ab' font-weight='700' text-anchor='middle'>投げる<\/text><\/g><g data-step='1'><path d='M808 190 L1036 190' fill='none' stroke='#d9480f' stroke-width='7' stroke-linejoin='round'/><polygon points='1058,190 1036,202 1036,178' fill='#d9480f'/><text x='933' y='96' font-size='28' fill='#d9480f' font-weight='700' text-anchor='middle'>② 回答と<\/text><text x='933' y='130' font-size='28' fill='#d9480f' font-weight='700' text-anchor='middle'>コンテキスト<\/text><text x='933' y='164' font-size='28' fill='#d9480f' font-weight='700' text-anchor='middle'>を集める<\/text><rect x='1060' y='100' width='500' height='180' rx='10' fill='#e7f0fa' stroke='#1864ab' stroke-width='4'/><text x='1310' y='154' font-size='34' fill='#1864ab' font-weight='700' text-anchor='middle'>採点<\/text><text x='1310' y='200' font-size='26' fill='#5b6675' text-anchor='middle'>生成 AI（GPT など）に採点させる<\/text><text x='1310' y='236' font-size='26' fill='#5b6675' text-anchor='middle'>か、プログラムで数える<\/text><\/g><g data-step='2'><path d='M1090 282 L1090 356' fill='none' stroke='#5b6675' stroke-width='7' stroke-linejoin='round'/><polygon points='1090,378 1078,356 1102,356' fill='#5b6675'/><path d='M1350 282 L1350 356' fill='none' stroke='#5b6675' stroke-width='7' stroke-linejoin='round'/><polygon points='1350,378 1338,356 1362,356' fill='#5b6675'/><text x='1220' y='338' font-size='28' fill='#5b6675' font-weight='700' text-anchor='middle'>③ 分けて見る<\/text><rect x='740' y='380' width='370' height='200' rx='10' fill='#fff' stroke='#1864ab' stroke-width='4'/><text x='925.0' y='434' font-size='34' fill='#1864ab' font-weight='700' text-anchor='middle'>検索の評価<\/text><text x='925.0' y='480' font-size='26' fill='#5b6675' text-anchor='middle'>正しい文書が上位に来たか<\/text><text x='925.0' y='516' font-size='26' fill='#5b6675' text-anchor='middle'>（NDCG、再現率）<\/text><rect x='1130' y='380' width='430' height='200' rx='10' fill='#fff' stroke='#1864ab' stroke-width='4'/><text x='1345.0' y='434' font-size='34' fill='#1864ab' font-weight='700' text-anchor='middle'>回答の評価<\/text><text x='1345.0' y='480' font-size='26' fill='#5b6675' text-anchor='middle'>根拠に沿っているか、<\/text><text x='1345.0' y='516' font-size='26' fill='#5b6675' text-anchor='middle'>質問に合っているか<\/text><text x='1345.0' y='552' font-size='26' fill='#5b6675' text-anchor='middle'>（groundedness、relevance）<\/text><\/g><g data-step='3'><text x='390' y='440' font-size='28' fill='#2b8a3e' font-weight='700' text-anchor='middle'>④ 分けておくと、悪い答えが<\/text><text x='390' y='474' font-size='28' fill='#2b8a3e' font-weight='700' text-anchor='middle'>検索のせいか生成のせいかを<\/text><text x='390' y='508' font-size='28' fill='#2b8a3e' font-weight='700' text-anchor='middle'>切り分けられる<\/text><\/g><\/svg>", "caption": "検索の評価と回答の評価を分けておくと、悪い答えが検索のせいか生成のせいかを切り分けられる", "notes": "狙い：検索の評価と回答の評価は別物で、分けておけば悪い答えの原因を検索側か生成側かに切り分けられると言える。\n話すこと：\n・段階0：評価の流れの1段目は正解データ（質問と、期待する答えの組）。同じ質問を自分の RAG アプリに投げる\n・段階1：回答と、そのとき検索で取れた文書（コンテキスト）を集める。それを採点する。採点は、生成 AI（GPT など）に採点させるか、プログラムで数える\n・段階2：採点を2つに分ける。検索の評価は、正しい文書が上位に来ているかを見る（NDCG、再現率など）。回答の評価は、検索結果をもとに作った回答がよいかを見る（groundedness、relevance など）\n・段階3：2つを分けておくと、悪い答えが検索のせいか生成のせいかを切り分けられる\n補足：生成 AI による指標は coherence、groundedness、relevance（1〜5 の点数）。プログラムで数える指標は、回答の長さ、F1 スコア、出典の記号が付いているか（自分で書く判定）。生成 AI の採点はぶれるので、同じ設定で何度か比べるか、人の判断と突き合わせる（p.44、p.45）。Azure では、azure-ai-evaluation SDK の評価器と evaluate() 関数、Foundry の評価（ポータルやクラウドで評価を動かし、結果を並べて比べる）を使う。Azure AI Search には NDCG や再現率を計算する機能はなく、検索の結果のキーと正解のキーを自分のコードで比べる（p.42）。検索方式ごとの NDCG の比べ方の例として、Microsoft が公開した測定がある（p.3。顧客企業のデータセット4つ、NDCG@3）\n注意：評価に使う SDK は azure-ai-evaluation。点数を1回だけ見せて結論を言わない。評価を実際に動かすと料金がかかる", "section": "A", "check": [{"ed": "基礎", "no": "05", "name": "検索の良し悪しを数字で測る", "dir": "05-measure-search"}, {"ed": "応用", "no": "20", "name": "答えを評価する", "dir": "20-answer-evaluation"}]}, {"id": "p40", "type": "kw", "title": "組み込み評価器", "sub": "質問、コンテキスト、回答、グラウンドトゥルースのどれとどれを比べるか", "cols": [{"title": "一般的な説明", "groups": [{"h": "評価に使う4つの材料", "items": ["質問：利用者が聞いたことです。", "コンテキスト：検索で取ってきた文書の中身です。", "回答とグラウンドトゥルース：回答は RAG が作った答え、グラウンドトゥルースは人が用意した正解です。"]}, {"h": "どの材料を比べるか", "items": ["回答とコンテキストを比べます：回答が検索結果に基づいているかを見ます（groundedness）。", "質問と回答を比べます：質問に合っているか（relevance）、話の筋が通っているか（coherence）を見ます。", "回答だけを見ます：文が自然か、文法に合っているかを見ます（fluency）。", "回答とグラウンドトゥルースを比べます：正解にどれだけ近いかを見ます。正解データがあるときだけ使えます。", "質問とコンテキストを比べます：検索が、答えの根拠になる文書を上位に出せたかを見ます（retrieval）。回答ではなく検索の側の物差しです。"]}, {"h": "採点のしかた", "items": ["生成 AI に採点させるもの：groundedness、relevance、coherence、fluency、similarity、retrieval。1〜5 の点数です。", "計算するもの：F1 スコア（0〜1）。回答と正解で重なる単語の割合です。", "生成 AI の採点はぶれます。計算で出す点数はぶれませんが、言い換えを見逃します。"]}]}, {"title": "Azure での説明", "groups": [{"h": "azure-ai-evaluation SDK の評価器", "items": ["`GroundednessEvaluator`：回答とコンテキストを使います（質問は付けても付けなくてもよい）。", "`RelevanceEvaluator`、`CoherenceEvaluator`：質問と回答を使います。`FluencyEvaluator` は回答だけを使います。", "`SimilarityEvaluator`：質問、回答、グラウンドトゥルースを使います。`F1ScoreEvaluator`：回答とグラウンドトゥルースを使います。", "`RetrievalEvaluator`：質問とコンテキスト（検索結果）を使います。"]}, {"h": "ほかの評価器と使い方", "items": ["`GroundednessProEvaluator`（Azure の評価サービスで、根拠に沿っているかを真偽で判定）や、安全性の評価器などもあります。", "`evaluate()` 関数に、データのファイルと評価器の一覧を渡してまとめて動かします。"]}]}], "kicker": "p.40", "notes": "位置：p.39 の評価の流れのうち、「採点」の部分を詳しく見るページです。\n言いたいこと：評価器の違いは、4つの材料のどれとどれを比べるかの違いです。名前を覚えるより、比べる組で整理します。\n気をつけること：\n・グラウンドトゥルースが要る評価器（similarity、F1）と要らない評価器（groundedness、relevance）を分けて話してください。\n・動かすと料金がかかる点は、このページでも言います。", "section": "A", "check": [{"ed": "応用", "no": "20", "name": "答えを評価する", "dir": "20-answer-evaluation"}]}, {"id": "p40d", "type": "diagram", "title": "評価器の違いは、==何と何を比べるか==の違い", "kicker": "p.40", "svg": "<svg viewBox='0 40 1600 540'><rect x='40' y='50' width='400' height='130' rx='10' fill='#fff' stroke='#1864ab' stroke-width='4'/><text x='240.0' y='106' font-size='34' fill='#1864ab' font-weight='700' text-anchor='middle'>質問<\/text><text x='240.0' y='150' font-size='26' fill='#5b6675' text-anchor='middle'>利用者が聞いたこと<\/text><rect x='40' y='420' width='400' height='130' rx='10' fill='#fff' stroke='#1864ab' stroke-width='4'/><text x='240.0' y='476' font-size='34' fill='#1864ab' font-weight='700' text-anchor='middle'>コンテキスト<\/text><text x='240.0' y='520' font-size='26' fill='#5b6675' text-anchor='middle'>検索で取ってきた文書の中身<\/text><rect x='600' y='215' width='320' height='150' rx='10' fill='#e7f0fa' stroke='#1864ab' stroke-width='4'/><text x='760.0' y='271' font-size='34' fill='#1864ab' font-weight='700' text-anchor='middle'>回答<\/text><text x='760.0' y='315' font-size='26' fill='#5b6675' text-anchor='middle'>RAG が作った答え<\/text><rect x='1260' y='215' width='300' height='150' rx='10' fill='#fff' stroke='#1864ab' stroke-width='4'/><text x='1410' y='262' font-size='34' fill='#1864ab' font-weight='700' text-anchor='middle'>グラウンド<\/text><text x='1410' y='300' font-size='34' fill='#1864ab' font-weight='700' text-anchor='middle'>トゥルース<\/text><text x='1410' y='348' font-size='26' fill='#5b6675' text-anchor='middle'>人が用意した正解<\/text><text x='760' y='410' font-size='26' fill='#5b6675' text-anchor='middle'>回答だけを見る：<\/text><text x='760' y='446' font-size='26' fill='#5b6675' text-anchor='middle'>fluency（文が自然か）<\/text><g data-step='1'><path d='M444 150 L577 232' fill='none' stroke='#1864ab' stroke-width='7' stroke-linejoin='round'/><polygon points='596,244 571,243 584,222' fill='#1864ab'/><path d='M596 244 L463 162' fill='none' stroke='#1864ab' stroke-width='7' stroke-linejoin='round'/><polygon points='444,150 469,151 456,172' fill='#1864ab'/><text x='468' y='118' font-size='28' fill='#1864ab' font-weight='700' text-anchor='start'>① relevance・coherence<\/text><\/g><g data-step='2'><path d='M444 452 L578 351' fill='none' stroke='#d9480f' stroke-width='7' stroke-linejoin='round'/><polygon points='596,338 586,361 571,342' fill='#d9480f'/><path d='M596 338 L462 439' fill='none' stroke='#d9480f' stroke-width='7' stroke-linejoin='round'/><polygon points='444,452 454,429 469,448' fill='#d9480f'/><text x='468' y='508' font-size='28' fill='#d9480f' font-weight='700' text-anchor='start'>② groundedness<\/text><path d='M240 184 L240 394' fill='none' stroke='#d9480f' stroke-width='7' stroke-linejoin='round'/><polygon points='240,416 228,394 252,394' fill='#d9480f'/><path d='M240 416 L240 206' fill='none' stroke='#d9480f' stroke-width='7' stroke-linejoin='round'/><polygon points='240,184 252,206 228,206' fill='#d9480f'/><text x='262' y='292' font-size='28' fill='#d9480f' font-weight='700' text-anchor='start'>② retrieval<\/text><text x='262' y='330' font-size='26' fill='#5b6675' text-anchor='start'>検索の側の物差し<\/text><\/g><g data-step='3'><path d='M922 290 L1236 290' fill='none' stroke='#2b8a3e' stroke-width='7' stroke-linejoin='round'/><polygon points='1258,290 1236,302 1236,278' fill='#2b8a3e'/><path d='M1258 290 L944 290' fill='none' stroke='#2b8a3e' stroke-width='7' stroke-linejoin='round'/><polygon points='922,290 944,278 944,302' fill='#2b8a3e'/><text x='1090' y='256' font-size='28' fill='#2b8a3e' font-weight='700' text-anchor='middle'>③ similarity・F1<\/text><text x='1090' y='338' font-size='26' fill='#5b6675' text-anchor='middle'>正解データが<\/text><text x='1090' y='374' font-size='26' fill='#5b6675' text-anchor='middle'>あるときだけ使う<\/text><\/g><\/svg>", "caption": "質問、コンテキスト、回答、グラウンドトゥルースのどれとどれを比べるか。名前より、比べる組で整理する", "notes": "狙い：評価器の違いは、4つの材料（質問、コンテキスト、回答、グラウンドトゥルース）のどれとどれを比べるかの違いで、名前を覚えるより、比べる組で整理すると言える。\n話すこと：\n・段階0：4つの材料。質問は利用者が聞いたこと、コンテキストは検索で取ってきた文書の中身、回答は RAG が作った答え、グラウンドトゥルースは人が用意した正解。回答だけを見る評価器もある（fluency：文が自然か、文法に合っているか）\n・段階1：質問と回答を比べる。質問に合っているか（relevance）、話の筋が通っているか（coherence）\n・段階2：回答とコンテキストを比べて、回答が検索結果に基づいているかを見る（groundedness）。質問とコンテキストを比べて、検索が答えの根拠になる文書を上位に出せたかを見る（retrieval）。retrieval は、回答ではなく検索の側の物差し\n・段階3：回答とグラウンドトゥルースを比べて、正解にどれだけ近いかを見る（similarity、F1）。正解データがあるときだけ使える\n補足：生成 AI に採点させるもの（groundedness、relevance、coherence、fluency、similarity、retrieval）は 1〜5 の点数。計算するもの（F1 スコア）は 0〜1 で、回答と正解で重なる単語の割合。生成 AI の採点はぶれる。計算で出す点数はぶれないが、言い換えを見逃す。azure-ai-evaluation SDK の評価器は、GroundednessEvaluator（回答とコンテキスト。質問は付けても付けなくてもよい）、RelevanceEvaluator と CoherenceEvaluator（質問と回答）、FluencyEvaluator（回答だけ）、SimilarityEvaluator（質問、回答、グラウンドトゥルース）、F1ScoreEvaluator（回答とグラウンドトゥルース）、RetrievalEvaluator（質問とコンテキスト）。GroundednessProEvaluator（Azure の評価サービスで、根拠に沿っているかを真偽で判定）や、安全性の評価器もある。evaluate() 関数に、データのファイルと評価器の一覧を渡してまとめて動かす\n注意：グラウンドトゥルースが要る評価器（similarity、F1）と要らない評価器（groundedness、relevance）を分けて話す。動かすと料金がかかる", "section": "A", "check": [{"ed": "応用", "no": "20", "name": "答えを評価する", "dir": "20-answer-evaluation"}]}, {"id": "p40a", "type": "table", "section": "A", "kicker": "p.40", "title": "評価器は、==何と何を比べるか==で整理する", "head": ["比べる材料", "見ること", "評価器", "正解データ"], "rows": [["回答とコンテキスト", "回答が検索結果に基づいているか", "groundedness", "要らない"], ["質問と回答", "質問に合っているか、話の筋が通っているか", "relevance<br>coherence", "要らない"], ["回答だけ", "文が自然か、文法に合っているか", "fluency", "要らない"], ["回答と正解", "正解にどれだけ近いか", "similarity（質問も使う）<br>F1 スコア", "要る"], ["質問とコンテキスト", "検索が、答えの根拠になる文書を上位に出せたか（回答ではなく検索の側の物差し）", "retrieval", "要らない"]], "colW": ["22%", "38%", "26%", "14%"], "check": [{"ed": "応用", "no": "20", "name": "答えを評価する", "dir": "20-answer-evaluation"}], "notes": "p.40 の表。名前を覚えるより、比べる組で整理する。\n・正解データが要るのは、similarity と F1 スコア。\n・生成 AI に採点させるものは 1〜5 の点数、F1 スコアは計算で出す 0〜1 の点数。"}, {"id": "p41", "type": "kw", "title": "正解データ（グラウンドトゥルース）", "sub": "質問、期待する答え、根拠の場所を組にして用意する", "cols": [{"title": "一般的な説明", "groups": [{"h": "1件の形", "items": ["質問：利用者が実際に聞きそうな文です。", "期待する答え：人が確かめた答えです。回答の評価で使います。", "根拠の文書と場所：答えが書かれている文書とチャンクです。検索の評価で使います。"]}, {"h": "集め方", "items": ["実際の問い合わせや、利用者から出た質問から集めます。", "生成 AI に文書を読ませて、質問と答えの下書きを作らせる方法もあります。", "下書きは、人が読んで直すか、外します。"]}, {"h": "気をつける点", "items": ["質問の種類（名前で聞く、言い換える、複数の文書にまたがる）を混ぜます（p.14）。", "答えが文書にない質問も入れておくと、「分からない」と言えるかを確かめられます。", "文書が変わったら、正解データも直します。"]}]}, {"title": "Azure AI Search での説明", "groups": [{"h": "検索の評価に使う形", "items": ["質問ごとに、正解のチャンクのキー（id）を持たせます。", "検索の結果のキーと比べて、NDCG や再現率を計算します（p.42）。", "出典の欄（p.26）があると、正解の場所を書きやすくなります。"]}, {"h": "回答の評価に使う形", "items": ["Foundry の評価や azure-ai-evaluation SDK では、質問、回答、コンテキスト、正解を1行にした JSONL を使います（列名の例：`query`、`response`、`context`、`ground_truth`）。", "正解を使う評価器と、使わない評価器があります（p.40）。", "azure-ai-evaluation SDK のシミュレーター（プレビュー）は、文章から質問と答えの組を作れます。"]}]}], "kicker": "p.41", "notes": "位置：p.39 の評価の流れのうち、最初の「正解データ」の段を詳しく見るページです。\n言いたいこと：正解データは、質問、期待する答え、根拠の場所の組です。生成 AI で下書きを作っても、最後は人が確かめます。\n気をつけること：\n・生成 AI で下書きを作ると料金がかかります。", "section": "B", "check": [{"ed": "基礎", "no": "05", "name": "検索の良し悪しを数字で測る", "dir": "05-measure-search"}]}, {"id": "p41d", "type": "diagram", "title": "正解データは、==質問・期待する答え・根拠の場所==を組にして用意する", "kicker": "p.41", "svg": "<svg viewBox='0 30 1600 560'><rect x='40' y='50' width='380' height='140' rx='10' fill='#e7f0fa' stroke='#1864ab' stroke-width='4'/><text x='230' y='106' font-size='34' fill='#1864ab' font-weight='700' text-anchor='middle'>実際の質問<\/text><text x='230' y='150' font-size='26' fill='#5b6675' text-anchor='middle'>問い合わせ、利用者の質問<\/text><circle cx='780' cy='240' r='38' fill='#5b6675'/><path d='M714 400 Q714 300 780 300 Q846 300 846 400 Z' fill='#5b6675'/><text x='780' y='170' font-size='34' fill='#5b6675' font-weight='700' text-anchor='middle'>人<\/text><g data-step='0'><path d='M424 140 L679 225' fill='none' stroke='#1864ab' stroke-width='7' stroke-linejoin='round'/><polygon points='700,232 675,236 683,214' fill='#1864ab'/><text x='470' y='112' font-size='28' fill='#1864ab' font-weight='700' text-anchor='start'>① 集める<\/text><\/g><g data-step='1'><path d='M50 360 H114 L140 386 V476 H50 Z' fill='#fff' stroke='#5b6675' stroke-width='4'/><path d='M114 360 V386 H140' fill='none' stroke='#5b6675' stroke-width='4'/><line x1='64' y1='404' x2='126' y2='404' stroke='#c9d6e6' stroke-width='5'/><line x1='64' y1='422' x2='126' y2='422' stroke='#c9d6e6' stroke-width='5'/><line x1='64' y1='440' x2='126' y2='440' stroke='#c9d6e6' stroke-width='5'/><line x1='64' y1='458' x2='126' y2='458' stroke='#c9d6e6' stroke-width='5'/><text x='95' y='512' font-size='30' fill='#1d2733' text-anchor='middle'>文書<\/text><circle cx='330' cy='420' r='38' fill='#1864ab'/><path d='M264 580 Q264 480 330 480 Q396 480 396 580 Z' fill='#1864ab'/><circle cx='318' cy='420' r='10' fill='none' stroke='#fff' stroke-width='4'/><circle cx='342' cy='420' r='10' fill='none' stroke='#fff' stroke-width='4'/><line x1='328' y1='420' x2='332' y2='420' stroke='#fff' stroke-width='4'/><text x='330' y='360' font-size='34' fill='#1864ab' font-weight='700' text-anchor='middle'>生成 AI<\/text><path d='M142 430 L264 430' fill='none' stroke='#5b6675' stroke-width='7' stroke-linejoin='round' stroke-dasharray='16 12'/><polygon points='286,430 264,442 264,418' fill='#5b6675'/><text x='215' y='400' font-size='28' fill='#5b6675' font-weight='700' text-anchor='middle'>読ませる<\/text><path d='M398 440 L691 358' fill='none' stroke='#5b6675' stroke-width='7' stroke-linejoin='round' stroke-dasharray='16 12'/><polygon points='712,352 694,369 688,346' fill='#5b6675'/><text x='430' y='492' font-size='28' fill='#5b6675' font-weight='700' text-anchor='start'>② 質問と答えの下書き<\/text><\/g><g data-step='2'><path d='M852 320 L1016 320' fill='none' stroke='#2b8a3e' stroke-width='7' stroke-linejoin='round'/><polygon points='1038,320 1016,332 1016,308' fill='#2b8a3e'/><text x='945' y='256' font-size='28' fill='#2b8a3e' font-weight='700' text-anchor='middle'>③ 読んで<\/text><text x='945' y='290' font-size='28' fill='#2b8a3e' font-weight='700' text-anchor='middle'>直す、外す<\/text><rect x='1040' y='60' width='520' height='500' rx='10' fill='#e7f0fa' stroke='#1864ab' stroke-width='4'/><text x='1300' y='116' font-size='34' fill='#1864ab' font-weight='700' text-anchor='middle'>正解データ<\/text><\/g><g data-step='3'><text x='1300' y='160' font-size='28' fill='#2b8a3e' font-weight='700' text-anchor='middle'>④ 1件は、この3つの組<\/text><text x='1080' y='226' font-size='30' fill='#1864ab' font-weight='700' text-anchor='start'>質問<\/text><text x='1080' y='264' font-size='26' fill='#5b6675' text-anchor='start'>利用者が実際に<\/text><text x='1080' y='298' font-size='26' fill='#5b6675' text-anchor='start'>聞きそうな文<\/text><text x='1080' y='342' font-size='30' fill='#2b8a3e' font-weight='700' text-anchor='start'>期待する答え<\/text><text x='1080' y='380' font-size='26' fill='#5b6675' text-anchor='start'>人が確かめた答え。<\/text><text x='1080' y='414' font-size='26' fill='#5b6675' text-anchor='start'>回答の評価で使う<\/text><text x='1080' y='458' font-size='30' fill='#d9480f' font-weight='700' text-anchor='start'>根拠の文書と場所<\/text><text x='1080' y='496' font-size='26' fill='#5b6675' text-anchor='start'>答えが書かれている文書と<\/text><text x='1080' y='530' font-size='26' fill='#5b6675' text-anchor='start'>チャンク。検索の評価で使う<\/text><\/g><\/svg>", "caption": "生成 AI に下書きさせても、最後は人が確かめる", "notes": "狙い：正解データは、質問、期待する答え、根拠の場所の組で、生成 AI で下書きを作っても、最後は人が確かめると言える。\n話すこと：\n・段階0：実際の問い合わせや、利用者から出た質問から集める\n・段階1：生成 AI に文書を読ませて、質問と答えの下書きを作らせる方法もある\n・段階2：下書きは、人が読んで直すか、外す\n・段階3：1件は、質問（利用者が実際に聞きそうな文）、期待する答え（人が確かめた答え。回答の評価で使う）、根拠の文書と場所（答えが書かれている文書とチャンク。検索の評価で使う）の組\n補足：気をつける点は、質問の種類（名前で聞く、言い換える、複数の文書にまたがる）を混ぜる（p.14）、答えが文書にない質問も入れて「分からない」と言えるかを確かめる、文書が変わったら正解データも直す、の3つ。Azure AI Search では、質問ごとに正解のチャンクのキー（id）を持たせ、検索の結果のキーと比べて NDCG や再現率を計算する（p.42）。出典の欄（p.26）があると、正解の場所を書きやすい。Foundry の評価や azure-ai-evaluation SDK では、質問、回答、コンテキスト、正解を1行にした JSONL を使う（列名の例：query、response、context、ground_truth）。シミュレーター（プレビュー）は、文章から質問と答えの組を作れる\n注意：生成 AI で下書きを作ると料金がかかる", "section": "B", "check": [{"ed": "基礎", "no": "05", "name": "検索の良し悪しを数字で測る", "dir": "05-measure-search"}]}, {"id": "p42", "type": "kw", "title": "NDCG と再現率", "sub": "順位まで見るか、拾えたかだけを見るか", "cols": [{"title": "一般的な説明", "groups": [{"h": "再現率（Recall@k）", "items": ["正解の文書のうち、上位 k 件に入った割合です。", "例：正解が2件で、上位3件に2件とも入れば、再現率@3 は 2 ÷ 2 ＝ 1.00 です。", "上位 k 件の中で何位だったかは見ません。"]}, {"h": "NDCG（NDCG@k）", "items": ["正解が上位にあるほど重く数える指標です。順位 i の正解は 1 / log2(i+1) で数えます。", "例：1位と3位が正解なら、1.00 ＋ 0.50 ＝ 1.50 です。理想の並び（1位と2位が正解）は 1.00 ＋ 0.63 ＝ 1.63 なので、NDCG@3 は 1.50 ÷ 1.63 ＝ 約0.92 です。", "正解に段階（とても合う、少し合う）を付けて数えることもできます。"]}, {"h": "使い分けの考え方", "items": ["生成 AI に渡すのが上位の数件なら、その中の順位が答えに効くので、NDCG が合います。", "多めに取ってから並べ直す段（ランカー）の前では、拾えたかどうかを見る再現率が合います。", "どちらも、正解データ（p.41）がないと計算できません。"]}]}, {"title": "Azure AI Search での説明", "groups": [{"h": "公式の測定の例", "items": ["Microsoft が公開した測定（2023年。顧客企業のデータセット4つ、NDCG@3）では、キーワード 40.6、ベクトル（Ada-002）43.8、ハイブリッド 48.4、セマンティックランカー付き 60.1 でした。"]}, {"h": "ランカーと再現率", "items": ["セマンティックランカーは、上位 50 件を並べ直します（p.5）。", "50 件の中に正解が入っていないと、ランカーでは上げられません。", "そのため、ランカーの前の段では、再現率@50 を見ることがあります。"]}, {"h": "計算する場所", "items": ["Azure AI Search には、NDCG や再現率を計算する機能はありません。", "検索の結果のキーと正解のキーを、自分のコードで比べて計算します。", "azure-ai-evaluation の `RetrievalEvaluator` は、質問と検索結果から検索の質を1〜5で採点します（p.40）。NDCG や再現率とは別の物差しです。"]}]}], "kicker": "p.42", "notes": "出典の URL：https://techcommunity.microsoft.com/t5/azure-ai-foundry-blog/azure-ai-search-outperforming-vector-search-with-hybrid/ba-p/3929167\n位置：p.39 の評価の流れのうち、検索の評価の物差しを見るページです。\n言いたいこと：再現率は拾えたかだけ、NDCG は順位まで見ます。生成 AI に渡す件数で、見る指標が変わります。\n気をつけること：\n・計算の例は説明用です。\n・この数字は Microsoft が公開した測定（顧客企業のデータセット4つ、NDCG@3）で、教材のデータの結果ではない、と言ってください。\n・どの検索方法がよいかの結論にはしません。", "section": "B", "check": [{"ed": "基礎", "no": "05", "name": "検索の良し悪しを数字で測る", "dir": "05-measure-search"}], "source": "Microsoft Tech Community「Azure AI Search: Outperforming vector search with hybrid retrieval and reranking」（2023年9月）"}, {"id": "p42d", "type": "diagram", "title": "NDCG は==順位まで==見て、再現率は==拾えたか==だけを見る", "kicker": "p.42", "svg": "<svg viewBox='0 15 1600 615'><text x='40' y='40' font-size='26' fill='#5b6675' font-weight='700' text-anchor='start'>検索の結果（上位3件。正解は2件）<\/text><rect x='40' y='50' width='540' height='70' rx='10' fill='#e7f0fa' stroke='#1864ab' stroke-width='4'/><text x='68' y='97' font-size='30' fill='#1864ab' font-weight='700' text-anchor='start'>1位　正解<\/text><rect x='40' y='132' width='540' height='70' rx='10' fill='#fff' stroke='#5b6675' stroke-width='4'/><text x='68' y='179' font-size='30' fill='#5b6675' font-weight='700' text-anchor='start'>2位　外れ<\/text><rect x='40' y='214' width='540' height='70' rx='10' fill='#e7f0fa' stroke='#1864ab' stroke-width='4'/><text x='68' y='261' font-size='30' fill='#1864ab' font-weight='700' text-anchor='start'>3位　正解<\/text><g data-step='1'><path d='M584 92 L776 92' fill='none' stroke='#1864ab' stroke-width='7' stroke-linejoin='round'/><polygon points='798,92 776,104 776,80' fill='#1864ab'/><text x='691' y='66' font-size='28' fill='#1864ab' font-weight='700' text-anchor='middle'>① 拾えたか<\/text><rect x='800' y='50' width='760' height='190' rx='10' fill='#e7f0fa' stroke='#1864ab' stroke-width='4'/><text x='830' y='100' font-size='34' fill='#1864ab' font-weight='700' text-anchor='start'>再現率@3<\/text><text x='830' y='146' font-size='30' fill='#1d2733' text-anchor='start'>正解2件のうち、上位3件に2件入った<\/text><text x='830' y='190' font-size='30' fill='#2b8a3e' font-weight='700' text-anchor='start'>再現率@3 ＝ 2 ÷ 2 ＝ 1.00<\/text><text x='830' y='226' font-size='26' fill='#5b6675' text-anchor='start'>上位3件の中の順位の違いは見ない<\/text><\/g><g data-step='2'><text x='290' y='97' font-size='26' fill='#5b6675' text-anchor='start'>1 / log2(2) = 1.00<\/text><text x='290' y='179' font-size='26' fill='#5b6675' text-anchor='start'>0<\/text><text x='290' y='261' font-size='26' fill='#5b6675' text-anchor='start'>1 / log2(4) = 0.50<\/text><path d='M584 290 L777 335' fill='none' stroke='#d9480f' stroke-width='7' stroke-linejoin='round'/><polygon points='798,340 774,347 779,323' fill='#d9480f'/><text x='690' y='246' font-size='28' fill='#d9480f' font-weight='700' text-anchor='middle'>② 順位ごとに<\/text><text x='690' y='280' font-size='28' fill='#d9480f' font-weight='700' text-anchor='middle'>重みを付ける<\/text><rect x='800' y='262' width='760' height='200' rx='10' fill='#e7f0fa' stroke='#1864ab' stroke-width='4'/><text x='830' y='314' font-size='34' fill='#1864ab' font-weight='700' text-anchor='start'>NDCG@3<\/text><text x='1010' y='314' font-size='26' fill='#5b6675' text-anchor='start'>上位ほど重く数える<\/text><text x='830' y='360' font-size='30' fill='#1d2733' text-anchor='start'>合計 ＝ 1.00 ＋ 0 ＋ 0.50 ＝ 1.50<\/text><text x='830' y='398' font-size='26' fill='#5b6675' text-anchor='start'>理想の並び（1位と2位が正解）：1.00 ＋ 0.63 ＝ 1.63<\/text><text x='830' y='442' font-size='30' fill='#2b8a3e' font-weight='700' text-anchor='start'>NDCG@3 ＝ 1.50 ÷ 1.63 ＝ 約0.92<\/text><\/g><g data-step='3'><path d='M1180 464 L1180 486' fill='none' stroke='#5b6675' stroke-width='7' stroke-linejoin='round'/><polygon points='1180,508 1168,486 1192,486' fill='#5b6675'/><text x='1210' y='496' font-size='28' fill='#5b6675' font-weight='700' text-anchor='start'>③ 公式の測定では<\/text><rect x='40' y='510' width='1520' height='110' rx='10' fill='#fff' stroke='#5b6675' stroke-width='4'/><text x='800' y='548' font-size='26' fill='#5b6675' text-anchor='middle'>Microsoft が公開した測定（2023年。顧客企業のデータセット4つ、NDCG@3）<\/text><text x='800' y='594' font-size='26' fill='#1d2733' font-weight='700' text-anchor='middle'>キーワード 40.6　ベクトル（Ada-002）43.8　ハイブリッド 48.4　セマンティックランカー付き 60.1<\/text><\/g><\/svg>", "caption": "計算の例は説明用。下の数字は Microsoft が公開した測定で、教材のデータの結果ではない", "notes": "狙い：再現率は拾えたかだけ、NDCG は順位まで見る。生成 AI に渡す件数で、見る指標が変わると言える。\n話すこと：\n・段階0：検索の結果の上位3件のうち、1位と3位が正解（正解は2件）という例\n・段階1：再現率@3は、正解のうち上位3件に入った割合。2 ÷ 2 ＝ 1.00。上位3件の中で何位だったかは見ない\n・段階2：NDCG@3は、正解が上位にあるほど重く数える。順位 i の正解は 1 / log2(i+1) で数える。1位は 1.00、3位は 0.50 で、合計 1.50。理想の並び（1位と2位が正解）は 1.00 ＋ 0.63 ＝ 1.63 なので、NDCG@3 ＝ 1.50 ÷ 1.63 ＝ 約0.92\n・段階3：Microsoft が公開した測定（2023年。顧客企業のデータセット4つ、NDCG@3）では、キーワード 40.6、ベクトル（Ada-002）43.8、ハイブリッド 48.4、セマンティックランカー付き 60.1。出典：Azure AI Search: Outperforming vector search with hybrid retrieval and reranking（Microsoft Tech Community、2023年9月）\n補足：使い分けは、生成 AI に渡すのが上位の数件なら、その中の順位が答えに効くので NDCG が合う。多めに取ってから並べ直す段（ランカー）の前では、拾えたかどうかを見る再現率が合う。セマンティックランカーは上位 50 件を並べ直す（p.5）ので、50 件の中に正解が入っていないと上げられない。そのため、ランカーの前の段では再現率@50 を見ることがある。どちらも、正解データ（p.41）がないと計算できない。Azure AI Search には、NDCG や再現率を計算する機能はなく、検索の結果のキーと正解のキーを自分のコードで比べる。azure-ai-evaluation の RetrievalEvaluator は、質問と検索結果から検索の質を1〜5で採点する、NDCG や再現率とは別の物差し（p.40）\n注意：計算の例は説明用。最後の数字は Microsoft が公開した測定（顧客企業のデータセット4つ、NDCG@3）で、教材のデータの結果ではない、と言う。どの検索方法がよいかの結論にはしない", "section": "B", "check": [{"ed": "基礎", "no": "05", "name": "検索の良し悪しを数字で測る", "dir": "05-measure-search"}], "source": "Microsoft Tech Community「Azure AI Search: Outperforming vector search with hybrid retrieval and reranking」（2023年9月）"}, {"id": "p43", "type": "kw", "title": "検索の評価と回答の評価の分け方", "sub": "どちらが悪いかで、直す場所が変わる", "cols": [{"title": "一般的な説明", "groups": [{"h": "4つの組み合わせ", "items": ["検索がよく、回答もよい：そのままです。", "検索がよく、回答が悪い：生成の側（プロンプト、モデル）を見ます。", "検索が悪く、回答が悪い：検索の側（取り込み、検索方法）を見ます。"]}, {"h": "見落としやすい組み合わせ", "items": ["検索が悪いのに、回答がよいことがあります。", "モデルがもともと知っていた知識で、たまたま当たった可能性があります。", "根拠のない回答なので、文書が変わったときに間違えるおそれがあります。"]}, {"h": "分けるための準備", "items": ["回答だけでなく、検索の結果（どのチャンクを渡したか）を残しておきます。", "検索の結果には検索の物差し（p.42）、回答には回答の物差しで点を付けます。", "同じ質問の2つの点を並べて、4つの組み合わせのどれかを見ます。"]}]}, {"title": "Azure AI Search での説明", "groups": [{"h": "検索の側の記録", "items": ["検索の結果のキー、点数（@search.score、@search.rerankerScore）を残します。", "ナレッジベースを使う場合は、返る記録（アクティビティ）で、何を探したかも残せます。", "残した結果と正解データ（p.41）で、検索の点を計算します。", "検索の質を生成 AI で採点する `RetrievalEvaluator`（質問と検索結果を渡し、1〜5の点数）もあります（p.40）。"]}, {"h": "回答の側の物差し", "items": ["azure-ai-evaluation の評価器：Groundedness（回答が根拠に沿っているか。回答と検索結果を渡す）、Relevance（回答が質問に合っているか）、Coherence と Fluency（回答の読みやすさ）。", "Groundedness は、検索の結果を「コンテキスト」として渡して測ります。", "「たまたま当たった」回答は、Groundedness が低く出ることで見分けられる場合があります。"]}]}], "kicker": "p.43", "notes": "言いたいこと：検索と回答に別々に点を付けると、悪い答えの原因が検索か生成かを分けられます。\n気をつけること：\n・「たまたま当たった」の組み合わせを、必ず取り上げてください。\n・評価を実際に動かすと料金がかかります。", "section": "B", "check": [{"ed": "基礎", "no": "05", "name": "検索の良し悪しを数字で測る", "dir": "05-measure-search"}, {"ed": "応用", "no": "20", "name": "答えを評価する", "dir": "20-answer-evaluation"}]}, {"id": "p43d", "type": "diagram", "title": "検索と回答に==別々に点==を付けると、直す場所が分かる", "kicker": "p.43", "svg": "<svg viewBox='0 30 1600 520'><text x='695' y='80' font-size='34' fill='#5b6675' font-weight='700' text-anchor='middle'>回答がよい<\/text><text x='695' y='116' font-size='26' fill='#5b6675' text-anchor='middle'>回答の物差し（p.40）<\/text><text x='1285' y='80' font-size='34' fill='#5b6675' font-weight='700' text-anchor='middle'>回答が悪い<\/text><text x='1285' y='116' font-size='26' fill='#5b6675' text-anchor='middle'>回答の物差し（p.40）<\/text><text x='230' y='238' font-size='34' fill='#5b6675' font-weight='700' text-anchor='middle'>検索がよい<\/text><text x='230' y='276' font-size='26' fill='#5b6675' text-anchor='middle'>検索の物差し（p.42）<\/text><text x='230' y='438' font-size='34' fill='#5b6675' font-weight='700' text-anchor='middle'>検索が悪い<\/text><text x='230' y='476' font-size='26' fill='#5b6675' text-anchor='middle'>検索の物差し（p.42）<\/text><g data-step='0'><rect x='420' y='150' width='550' height='180' rx='10' fill='#fff' stroke='#2b8a3e' stroke-width='4'/><text x='695' y='212' font-size='34' fill='#2b8a3e' font-weight='700' text-anchor='middle'>① そのまま<\/text><text x='695' y='262' font-size='26' fill='#5b6675' text-anchor='middle'>検索も回答もよい<\/text><\/g><g data-step='1'><rect x='1010' y='150' width='550' height='180' rx='10' fill='#fff' stroke='#1864ab' stroke-width='4'/><text x='1285' y='212' font-size='34' fill='#1864ab' font-weight='700' text-anchor='middle'>② 生成の側を見る<\/text><text x='1285' y='262' font-size='26' fill='#5b6675' text-anchor='middle'>（プロンプト、モデル）<\/text><\/g><g data-step='2'><rect x='1010' y='350' width='550' height='180' rx='10' fill='#fff' stroke='#1864ab' stroke-width='4'/><text x='1285' y='412' font-size='34' fill='#1864ab' font-weight='700' text-anchor='middle'>③ 検索の側を見る<\/text><text x='1285' y='462' font-size='26' fill='#5b6675' text-anchor='middle'>（取り込み、検索方法）<\/text><\/g><g data-step='3'><rect x='420' y='350' width='550' height='180' rx='10' fill='#fff' stroke='#d9480f' stroke-width='7'/><text x='695' y='412' font-size='34' fill='#d9480f' font-weight='700' text-anchor='middle'>④ たまたま当たった<\/text><text x='695' y='462' font-size='26' fill='#5b6675' text-anchor='middle'>（モデルの知識など）<\/text><text x='695' y='500' font-size='26' fill='#5b6675' text-anchor='middle'>根拠のない回答かもしれない<\/text><\/g><\/svg>", "caption": "検索の結果を残しておき、回答とは別に点を付ける。同じ質問の2つの点を並べて、4つの組み合わせのどれかを見る", "notes": "狙い：検索と回答に別々に点を付けると、悪い答えの原因が検索か生成かを分けられると言える。\n話すこと：\n・段階0：検索がよく、回答もよい：そのまま\n・段階1：検索がよく、回答が悪い：生成の側（プロンプト、モデル）を見る\n・段階2：検索が悪く、回答も悪い：検索の側（取り込み、検索方法）を見る\n・段階3：見落としやすい組み合わせ。検索が悪いのに、回答がよいことがある。モデルがもともと知っていた知識で、たまたま当たった可能性がある。根拠のない回答なので、文書が変わったときに間違えるおそれがある\n補足：分けるための準備として、回答だけでなく、検索の結果（どのチャンクを渡したか）を残しておく。検索の結果には検索の物差し（p.42）、回答には回答の物差しで点を付け、同じ質問の2つの点を並べる。Azure AI Search では、検索の結果のキー、点数（@search.score、@search.rerankerScore）を残す。ナレッジベースを使う場合は、返る記録（アクティビティ）で、何を探したかも残せる。残した結果と正解データ（p.41）で、検索の点を計算する。検索の質を生成 AI で採点する RetrievalEvaluator（質問と検索結果を渡し、1〜5の点数）もある（p.40）。回答の側は、azure-ai-evaluation の Groundedness（回答が根拠に沿っているか。回答と検索結果を渡す）、Relevance、Coherence と Fluency。「たまたま当たった」回答は、Groundedness が低く出ることで見分けられる場合がある\n注意：「たまたま当たった」の組み合わせを、必ず取り上げる。評価を実際に動かすと料金がかかる", "section": "B", "check": [{"ed": "基礎", "no": "05", "name": "検索の良し悪しを数字で測る", "dir": "05-measure-search"}, {"ed": "応用", "no": "20", "name": "答えを評価する", "dir": "20-answer-evaluation"}]}, {"id": "p44", "type": "kw", "title": "生成 AI による採点のぶれ", "sub": "同じ回答でも、点数が変わる", "cols": [{"title": "一般的な説明", "groups": [{"h": "何が起きるか", "items": ["生成 AI に回答を採点させると、同じ質問と同じ回答でも、回ごとに点数が変わることがあります。", "1〜5 の点数では、1点の違いが、ぶれなのか差なのかを見分けにくくなります。", "1回の点数だけで、2つの設定のどちらがよいかを決めると、ぶれを差と見誤ることがあります。"]}, {"h": "ぶれの元", "items": ["採点のプロンプトの書き方と、点数の基準の言葉。", "採点に使うモデルとその版、温度などの設定。", "回答の長さや、並べる順番（2つを比べるときに、先に出したほうが有利になる「位置の偏り」。Zheng ら、2023、MT-Bench の論文）。"]}, {"h": "抑え方", "items": ["同じ設定で何回か採点し、平均と幅を見ます。", "質問の数を増やして、1問の違いに左右されにくくします。", "一部を人が採点し、生成 AI の点数と突き合わせます（p.45）。"]}]}, {"title": "Azure AI Search での説明", "groups": [{"h": "どこで起きるか", "items": ["検索の点数（BM25、RRF、rerankerScore）も、まったく動かないわけではありません。インデックスの更新、レプリカごとの統計の差、同点の並びの不定で、順位や点数がわずかに変わります。セマンティックランカーの点数も、基盤側の条件やモデルの更新で、分布が少し変わります。", "ぶれが大きいのは、Foundry の評価器や azure-ai-evaluation SDK のように、生成 AI で採点する段です。同じ入力でも、回ごとに点数が変わります。", "NDCG や再現率（p.42）は、保存した検索結果と正解から計算式で決まる指標なので、同じ結果なら同じ値です。ただし検索結果そのものは変わりえるので、比べるときは条件（インデックスの状態、時期）をそろえ、検索結果を保存しておきます。"]}, {"h": "評価器の設定", "items": ["評価器には、採点に使うモデルを指定します。", "モデルを変えると、同じ回答でも点数が変わることがあります。", "比べる2つの設定では、採点のモデルと版をそろえます。"]}, {"h": "記録に残すもの", "items": ["採点のモデル、版、日付を、点数と一緒に残します。", "点数の理由の文（評価器が返すもの）も残すと、ぶれた理由を後で読めます。"]}]}], "kicker": "p.44", "notes": "位置：p.40 の組み込み評価器で、生成 AI に採点させるときの注意のページです。p.45 のキャリブレーションにつながります。\n言いたいこと：生成 AI の採点はぶれます。1回の点数で比べず、何回か採点して幅を見ます。\n気をつけること：\n・図の点数（4、3、4）は説明用の例です。\n・検索の点数も、インデックスの更新、レプリカの差、ランカーのモデルの更新で変わり、同点の順位は決まっていません。そのことも添えてください。", "section": "C", "check": [{"ed": "応用", "no": "20", "name": "答えを評価する", "dir": "20-answer-evaluation"}]}, {"id": "p44d", "type": "diagram", "title": "生成 AI の採点は、==同じ回答でも==回ごとにぶれる", "kicker": "p.44", "svg": "<svg viewBox='0 40 1600 560'><rect x='40' y='140' width='300' height='200' rx='10' fill='#fff' stroke='#5b6675' stroke-width='4'/><text x='190' y='192' font-size='30' fill='#5b6675' font-weight='700' text-anchor='middle'>採点の対象<\/text><text x='190' y='248' font-size='30' fill='#1d2733' text-anchor='middle'>同じ質問<\/text><text x='190' y='294' font-size='30' fill='#1d2733' text-anchor='middle'>同じ回答<\/text><circle cx='560' cy='190' r='38' fill='#1864ab'/><path d='M494 350 Q494 250 560 250 Q626 250 626 350 Z' fill='#1864ab'/><circle cx='548' cy='190' r='10' fill='none' stroke='#fff' stroke-width='4'/><circle cx='572' cy='190' r='10' fill='none' stroke='#fff' stroke-width='4'/><line x1='558' y1='190' x2='562' y2='190' stroke='#fff' stroke-width='4'/><text x='560' y='126' font-size='34' fill='#1864ab' font-weight='700' text-anchor='middle'>採点する生成 AI<\/text><g data-step='0'><path d='M342 290 L466 290' fill='none' stroke='#1864ab' stroke-width='7' stroke-linejoin='round'/><polygon points='488,290 466,302 466,278' fill='#1864ab'/><text x='415' y='224' font-size='28' fill='#1864ab' font-weight='700' text-anchor='middle'>① 採点<\/text><text x='415' y='258' font-size='28' fill='#1864ab' font-weight='700' text-anchor='middle'>させる<\/text><\/g><g data-step='1'><path d='M632 290 L796 290' fill='none' stroke='#d9480f' stroke-width='7' stroke-linejoin='round'/><polygon points='818,290 796,302 796,278' fill='#d9480f'/><text x='725' y='258' font-size='28' fill='#d9480f' font-weight='700' text-anchor='middle'>② 3回採点<\/text><rect x='820' y='120' width='280' height='240' rx='10' fill='#fff' stroke='#5b6675' stroke-width='4'/><text x='960' y='170' font-size='30' fill='#5b6675' font-weight='700' text-anchor='middle'>採点の結果<\/text><text x='960' y='232' font-size='30' fill='#1d2733' text-anchor='middle'>1回目　4<\/text><text x='960' y='286' font-size='30' fill='#1d2733' text-anchor='middle'>2回目　3<\/text><text x='960' y='340' font-size='30' fill='#1d2733' text-anchor='middle'>3回目　4<\/text><\/g><g data-step='2'><path d='M1258 290 L1124 290' fill='none' stroke='#d9480f' stroke-width='7' stroke-linejoin='round'/><polygon points='1102,290 1124,278 1124,302' fill='#d9480f'/><text x='1180' y='224' font-size='28' fill='#d9480f' font-weight='700' text-anchor='middle'>③ 点数を<\/text><text x='1180' y='258' font-size='28' fill='#d9480f' font-weight='700' text-anchor='middle'>動かす<\/text><rect x='1260' y='60' width='300' height='350' rx='10' fill='#fff' stroke='#d9480f' stroke-width='4'/><text x='1410' y='116' font-size='34' fill='#d9480f' font-weight='700' text-anchor='middle'>ぶれの元<\/text><text x='1410' y='180' font-size='30' fill='#1d2733' text-anchor='middle'>採点のプロンプト<\/text><text x='1410' y='228' font-size='30' fill='#1d2733' text-anchor='middle'>モデルとその版<\/text><text x='1410' y='276' font-size='30' fill='#1d2733' text-anchor='middle'>温度などの設定<\/text><text x='1410' y='324' font-size='30' fill='#1d2733' text-anchor='middle'>回答の長さ<\/text><text x='1410' y='372' font-size='30' fill='#1d2733' text-anchor='middle'>並べる順番<\/text><\/g><g data-step='3'><path d='M960 470 L960 384' fill='none' stroke='#2b8a3e' stroke-width='7' stroke-linejoin='round'/><polygon points='960,362 972,384 948,384' fill='#2b8a3e'/><text x='990' y='428' font-size='28' fill='#2b8a3e' font-weight='700' text-anchor='start'>④ 抑える<\/text><rect x='300' y='470' width='920' height='120' rx='10' fill='#fff' stroke='#2b8a3e' stroke-width='4'/><text x='760' y='520' font-size='30' fill='#2b8a3e' font-weight='700' text-anchor='middle'>同じ設定で何回か採点し、平均と幅を見る<\/text><text x='760' y='562' font-size='26' fill='#5b6675' text-anchor='middle'>質問の数を増やす。一部を人が採点して突き合わせる（p.45）<\/text><\/g><\/svg>", "caption": "点数（4、3、4）は説明用の例。1回の点数で比べず、何回か採点して幅を見てから比べる", "notes": "狙い：生成 AI の採点はぶれる。1回の点数で比べず、何回か採点して幅を見ると言える。\n話すこと：\n・段階0：同じ質問と同じ回答を、生成 AI に採点させる\n・段階1：3回採点させると、点数が回ごとに変わることがある（図は4、3、4の例）。1〜5 の点数では、1点の違いが、ぶれなのか差なのかを見分けにくい。1回の点数だけで、2つの設定のどちらがよいかを決めると、ぶれを差と見誤ることがある\n・段階2：ぶれの元は、採点のプロンプトと点数の基準の言葉、採点に使うモデルとその版、温度などの設定、回答の長さ、並べる順番。並べる順番は、2つを比べるときに、先に出したほうが有利になる「位置の偏り」（Zheng ら、2023、MT-Bench の論文）\n・段階3：抑え方は、同じ設定で何回か採点して平均と幅を見る、質問の数を増やして1問の違いに左右されにくくする、一部を人が採点して生成 AI の点数と突き合わせる（p.45）\n補足：Azure AI Search の検索の点数（BM25、RRF、rerankerScore）も、まったく動かないわけではない。インデックスの更新、レプリカごとの統計の差、同点の並びの不定で、順位や点数がわずかに変わる。セマンティックランカーの点数も、基盤側の条件やモデルの更新で、分布が少し変わる。ぶれが大きいのは、Foundry の評価器や azure-ai-evaluation SDK のように、生成 AI で採点する段。NDCG や再現率（p.42）は、保存した検索結果と正解から計算式で決まる指標なので、同じ結果なら同じ値。ただし検索結果そのものは変わりえるので、比べるときは条件（インデックスの状態、時期）をそろえ、検索結果を保存しておく。評価器には、採点に使うモデルを指定する。モデルを変えると、同じ回答でも点数が変わることがあるので、比べる2つの設定では採点のモデルと版をそろえる。採点のモデル、版、日付を、点数と一緒に残す。点数の理由の文（評価器が返すもの）も残すと、ぶれた理由を後で読める\n注意：図の点数（4、3、4）は説明用の例。検索の点数も、インデックスの更新、レプリカの差、ランカーのモデルの更新で変わり、同点の順位は決まっていない。そのことも添える", "section": "C", "check": [{"ed": "応用", "no": "20", "name": "答えを評価する", "dir": "20-answer-evaluation"}]}, {"id": "p45", "type": "kw", "title": "キャリブレーション", "sub": "採点する側どうしの物差しをそろえる", "cols": [{"title": "一般的な説明", "groups": [{"h": "何をそろえるか", "items": ["人と人、または人と生成 AI が、同じ回答に付ける点数のずれをそろえます。", "点数そのものではなく、点数の基準（何があれば4点か）の言葉をそろえます。", "ずれは、基準がそれぞれの頭の中にあって、言葉になっていないときに起きやすくなります。"]}, {"h": "進め方", "items": ["回答の一部を見本にして、人と生成 AI の両方が採点します。", "点数がずれた例を並べて、どちらの読み方が基準に合うかを話し合います。", "基準の言葉を直し、直した基準で、もう一度採点します。"]}, {"h": "見る数字", "items": ["人と生成 AI の点数がどれだけそろったか（一致した割合や相関）を見ます。", "そろうまで、見本の採点と基準の直しをくり返します。", "そろった後も、文書や質問が変わったら、もう一度見本で確かめます。"]}]}, {"title": "Azure AI Search での説明", "groups": [{"h": "Azure の中の位置", "items": ["Azure AI Search には、キャリブレーションの機能はありません。", "Foundry の評価器の採点の基準は、評価器のプロンプトの中にあります。", "基準を自分の言葉で書きたいときは、カスタムの評価器を作る方法があります。"]}, {"h": "RAG の評価での使い方", "items": ["見本の質問で、人の点数と、評価器（Groundedness、Relevance など）の点数を並べます。", "ずれが大きい質問を読んで、評価器のプロンプトか、正解データ（p.41）を直します。"]}]}], "kicker": "p.45", "notes": "言いたいこと：キャリブレーションは、点数ではなく基準の言葉をそろえる作業です。ずれた例を並べて、基準を直します。", "section": "C", "check": [{"ed": "応用", "no": "20", "name": "答えを評価する", "dir": "20-answer-evaluation"}]}, {"id": "p45d", "type": "diagram", "title": "キャリブレーションは、点数ではなく==基準の言葉をそろえる==作業", "kicker": "p.45", "svg": "<svg viewBox='0 -20 1600 600'><path d='M65 297 H129 L155 323 V413 H65 Z' fill='#fff' stroke='#5b6675' stroke-width='4'/><path d='M129 297 V323 H155' fill='none' stroke='#5b6675' stroke-width='4'/><line x1='79' y1='341' x2='141' y2='341' stroke='#c9d6e6' stroke-width='5'/><line x1='79' y1='359' x2='141' y2='359' stroke='#c9d6e6' stroke-width='5'/><line x1='79' y1='377' x2='141' y2='377' stroke='#c9d6e6' stroke-width='5'/><line x1='79' y1='395' x2='141' y2='395' stroke='#c9d6e6' stroke-width='5'/><text x='110' y='452' font-size='30' fill='#1d2733' font-weight='700' text-anchor='middle'>見本<\/text><text x='110' y='489' font-size='26' fill='#5b6675' text-anchor='middle'>同じ回答の一部<\/text><circle cx='520' cy='130' r='38' fill='#5b6675'/><path d='M454 290 Q454 190 520 190 Q586 190 586 290 Z' fill='#5b6675'/><text x='520' y='78' font-size='34' fill='#5b6675' font-weight='700' text-anchor='middle'>人<\/text><circle cx='520' cy='420' r='38' fill='#1864ab'/><path d='M454 580 Q454 480 520 480 Q586 480 586 580 Z' fill='#1864ab'/><circle cx='508' cy='420' r='10' fill='none' stroke='#fff' stroke-width='4'/><circle cx='532' cy='420' r='10' fill='none' stroke='#fff' stroke-width='4'/><line x1='518' y1='420' x2='522' y2='420' stroke='#fff' stroke-width='4'/><text x='520' y='364' font-size='34' fill='#1864ab' font-weight='700' text-anchor='middle'>生成 AI<\/text><g data-step='0'><path d='M162 325 L450 204' fill='none' stroke='#1864ab' stroke-width='7' stroke-linejoin='round'/><polygon points='470,195 454,215 445,192' fill='#1864ab'/><path d='M162 385 L440 441' fill='none' stroke='#1864ab' stroke-width='7' stroke-linejoin='round'/><polygon points='462,445 438,452 443,429' fill='#1864ab'/><text x='300' y='336' font-size='28' fill='#1864ab' font-weight='700' text-anchor='middle'>① 両方が<\/text><text x='300' y='370' font-size='28' fill='#1864ab' font-weight='700' text-anchor='middle'>採点する<\/text><\/g><g data-step='1'><path d='M592 200 L874 258' fill='none' stroke='#d9480f' stroke-width='7' stroke-linejoin='round'/><polygon points='896,262 872,269 877,246' fill='#d9480f'/><path d='M592 470 L875 360' fill='none' stroke='#d9480f' stroke-width='7' stroke-linejoin='round'/><polygon points='896,352 880,371 871,349' fill='#d9480f'/><text x='750' y='312' font-size='28' fill='#d9480f' font-weight='700' text-anchor='middle'>② 点数を<\/text><text x='750' y='346' font-size='28' fill='#d9480f' font-weight='700' text-anchor='middle'>並べる<\/text><rect x='900' y='215' width='380' height='180' rx='10' fill='#e7f0fa' stroke='#1864ab' stroke-width='4'/><text x='1090' y='268' font-size='34' fill='#1864ab' font-weight='700' text-anchor='middle'>突き合わせる<\/text><text x='1090' y='316' font-size='26' fill='#5b6675' text-anchor='middle'>ずれた例を並べて、<\/text><text x='1090' y='352' font-size='26' fill='#5b6675' text-anchor='middle'>基準の言葉を直す<\/text><\/g><g data-step='2'><path d='M1090 213 L1090 24 L110 24 L110 271' fill='none' stroke='#5b6675' stroke-width='7' stroke-linejoin='round' stroke-dasharray='16 12'/><polygon points='110,293 98,271 122,271' fill='#5b6675'/><text x='830' y='68' font-size='28' fill='#5b6675' font-weight='700' text-anchor='middle'>③ 直した基準で、もう一度採点する<\/text><\/g><g data-step='3'><text x='1430' y='280' font-size='28' fill='#2b8a3e' font-weight='700' text-anchor='middle'>④ そろうまで<\/text><text x='1430' y='314' font-size='28' fill='#2b8a3e' font-weight='700' text-anchor='middle'>くり返す<\/text><text x='1430' y='360' font-size='26' fill='#5b6675' text-anchor='middle'>一致した割合や<\/text><text x='1430' y='396' font-size='26' fill='#5b6675' text-anchor='middle'>相関を見る<\/text><\/g><\/svg>", "caption": "採点者が見本の答案で目線をそろえるのと同じ。見本の答案は回答の一部、採点者は人と生成 AI", "notes": "狙い：キャリブレーションは、点数ではなく基準の言葉をそろえる作業で、ずれた例を並べて基準を直すと言える。\n話すこと：\n・段階0：回答の一部を見本にして、人と生成 AI の両方が、同じ見本を採点する。採点者が見本の答案で目線をそろえるのと同じ\n・段階1：点数がずれた例を並べて、どちらの読み方が基準に合うかを話し合う。そろえるのは点数そのものではなく、基準（何があれば4点か）の言葉。ずれは、基準がそれぞれの頭の中にあって、言葉になっていないときに起きやすい\n・段階2：基準の言葉を直し、直した基準で、もう一度採点する\n・段階3：人と生成 AI の点数がどれだけそろったか（一致した割合や相関）を見る。そろうまで、見本の採点と基準の直しをくり返す。そろった後も、文書や質問が変わったら、もう一度見本で確かめる\n補足：Azure AI Search には、キャリブレーションの機能はない。Foundry の評価器の採点の基準は、評価器のプロンプトの中にある。基準を自分の言葉で書きたいときは、カスタムの評価器を作る方法がある。RAG の評価では、見本の質問で、人の点数と、評価器（Groundedness、Relevance など）の点数を並べ、ずれが大きい質問を読んで、評価器のプロンプトか、正解データ（p.41）を直す\n注意：採点者の目線をそろえる例え話。見本の答案は回答の一部、採点者は人と生成 AI に当たる", "section": "C", "check": [{"ed": "応用", "no": "20", "name": "答えを評価する", "dir": "20-answer-evaluation"}]}]};
+const META = DECK.meta || {};
+
+const E = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
+// 段階の指定は 0 以上の整数だけ（tools/_common.py の is_step と同じ決まり）。正しくない値は 0（最初から見える）として扱う。
+// 正しくない値は tools/build_deck.py が不合格にする
+const isStep = v => typeof v === 'number' && Number.isInteger(v) && v >= 0;
+const stepOf = v => isStep(v) ? v : 0;
+// data-step 属性（文字列）：数字だけの文字列を段階に読む。それ以外は 0
+const attrStep = a => /^[0-9]+$/.test(a == null ? '' : String(a)) ? parseInt(a, 10) : 0;
+const vis = (o, step) => stepOf(o && o.step) <= step;
+const hv = (o, step) => vis(o, step) ? '' : ' hide';
+const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+// 描画中のスライドの links。本文の [[ラベル]] を、同じ label を持つ links の位置に結びつける
+let LINKS = [];
+const linkHtml = lab => {
+  const k = LINKS.findIndex(l => l && l.label === lab);
+  return k < 0 ? lab : `<span class="lnk" data-link="${k}">${lab}</span>`;
+};
+// ==強調（赤。外れ・注意）==、++強調（緑。当たり）++、**太字**、`コード`、[[リンク]]。コードの中の [[ ]] はリンクにしない
+const fmt = s => s == null ? '' : String(s)
+  .replace(/`[^`]*`|\[\[(.+?)\]\]/g, (m, lab) => lab == null ? m : linkHtml(lab))
+  .replace(/==(.+?)==/g, '<span class="em">$1</span>')
+  .replace(/\+\+(.+?)\+\+/g, '<span class="em ok">$1</span>')
+  .replace(/\*\*(.+?)\*\*/g, '<span class="b">$1</span>')
+  .replace(/`([^`]+)`/g, '<code>$1</code>');
+// 題名などをプレイヤーへ渡すときに、飾りの記法を外す（<br> は空白に）
+const plain = s => s == null ? '' : String(s)
+  .replace(/<br\s*\/?>/gi, ' ')
+  .replace(/\[\[(.+?)\]\]/g, '$1')
+  .replace(/==(.+?)==/g, '$1')
+  .replace(/\+\+(.+?)\+\+/g, '$1')
+  .replace(/\*\*(.+?)\*\*/g, '$1')
+  .replace(/`([^`]+)`/g, '$1')
+  .trim();
+
+// スライドの中で使われている step の最大値
+function maxStep(o) {
+  let m = 0;
+  const walk = v => {
+    if (Array.isArray(v)) v.forEach(walk);
+    else if (v && typeof v === 'object') { if (isStep(v.step)) m = Math.max(m, v.step); Object.values(v).forEach(walk); }
+  };
+  walk(o);
+  if (o.type === 'quiz') m = Math.max(m, 1);
+  if (o.type === 'run') m = Math.max(m, stepOf(o.expectStep), stepOf(o.checkStep));
+  if (Array.isArray(o.rowSteps)) o.rowSteps.forEach(x => { m = Math.max(m, stepOf(x)); });
+  // SVG は HTML として読む（= の前後の空白、一重・二重・なしの引用符を、ブラウザの読み方で扱う）
+  if (o.type === 'diagram' && typeof o.svg === 'string') {
+    const t = document.createElement('template');
+    t.innerHTML = o.svg;
+    t.content.querySelectorAll('[data-step]').forEach(e => { m = Math.max(m, attrStep(e.getAttribute('data-step'))); });
+  }
+  return m;
+}
+
+const LEVEL_BADGE = { must: '全員で実行', demo: '進行役が見せる', extra: '発展' };
+const LEVEL_NOTE = { must: '必須（全員で行う）', demo: '進行役が見せる', extra: '発展（時間の合計に入れない）' };
+
+const C = {};
+
+C.agenda = (s, st) => {
+  const w = E('div', 'agenda');
+  s.items.forEach((it, i) => {
+    const d = E('div', 'it' + hv(it, st));
+    d.innerHTML = `<div class="k">${esc(it.k || String.fromCharCode(65 + i))}</div><div><div class="t">${fmt(it.t)}</div>${it.s ? `<div class="s">${fmt(it.s)}</div>` : ''}</div>${it.minutes ? `<div class="m">${it.minutes}分</div>` : ''}`;
+    w.append(d);
+  });
+  return w;
+};
+
+C.points = (s, st) => {
+  const w = E('div', 'points');
+  s.items.forEach((it, i) => {
+    const d = E('div', 'p' + hv(it, st));
+    d.innerHTML = `<div class="dot">${esc(it.k || i + 1)}</div><div>${fmt(it.text)}${it.sub ? `<span class="sub">${fmt(it.sub)}</span>` : ''}</div>`;
+    w.append(d);
+  });
+  return w;
+};
+
+C.compare = (s, st) => {
+  const wrap = E('div', 'cwrap');
+  const w = E('div', 'compare');
+  s.cols.forEach(col => {
+    const c = E('div', 'col ' + (col.tone || '') + hv(col, st));
+    c.append(E('h2', '', fmt(col.title)));
+    (col.rows || []).forEach(r => c.append(E('div', 'row' + hv(r, st), (r.label ? `<span class="lab">${fmt(r.label)}</span>` : '') + fmt(r.text))));
+    w.append(c);
+  });
+  wrap.append(w);
+  if (s.verdict) wrap.append(E('div', 'verdict' + hv(s.verdict, st), fmt(s.verdict.text)));
+  return wrap;
+};
+
+C.flow = (s, st) => {
+  const w = E('div', 'flow');
+  (s.rows || [{ nodes: s.nodes, arrows: s.arrows }]).forEach(r => {
+    const row = E('div', 'flow-row' + hv(r, st));
+    if (r.label) row.append(E('div', 'rl', fmt(r.label)));
+    r.nodes.forEach((n, i) => {
+      if (i > 0) { const a = (r.arrows || [])[i - 1] || {}; row.append(E('div', 'arrow' + hv(a, st), `<div class="ar">${a.down ? '↓' : '→'}</div><div class="at">${fmt(a.text || '')}</div>`)); }
+      const d = E('div', 'node ' + (n.tone || '') + hv(n, st), `${n.badge ? `<div class="badge">${esc(n.badge)}</div>` : ''}<div class="t">${fmt(n.t)}</div>${n.s ? `<div class="s">${fmt(n.s)}</div>` : ''}`);
+      if (n.grow) d.style.flex = n.grow;
+      row.append(d);
+    });
+    w.append(row);
+  });
+  (s.banners || []).forEach(b => w.append(E('div', 'banner ' + (b.tone || '') + hv(b, st), fmt(b.text))));
+  return w;
+};
+
+C.diagram = (s, st) => {
+  const w = E('div', 'diagram');
+  const box = E('div', '', s.svg);
+  box.style.width = '100%'; box.style.flex = '1'; box.style.minHeight = '0'; box.style.display = 'flex';
+  box.querySelectorAll('[data-step]').forEach(el => { if (attrStep(el.getAttribute('data-step')) > st) el.style.visibility = 'hidden'; });
+  w.append(box);
+  if (s.caption) w.append(E('div', 'cap', fmt(s.caption)));
+  return w;
+};
+
+C.code = (s, st) => {
+  const w = E('div', 'code');
+  w.append(E('div', 'file', esc(s.file || '') + (s.lang ? `　<span style="opacity:.6">${esc(s.lang)}</span>` : '')));
+  const pre = E('pre');
+  const start = s.start || 1;
+  const hls = (s.highlight || []).filter(h => vis(h, st));
+  const cur = hls.length ? hls[hls.length - 1] : null;
+  s.lines.forEach((l, i) => {
+    const n = start + i;
+    const on = cur && n >= cur.from && n <= cur.to;
+    pre.append(E('span', 'ln' + (on ? ' hl' : (cur && s.dimOthers !== false ? ' dim' : '')), `<span class="no">${n}</span>${esc(l)}`));
+  });
+  w.append(pre);
+  return w;
+};
+
+C.table = (s, st) => {
+  const t = E('table', 'tb');
+  const hl = new Set((s.highlight || []).filter(h => vis(h, st)).map(h => h.row));
+  t.innerHTML = `<tr>${s.head.map((h, i) => `<th${s.colW ? ` style="width:${s.colW[i]}"` : ''}>${fmt(h)}</th>`).join('')}</tr>` +
+    s.rows.map((r, i) => { const step = stepOf((s.rowSteps || [])[i]); return `<tr class="${hl.has(i) ? 'hl' : ''}${step > st ? ' hide' : ''}">${r.map(c => `<td>${fmt(c)}</td>`).join('')}</tr>`; }).join('');
+  const w = E('div', ''); w.style.width = '100%'; w.append(t);
+  return w;
+};
+
+C.stat = (s, st) => {
+  const w = E('div', 'stat');
+  s.items.forEach(it => w.append(E('div', 'it ' + (it.tone || '') + hv(it, st), `<div class="v">${fmt(it.value)}</div><div class="l">${fmt(it.label)}</div>${it.sub ? `<div class="s">${fmt(it.sub)}</div>` : ''}`)));
+  return w;
+};
+
+C.bars = (s, st) => {
+  const w = E('div', 'bars');
+  const area = E('div', 'area'), labels = E('div', 'labels');
+  const max = s.max || Math.max(...s.items.map(i => i.value));
+  s.items.forEach(it => {
+    const ratio = s.invert ? (max - it.value + 1) / max : it.value / max;
+    const b = E('div', 'bar ' + (it.tone || '') + hv(it, st));
+    b.innerHTML = `<div class="val">${fmt(it.display || it.value)}</div><div class="col" style="height:${Math.max(4, ratio * 78)}%"></div>`;
+    area.append(b);
+    labels.append(E('div', hv(it, st).trim(), `${fmt(it.label)}${it.sub ? `<small>${fmt(it.sub)}</small>` : ''}`));
+  });
+  w.append(area, labels);
+  return w;
+};
+
+C.quote = (s, st) => {
+  const w = E('div', 'quote');
+  w.append(E('div', 'q', fmt(s.text)), E('div', 'by', fmt(s.by || '')));
+  return w;
+};
+
+C.quiz = (s, st) => {
+  const w = E('div', 'quiz');
+  w.append(E('div', 'qq', fmt(s.question)));
+  const chs = E('div', 'chs');
+  (s.choices || []).forEach((c, i) => chs.append(E('div', 'ch' + (st >= 1 && i === s.answer ? ' right' : ''), `<span class="k">${'ABCD'[i]}</span>${fmt(c)}`)));
+  w.append(chs);
+  w.append(E('div', 'ex' + (st >= 1 ? '' : ' hide'), fmt(s.explain)));
+  return w;
+};
+
+C.steps = (s, st) => {
+  const w = E('div', 'stepl');
+  s.items.forEach((it, i) => w.append(E('div', 'it' + hv(it, st), `<div class="n">${esc(it.n || i + 1)}</div><div><div class="t">${fmt(it.t)}</div>${it.s ? `<div class="s">${fmt(it.s)}</div>` : ''}</div>${it.cmd ? `<div class="cmd">${esc(it.cmd)}</div>` : ''}`)));
+  if (s.foot) w.append(E('div', 'foot', fmt(s.foot)));   // 小さな注（1行）
+  return w;
+};
+
+C.recap = (s, st) => {
+  const w = E('div', 'recap');
+  s.items.forEach(it => w.append(E('div', 'p' + hv(it, st), `<div>${fmt(it.text)}</div>`)));
+  if (s.next) w.append(E('div', 'next' + hv(s.next, st), fmt(s.next.text)));
+  return w;
+};
+
+// ---- ハンズオン資料で足した部品 ----
+// kw：キーワードのページ。cols: [{title, groups: [{h, items: [文字列]}]}]、sub（サブタイトル）。文字はあとで fitKw が枠に収まる大きさに縮める
+C.kw = (s, st) => {
+  const w = E('div', 'kw');
+  if (s.sub) w.append(E('div', 'ksub', fmt(s.sub)));
+  const cols = E('div', 'kcols kfit');
+  (s.cols || []).forEach(col => {
+    const c = E('div', 'kcol');
+    c.append(E('h2', '', fmt(col.title)));
+    (col.groups || []).forEach(g => {
+      if (g.h) c.append(E('h3', '', fmt(g.h)));
+      if ((g.items || []).length) c.append(E('ul', '', g.items.map(t => `<li>${fmt(t)}</li>`).join('')));
+    });
+    cols.append(c);
+  });
+  w.append(cols);
+  return w;
+};
+
+// kw の段組みを、どちらの段もはみ出さない文字の大きさに縮める（26px から 17px まで）
+function fitKw(stage) {
+  stage.querySelectorAll('.kfit').forEach(box => {
+    const cols = [...box.querySelectorAll('.kcol')];
+    const over = () => cols.some(c => c.scrollHeight > c.clientHeight + 1);
+    let fs = 26;
+    box.style.fontSize = fs + 'px';
+    while (fs > 17 && over()) { fs -= 1; box.style.fontSize = fs + 'px'; }
+  });
+}
+
+// 「確かめる」の欄：s.check は [{ed, no, name, dir}]、s.checkNote は補足
+const chkHtml = s => `<span class="ck">確かめる</span>` +
+  s.check.map(c => {
+    // トピックが2つ以上並ぶときは、フォルダ名を省いて1行に収める
+    const inner = `<b>${esc(c.ed)} ${esc(c.no)}</b>${esc(c.name)}` + (s.check.length > 1 ? '' : `<code>${esc(c.dir)}</code>`);
+    return `<span class="tp">${inner}</span>`;
+  }).join('<span class="nt">／</span>') +
+  (s.checkNote ? `<span class="nt">（${esc(s.checkNote)}）</span>` : '');
+
+// ---- 操作のページ（run）と、実測の出力のページ（output）----
+const termHead = (label, right) => `<div class="thead"><span class="dots"><i></i><i></i><i></i></span><span class="tl">${label}</span>${right ? `<span class="tr">${right}</span>` : ''}</div>`;
+// 行が少ないときは字を大きくする（8行まで 32px、11行まで 28px、それより多いと 24px）。build_deck.py の幅の見積もりも同じ
+const termSize = n => n <= 8 ? ' fs-l' : n <= 11 ? ' fs-m' : '';
+const termLines = (lines, cls) => lines.map((l, i) => `<span class="ln${cls ? cls(i + 1) : ''}">${esc(l) || '&nbsp;'}</span>`).join('');
+
+C.run = (s, st) => {
+  const w = E('div', 'run');
+  const card = E('div', 'cmdcard');
+  card.append(E('div', 'rhead', `<span class="rfile">${esc(s.file || '')}</span>${s.level ? `<span class="lvl ${esc(s.level)}">${esc(LEVEL_BADGE[s.level] || s.level)}</span>` : ''}`));
+  // where：そのフォルダで最初に打つコマンドの上に、うす字で場所と移り方を出す
+  if (s.where) card.append(E('div', 'rwhere', fmt(s.where)));
+  card.append(E('div', 'rcmd', `<span class="ps">${esc(s.prompt || 'PS>')}</span><span class="ctext" data-link="${(s.links || []).length}">${esc(s.cmd || '')}</span>`));
+  w.append(card);
+  w.append(E('div', 'term' + hv({ step: s.expectStep }, st), termHead('実行すると、こう表示される（一部）') + `<pre class="${termSize((s.expect || []).length).trim()}">${termLines(s.expect || [])}</pre>`));
+  w.append(E('div', 'rcheck' + hv({ step: s.checkStep }, st), `<span class="rk">確かめること</span>${fmt(s.check)}`));
+  return w;
+};
+
+C.output = (s, st) => {
+  const w = E('div', 'term outp');
+  // 光る行：いま見えている highlight のうち、いちばん新しい段階のものだけ。ほかの行は暗くする
+  const hls = (s.highlight || []).filter(h => vis(h, st));
+  const top = hls.length ? Math.max(...hls.map(h => stepOf(h.step))) : -1;
+  const on = new Set(hls.filter(h => stepOf(h.step) === top).map(h => h.line));
+  w.innerHTML = termHead('実行すると、こう表示される', s.measure ? `実測の記録：${esc(s.measure)}` : '') +
+    `<pre class="${termSize((s.lines || []).length).trim()}">${termLines(s.lines || [], n => on.has(n) ? ' hl' : (hls.length ? ' dim' : ''))}</pre>` +
+    `<div class="tcap">${fmt(s.caption)}</div>`;
+  return w;
+};
+
+// ノートに出す文字列：時間・区分・出典を先頭に、そのあとに notes
+function noteText(s) {
+  const t = [];
+  if (s.minutes != null) t.push(`話す ${s.minutes} 分`);
+  if (s.opMinutes != null) t.push(`操作 ${s.opMinutes} 分`);
+  if (s.level) t.push(LEVEL_NOTE[s.level] || s.level);
+  if (s.ref) t.push(plain(s.ref));
+  return (t.length ? t.join('　') + '\n\n' : '') + (s.notes || '（ノートなし）');
+}
+
+// プレイヤーへ渡すリンク。run は、コマンドを写す copy リンクを最後に自動で足す（番号は links の長さ。作者の links の番号は変わらない）
+const slideLinks = s => {
+  const base = s.links || [];
+  return s.type === 'run' && typeof s.cmd === 'string' && s.cmd ? base.concat([{ label: 'コマンド', kind: 'copy', text: s.cmd }]) : base;
+};
+
+// メインの舞台以外に描いたとき、描いた中の id と、その参照（url(#id)、href="#id"）に描画先ごとの接尾辞を付ける（CONTRACT §2.5）。
+// 新しい中身は SVG に id を使わない（build_deck.py が不合格にする）ので、ふだんは何もしない。念のための処理
+let TARGET_SEQ = 0;
+const TARGET_NO = new WeakMap();
+function suffixIds(target) {
+  const els = target.querySelectorAll('[id]');
+  if (!els.length) return;
+  if (!TARGET_NO.has(target)) TARGET_NO.set(target, ++TARGET_SEQ);
+  const suf = `-t${TARGET_NO.get(target)}`;
+  const ids = new Set([...els].map(e => e.id));
+  els.forEach(e => { e.id = e.id + suf; });
+  const fix = v => v
+    .replace(/url\(\s*(['"]?)#([^)'"\s]+)\1\s*\)/g, (m, q, id) => ids.has(id) ? `url(${q}#${id}${suf}${q})` : m)
+    .replace(/^#([^\s]+)$/, (m, id) => ids.has(id) ? `#${id}${suf}` : m);
+  target.querySelectorAll('*').forEach(e => {
+    for (const a of [...e.attributes]) {
+      if (a.name === 'id' || !a.value.includes('#')) continue;
+      const nv = fix(a.value);
+      if (nv !== a.value) e.setAttribute(a.name, nv);
+    }
+  });
+}
+
+const sectionTitle = id => { const x = (META.sections || []).find(s => s.id === id); return x ? `${x.id}　${x.title}` : ''; };
+
+function draw(i, st, stage) {
+  const s = DECK.slides[i];
+  stage.replaceChildren();
+  stage.style.setProperty('--accent', META.accent || '#0b6bcb');
+  if (META.accentSoft) stage.style.setProperty('--accent-soft', META.accentSoft); else stage.style.removeProperty('--accent-soft');
+  if (s.type === 'cover') {
+    const c = E('div', 'cover');
+    c.innerHTML = `<div class="lab">${fmt(s.label || '')}</div><h1>${fmt(s.title)}</h1><div class="lead">${fmt(s.lead || '')}</div><div class="meta">${(s.meta || []).map(m => `<div>${fmt(m)}</div>`).join('')}</div>`;
+    stage.append(c);
+    return;
+  }
+  if (s.type === 'section') {
+    const c = E('div', 'sectionpg');
+    c.innerHTML = `<div class="no">${esc(s.no || '')}</div><div><h1>${fmt(s.title)}</h1><div class="lead">${fmt(s.lead || '')}</div>${s.minutesLabel ? `<div class="mins">${fmt(s.minutesLabel)}</div>` : ''}</div>`;
+    stage.append(c);
+  } else {
+    if (!C[s.type]) throw new Error(`未知の type: ${s.type}（${s.id}）`);
+    const h = E('header');
+    h.innerHTML = `<div class="kick"><span class="chip">${fmt(META.short || '')}</span><span>${fmt(s.kicker || sectionTitle(s.section) || '')}</span><span class="ref">${fmt(s.ref || '')}</span></div><h1>${fmt(s.title)}</h1>`;
+    stage.append(h);
+    const callouts = s.callouts || [];
+    const hasChk = Array.isArray(s.check) && s.check.length > 0;
+    const m = E('main', (s.layout === 'below' ? 'below' : '') + (hasChk ? ' withchk' : '') + (s.source ? ' withsrc' : ''));
+    const v = E('div', 'visual');
+    v.append(C[s.type](s, st));
+    m.append(v);
+    if (callouts.length) {
+      const side = E('div', 'side');
+      // items があれば、体言止めの箇条として出す（折り返しても字下げがそろう）
+      callouts.forEach(c => side.append(E('div', 'call ' + (c.tone || '') + hv(c, st), (c.title ? `<div class="ct">${fmt(c.title)}</div>` : '') +
+        (c.items ? `<ul class="cl">${c.items.map(x => `<li>${fmt(x)}</li>`).join('')}</ul>` : fmt(c.text)))));
+      m.append(side);
+    }
+    stage.append(m);
+    // source：出典をうす字で小さく（「確かめる」の行の上）
+    if (s.source) stage.append(E('div', 'srcnote' + (hasChk ? ' withchk' : ''), '出典：' + fmt(s.source)));
+    if (hasChk) stage.append(E('div', 'chkbar', chkHtml(s)));
+    fitKw(stage);
+  }
+  const f = E('footer');
+  const secs = META.sections || [];
+  const ci = secs.findIndex(x => x.id === s.section);
+  secs.forEach((x, k) => f.append(E('div', 'sec' + (k === ci ? ' on' : k < ci ? ' done' : ''), `${esc(x.id)}　${fmt(x.title)}`)));
+  f.append(E('div', 'pg', `${i + 1} / ${DECK.slides.length}`));
+  stage.append(f);
+}
+
+const steps = DECK.slides.map(maxStep);
+
+// render(ref, step, target)：ref は 0 から数えた位置か id。target を省くと #stage
+function render(ref, step, target) {
+  const i = typeof ref === 'number' ? ref : DECK.slides.findIndex(x => x.id === ref);
+  if (!Number.isInteger(i) || i < 0 || i >= DECK.slides.length) throw new Error(`render: スライドがない（${ref}）`);
+  const stage = target || document.getElementById('stage');
+  stage.classList.add('sp-target');
+  const st = Math.max(0, Math.min(steps[i], step | 0));
+  LINKS = slideLinks(DECK.slides[i]);
+  try { draw(i, st, stage); } finally { LINKS = []; }
+  if (stage !== document.getElementById('stage')) suffixIds(stage);
+}
+
+const deckId = META.id || `s-${String(META.session || 0).padStart(2, '0')}`;
+window.slideDeck = {
+  contract: 1,
+  info: {
+    id: deckId,
+    title: plain(META.title),
+    label: plain(META.short),
+    home: META.home || '../index.html',
+    color: META.accent,
+    sections: (META.sections || []).map(x => ({ id: x.id, title: plain(x.title) })),
+    slides: DECK.slides.map((s, i) => ({
+      id: s.id, title: plain(s.title), section: s.section, steps: steps[i],
+      notes: noteText(s), minutes: s.minutes, links: slideLinks(s)
+    }))
+  },
+  render
+};
+// 動画づくり（tools/build_deck.py --check、tools/build_video.py）が使う。?render のときも通常のときも同じ名前で残す
+window.renderSlide = (i, st) => render(i, st);
+window.deckInfo = () => DECK.slides.map((s, i) => ({ id: s.id, steps: steps[i] }));
+if (new URLSearchParams(location.search).has('render')) document.body.classList.add('render');
+</script>
+<script src="../player.js"></script>
+</body>
+</html>

@@ -1,0 +1,637 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>はじめに：研修の進め方</title>
+<style>
+/* 描画先（舞台）。メインの舞台 #stage のほか、縮小一覧などの描画先にも class sp-target が付く。
+   中身の CSS はすべて .sp-target の中だけに効くように書く（CONTRACT §2.5） */
+.sp-target {
+  position: relative; width: 1920px; height: 1080px; overflow: hidden; background: var(--bg);
+  font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif; color: var(--ink);
+  --accent: #0b6bcb; --accent-soft: #e3effb; --ink: #1d2733; --sub: #5b6675; --line: #d3dae3;
+  --bg: #f5f7fa; --card: #ffffff; --warn: #d9480f; --warn-soft: #fff1e6; --ok: #2b8a3e; --ok-soft: #e6f4ea;
+  --gray-soft: #eef1f5; --code-bg: #0f1720;
+}
+@supports (color: color-mix(in srgb, red, blue)) {
+  .sp-target { --accent-soft: color-mix(in srgb, var(--accent) 12%, #fff); }
+}
+.sp-target, .sp-target * { box-sizing: border-box; }
+
+.sp-target .hide { visibility: hidden; }
+.sp-target .em { color: var(--warn); font-weight: 700; }
+.sp-target .em.ok { color: var(--ok); }   /* ++…++：当たり・うまくいく（==…== は外れ・注意の赤） */
+.sp-target .b { font-weight: 700; }
+.sp-target code, .sp-target .mono { font-family: Menlo, Consolas, monospace; }
+/* frame */
+.sp-target header { position: absolute; left: 0; right: 0; top: 0; height: 150px; padding: 26px 64px 0; background: #fff; border-bottom: 2px solid var(--line); }
+.sp-target header .kick { display: flex; gap: 16px; align-items: center; font-size: 24px; color: var(--sub); }
+.sp-target header .chip { background: var(--accent); color: #fff; font-weight: 700; border-radius: 8px; padding: 4px 14px; }
+.sp-target header .ref { margin-left: auto; font-size: 22px; color: var(--sub); }
+.sp-target header h1 { margin: 10px 0 0; font-size: 44px; line-height: 1.25; font-weight: 800; letter-spacing: .01em; }
+.sp-target main { position: absolute; left: 64px; right: 64px; top: 182px; bottom: 92px; display: flex; gap: 40px; }
+.sp-target main.below { flex-direction: column; gap: 24px; }
+.sp-target .visual { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center; }
+.sp-target main.below .visual { flex: 1; min-height: 0; }
+.sp-target .side { flex: 0 0 520px; display: flex; flex-direction: column; justify-content: center; gap: 20px; }
+.sp-target main.below .side { flex: 0 0 auto; flex-direction: row; }
+.sp-target main.below .side .call { flex: 1; }
+.sp-target .call { background: #fff; border-left: 8px solid var(--accent); border-radius: 10px; padding: 18px 24px; font-size: 28px; line-height: 1.5; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+.sp-target .call.warn { border-left-color: var(--warn); }
+.sp-target .call.ok { border-left-color: var(--ok); }
+.sp-target .call ul.cl { margin: 0; padding-left: 1.1em; font-size: 25px; line-height: 1.45; }
+.sp-target .call ul.cl li { margin: 4px 0; }
+.sp-target .call .ct { font-size: 22px; font-weight: 700; color: var(--sub); margin-bottom: 4px; }
+.sp-target footer { position: absolute; left: 0; right: 0; bottom: 0; height: 70px; padding: 0 64px; display: flex; align-items: center; gap: 10px; background: #fff; border-top: 2px solid var(--line); }
+.sp-target footer .sec { flex: 1; text-align: center; font-size: 20px; padding: 8px 4px; border-radius: 6px; background: var(--gray-soft); color: #8a94a3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sp-target footer .sec.done { background: var(--accent-soft); color: var(--accent); }
+.sp-target footer .sec.on { background: var(--accent); color: #fff; font-weight: 700; }
+.sp-target footer .pg { flex: 0 0 110px; text-align: right; font-size: 22px; color: var(--sub); }
+/* cover / section */
+.sp-target .cover { position: absolute; inset: 0; background: var(--accent); color: #fff; padding: 150px 140px; display: flex; flex-direction: column; }
+.sp-target .cover .lab { font-size: 34px; opacity: .85; }
+.sp-target .cover h1 { font-size: 92px; margin: 24px 0 18px; line-height: 1.15; font-weight: 800; }
+.sp-target .cover .lead { font-size: 38px; opacity: .92; line-height: 1.5; }
+.sp-target .cover .meta { margin-top: auto; display: flex; gap: 48px; font-size: 28px; opacity: .85; }
+.sp-target .sectionpg { position: absolute; inset: 0; background: #fff; display: flex; align-items: center; padding: 0 160px; gap: 70px; }
+.sp-target .sectionpg .no { font-size: 240px; font-weight: 800; color: var(--accent); line-height: 1; }
+.sp-target .sectionpg h1 { font-size: 72px; margin: 0 0 22px; }
+.sp-target .sectionpg .lead { font-size: 34px; color: var(--sub); line-height: 1.55; }
+.sp-target .sectionpg .mins { margin-top: 24px; font-size: 26px; color: var(--accent); }
+/* agenda */
+.sp-target .agenda { width: 100%; display: flex; flex-direction: column; gap: 16px; }
+.sp-target .agenda .it { display: flex; align-items: center; gap: 28px; background: #fff; border-radius: 12px; padding: 20px 30px; border: 2px solid var(--line); }
+.sp-target .agenda .it .k { font-size: 40px; font-weight: 800; color: var(--accent); width: 60px; text-align: center; }
+.sp-target .agenda .it .t { font-size: 34px; font-weight: 700; }
+.sp-target .agenda .it .s { font-size: 24px; color: var(--sub); margin-top: 4px; }
+.sp-target .agenda .it .m { margin-left: auto; font-size: 26px; color: var(--sub); white-space: nowrap; }
+/* points */
+.sp-target .points { width: 100%; display: flex; flex-direction: column; gap: 22px; }
+.sp-target .points .p { background: #fff; border-radius: 12px; padding: 22px 30px; font-size: 34px; line-height: 1.45; display: flex; gap: 22px; align-items: flex-start; box-shadow: 0 1px 3px rgba(0,0,0,.05); }
+.sp-target .points .p .dot { flex: 0 0 auto; width: 46px; height: 46px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 24px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin-top: 2px; }
+.sp-target .points .p .sub { display: block; font-size: 26px; color: var(--sub); margin-top: 6px; }
+/* compare */
+.sp-target .compare { width: 100%; height: 100%; display: flex; gap: 28px; align-items: stretch; }
+.sp-target .compare .col { flex: 1; background: #fff; border-radius: 14px; border: 3px solid var(--line); padding: 24px 28px; display: flex; flex-direction: column; gap: 14px; }
+.sp-target .compare .col.accent { border-color: var(--accent); }
+.sp-target .compare .col.warn { border-color: var(--warn); }
+.sp-target .compare .col.ok { border-color: var(--ok); }
+.sp-target .compare .col h2 { margin: 0 0 6px; font-size: 36px; }
+.sp-target .compare .col.accent h2 { color: var(--accent); }
+.sp-target .compare .col.warn h2 { color: var(--warn); }
+.sp-target .compare .row { background: var(--gray-soft); border-radius: 10px; padding: 14px 18px; font-size: 29px; line-height: 1.45; }
+.sp-target .compare .row .lab { display: block; font-size: 21px; color: var(--sub); font-weight: 700; margin-bottom: 2px; }
+.sp-target .cwrap { width: 100%; height: 100%; display: flex; flex-direction: column; gap: 20px; }
+.sp-target .verdict { background: var(--warn-soft); color: var(--warn); border-radius: 10px; padding: 16px 24px; font-size: 30px; font-weight: 700; text-align: center; }
+/* flow */
+.sp-target .flow { width: 100%; display: flex; flex-direction: column; gap: 30px; }
+.sp-target .flow-row { display: flex; align-items: center; gap: 12px; }
+.sp-target .flow-row .rl { flex: 0 0 150px; font-size: 24px; font-weight: 700; color: var(--accent); text-align: center; }
+.sp-target .node { position: relative; flex: 1; min-width: 0; background: #fff; border: 3px solid var(--line); border-radius: 14px; padding: 18px 14px; text-align: center; }
+.sp-target .node.accent { border-color: var(--accent); background: var(--accent-soft); }
+.sp-target .node.warn { border-color: var(--warn); background: var(--warn-soft); }
+.sp-target .node.ok { border-color: var(--ok); background: var(--ok-soft); }
+.sp-target .node.dim { border-style: dashed; background: var(--gray-soft); color: var(--sub); }
+.sp-target .node .t { font-size: 29px; font-weight: 700; line-height: 1.3; }
+.sp-target .node .s { font-size: 22px; color: var(--sub); margin-top: 6px; line-height: 1.4; }
+.sp-target .node .badge { position: absolute; left: -14px; top: -14px; width: 40px; height: 40px; border-radius: 50%; background: var(--warn); color: #fff; font-size: 21px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.sp-target .arrow { flex: 0 0 auto; text-align: center; color: var(--accent); min-width: 56px; max-width: 150px; }
+.sp-target .arrow .ar { font-size: 40px; line-height: 1; }
+.sp-target .arrow .at { font-size: 19px; line-height: 1.3; color: var(--sub); }
+.sp-target .banner { background: var(--warn-soft); color: var(--warn); border-radius: 10px; padding: 16px 24px; font-size: 29px; font-weight: 700; text-align: center; }
+.sp-target .banner.info { background: var(--accent-soft); color: var(--accent); }
+/* diagram */
+.sp-target .diagram { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; }
+.sp-target .diagram svg { width: 100%; height: 100%; max-height: 100%; }
+.sp-target .diagram svg text { font-family: "Hiragino Sans", sans-serif; }
+.sp-target .diagram .cap { font-size: 22px; color: var(--sub); }
+/* code */
+.sp-target .code { width: 100%; height: 100%; display: flex; flex-direction: column; }
+.sp-target .code .file { background: #2a3442; color: #cbd5e1; font-size: 22px; padding: 10px 20px; border-radius: 12px 12px 0 0; font-family: Menlo, monospace; }
+.sp-target .code pre { margin: 0; flex: 1; background: var(--code-bg); color: #e6edf3; border-radius: 0 0 12px 12px; padding: 16px 0; font-size: 23px; line-height: 1.5; overflow: hidden; font-family: Menlo, Consolas, monospace; }
+.sp-target .code .ln { display: block; padding: 0 20px; white-space: pre; }
+.sp-target .code .ln .no { display: inline-block; width: 52px; color: #5f6b7a; text-align: right; margin-right: 18px; }
+.sp-target .code .ln.hl { background: rgba(255, 180, 60, .22); box-shadow: inset 6px 0 0 #ffb43c; }
+.sp-target .code .ln.dim { opacity: .38; }
+/* table */
+.sp-target table.tb { width: 100%; border-collapse: separate; border-spacing: 0; background: #fff; border-radius: 12px; overflow: hidden; border: 2px solid var(--line); }
+.sp-target table.tb th { background: var(--accent); color: #fff; font-size: 25px; text-align: left; padding: 14px 18px; }
+.sp-target table.tb td { font-size: 26px; padding: 13px 18px; border-top: 1px solid var(--line); line-height: 1.4; vertical-align: top; }
+.sp-target table.tb tr.hl td { background: var(--warn-soft); }
+.sp-target table.tb tr.hl td:first-child { box-shadow: inset 6px 0 0 var(--warn); }
+/* stat */
+.sp-target .stat { width: 100%; display: flex; gap: 28px; }
+.sp-target .stat .it { flex: 1; background: #fff; border-radius: 16px; padding: 34px 24px; text-align: center; border: 3px solid var(--line); }
+.sp-target .stat .it.accent { border-color: var(--accent); }
+.sp-target .stat .v { font-size: 92px; font-weight: 800; color: var(--accent); line-height: 1.05; }
+.sp-target .stat .it.warn .v { color: var(--warn); }
+.sp-target .stat .l { font-size: 30px; font-weight: 700; margin-top: 12px; }
+.sp-target .stat .s { font-size: 23px; color: var(--sub); margin-top: 8px; line-height: 1.4; }
+/* bars */
+.sp-target .bars { width: 100%; height: 100%; display: flex; flex-direction: column; }
+.sp-target .bars .area { flex: 1; display: flex; align-items: flex-end; gap: 40px; padding: 0 30px; border-bottom: 3px solid var(--line); }
+.sp-target .bars .bar { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; }
+.sp-target .bars .bar .val { font-size: 52px; font-weight: 800; color: var(--accent); margin-bottom: 8px; }
+.sp-target .bars .bar.warn .val { color: var(--warn); }
+.sp-target .bars .bar .col { width: 70%; background: var(--accent); border-radius: 10px 10px 0 0; }
+.sp-target .bars .bar.warn .col { background: var(--warn); }
+.sp-target .bars .bar.dim .col { background: #b8c2cf; }
+.sp-target .bars .labels { display: flex; gap: 40px; padding: 12px 30px 0; }
+.sp-target .bars .labels div { flex: 1; text-align: center; font-size: 26px; font-weight: 700; }
+.sp-target .bars .labels div small { display: block; font-size: 21px; font-weight: 400; color: var(--sub); }
+/* quote */
+.sp-target .quote { max-width: 1400px; text-align: center; }
+.sp-target .quote .q { font-size: 56px; font-weight: 700; line-height: 1.45; }
+.sp-target .quote .q::before { content: "“"; color: var(--accent); margin-right: 8px; }
+.sp-target .quote .q::after { content: "”"; color: var(--accent); margin-left: 8px; }
+.sp-target .quote .by { margin-top: 30px; font-size: 28px; color: var(--sub); }
+/* quiz */
+.sp-target .quiz { width: 100%; display: flex; flex-direction: column; gap: 22px; }
+.sp-target .quiz .qq { font-size: 40px; font-weight: 800; line-height: 1.4; }
+.sp-target .quiz .qq::before { content: "Q. "; color: var(--accent); }
+.sp-target .quiz .chs { display: flex; flex-direction: column; gap: 14px; }
+.sp-target .quiz .ch { background: #fff; border: 3px solid var(--line); border-radius: 12px; padding: 16px 24px; font-size: 31px; }
+.sp-target .quiz .ch.right { border-color: var(--ok); background: var(--ok-soft); font-weight: 700; }
+.sp-target .quiz .ch .k { color: var(--accent); font-weight: 800; margin-right: 14px; }
+.sp-target .quiz .ex { background: var(--accent-soft); border-radius: 12px; padding: 18px 24px; font-size: 29px; line-height: 1.5; }
+.sp-target .quiz .ex::before { content: "答え  "; font-weight: 800; color: var(--accent); }
+/* steps */
+.sp-target .stepl { width: 100%; display: flex; flex-direction: column; gap: 14px; }
+.sp-target .stepl .it { display: flex; gap: 22px; align-items: center; background: #fff; border-radius: 12px; padding: 14px 22px; border: 2px solid var(--line); }
+.sp-target .stepl .it .n { flex: 0 0 56px; height: 56px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 28px; font-weight: 800; display: flex; align-items: center; justify-content: center; }
+.sp-target .stepl .it .t { font-size: 29px; font-weight: 700; }
+.sp-target .stepl .it .s { font-size: 22px; color: var(--sub); margin-top: 2px; }
+.sp-target .stepl .foot { font-size: 21px; color: var(--sub); padding: 2px 6px; }
+.sp-target .stepl .it .cmd { margin-left: auto; font-family: Menlo, monospace; font-size: 23px; background: var(--code-bg); color: #e6edf3; padding: 8px 14px; border-radius: 8px; white-space: nowrap; }
+/* recap */
+.sp-target .recap { width: 100%; display: flex; flex-direction: column; gap: 18px; }
+.sp-target .recap .p { display: flex; gap: 20px; align-items: flex-start; font-size: 34px; line-height: 1.45; background: #fff; border-radius: 12px; padding: 20px 28px; }
+.sp-target .recap .p::before { content: "✓"; color: var(--ok); font-weight: 800; }
+.sp-target .recap .next { margin-top: 10px; font-size: 30px; color: var(--sub); padding: 0 6px; }
+.sp-target .recap .next b { color: var(--accent); }
+
+/* run（操作）と output（実測の出力） */
+.sp-target .run { width: 100%; max-height: 100%; display: flex; flex-direction: column; gap: 20px; }
+.sp-target .cmdcard { flex: 0 0 auto; background: var(--code-bg); border-radius: 14px; overflow: hidden; }
+.sp-target .cmdcard .rhead { display: flex; align-items: center; gap: 16px; background: #2a3442; color: #cbd5e1; font-size: 22px; padding: 10px 20px; font-family: Menlo, Consolas, monospace; }
+.sp-target .cmdcard .rhead .rfile { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sp-target .lvl { margin-left: auto; flex: 0 0 auto; font-family: "Hiragino Sans", "Meiryo", sans-serif; font-size: 21px; font-weight: 700; line-height: 1.4; border-radius: 999px; padding: 2px 16px; white-space: nowrap; }
+.sp-target .lvl.must { background: #2f9e44; color: #fff; }
+.sp-target .lvl.demo { background: #ffb43c; color: #1d2733; }
+.sp-target .lvl.extra { border: 2px dashed #94a3b8; color: #cbd5e1; padding: 0 14px; }
+.sp-target .cmdcard .rcmd { padding: 26px 30px 30px; color: #fff; font-family: Menlo, Consolas, monospace; font-size: 38px; line-height: 1.35; white-space: pre-wrap; word-break: break-all; }
+.sp-target .cmdcard .rcmd .ps { color: #7dd3a8; margin-right: 20px; }
+.sp-target .term { flex: 0 1 auto; min-height: 0; width: 100%; display: flex; flex-direction: column; background: #0b1118; border-radius: 14px; overflow: hidden; }
+.sp-target .term .thead { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; background: #2a3442; color: #cbd5e1; font-size: 21px; padding: 10px 20px; }
+.sp-target .term .thead .dots i { display: inline-block; width: 14px; height: 14px; border-radius: 50%; margin-right: 8px; background: #ff5f56; }
+.sp-target .term .thead .dots i:nth-child(2) { background: #ffbd2e; }
+.sp-target .term .thead .dots i:nth-child(3) { background: #27c93f; }
+.sp-target .term .thead .tl { margin-left: 8px; }
+.sp-target .term .thead .tr { margin-left: auto; font-family: Menlo, Consolas, monospace; font-size: 20px; opacity: .85; }
+.sp-target .term pre { margin: 0; flex: 1 1 auto; min-height: 0; padding: 16px 0; font-size: 24px; line-height: 1.5; color: #d5dde6; overflow: hidden; font-family: Menlo, Consolas, monospace; }
+.sp-target .term pre.fs-l { font-size: 32px; }
+.sp-target .term pre.fs-m { font-size: 28px; }
+.sp-target .term .ln { display: block; padding: 0 24px; white-space: pre; }
+.sp-target .term .ln.hl { background: rgba(255, 180, 60, .22); box-shadow: inset 6px 0 0 #ffb43c; color: #fff; }
+.sp-target .term .ln.dim { opacity: .55; }
+.sp-target .term .tcap { flex: 0 0 auto; background: #151f2b; color: #aebbc9; font-size: 22px; line-height: 1.4; padding: 10px 24px; border-top: 1px solid #2a3442; }
+.sp-target .term .tcap .em { color: #ffb43c; }
+.sp-target .cmdcard .rwhere { padding: 14px 30px 0; font-size: 20px; color: #8b98a8; }
+.sp-target .cmdcard .rwhere code { color: #b8c4d2; }
+.sp-target .rcheck { flex: 0 0 auto; background: #fff; border-left: 8px solid var(--ok); border-radius: 10px; padding: 14px 24px; font-size: 28px; line-height: 1.5; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+.sp-target .rcheck .rk { display: inline-block; font-size: 21px; font-weight: 700; color: var(--ok); margin-right: 14px; }
+
+/* ハンズオン資料で足した部品：kw（キーワードのページ）、全ページ共通の「確かめる」の欄 */
+.sp-target main.withchk { bottom: 156px; }
+.sp-target main.withsrc { bottom: 124px; }
+.sp-target main.withchk.withsrc { bottom: 188px; }
+.sp-target .srcnote { position: absolute; left: 64px; right: 64px; bottom: 92px; font-size: 16px; line-height: 1.35; color: var(--sub); opacity: .8; }
+.sp-target .srcnote.withchk { bottom: 148px; }
+.sp-target .chkbar { position: absolute; left: 64px; right: 64px; bottom: 84px; height: 58px; display: flex; align-items: center; gap: 18px; padding: 0 22px; background: var(--accent-soft); border-left: 8px solid var(--accent); font-size: 23px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sp-target .chkbar .ck { flex: 0 0 auto; font-weight: 800; color: var(--accent); }
+.sp-target .chkbar .tp { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.sp-target .chkbar .tp b { color: var(--ink); margin-right: 6px; }
+.sp-target .chkbar .tp code { font-size: 20px; color: var(--sub); margin-left: 8px; }
+.sp-target .chkbar .nt { flex: 0 0 auto; color: var(--sub); }
+.sp-target .kw { width: 100%; height: 100%; display: flex; flex-direction: column; gap: 14px; }
+.sp-target .kw .ksub { flex: 0 0 auto; font-size: 28px; color: var(--sub); }
+.sp-target .kw .kcols { flex: 1; min-height: 0; display: flex; gap: 28px; font-size: 26px; }
+.sp-target .kw .kcol { flex: 1; min-width: 0; background: #fff; border: 2px solid var(--line); padding: 16px 24px; overflow: hidden; }
+.sp-target .kw .kcol h2 { margin: 0 0 6px; font-size: 1.15em; color: var(--accent); }
+.sp-target .kw .kcol h3 { margin: .55em 0 .15em; font-size: 1em; font-weight: 800; }
+.sp-target .kw .kcol h2 + h3 { margin-top: .2em; }
+.sp-target .kw .kcol ul { margin: 0; padding-left: 1.1em; line-height: 1.42; }
+.sp-target .kw .kcol li { margin: .1em 0; }
+.sp-target .kw .kcol code { font-size: .88em; background: var(--gray-soft); padding: 0 .2em; }
+
+/* ?render（動画づくり）のとき、舞台を左上に縮小せずに置く（CONTRACT §3.1。プレイヤーに置き換えても残す） */
+.render #stage { left: 0; top: 0; transform: none !important; }
+/* 動画の静止画では舞台を左上 (0,0) に置く（約束 v1.1 §3.1）。閲覧用の CSS を消しても残す */
+html, body { margin: 0; }
+
+</style>
+</head>
+<body>
+<div id="stage" class="sp-target"></div>
+<script>
+/* ============================================================
+   中身（描画）。プレイヤーとの約束（slide-player/CONTRACT.md §2）の形。
+   window.slideDeck を作り、window.renderSlide / window.deckInfo を残す。
+   ============================================================ */
+const DECK = {"meta": {"id": "intro", "title": "はじめに：研修の進め方", "short": "はじめに", "accent": "#008c86", "home": "../index.html", "sections": [{"id": "A", "title": "進め方"}, {"id": "B", "title": "動かす準備"}, {"id": "C", "title": "トピックの地図"}]}, "slides": [{"id": "cover", "type": "cover", "label": "検索と RAG の仕組み", "title": "はじめに：研修の進め方", "lead": "チームの役割、clone から動かすまで、スクリプトと Notebook、部とトピックの対応", "meta": [], "notes": "チームの役割、clone から動かすまで、スクリプトと Notebook、部とトピックの対応"}, {"id": "i01", "type": "points", "section": "A", "title": "スライドで==仕組み==、手元で==振る舞い==を確かめる", "items": [{"text": "スライド：手法、Azure のリソース、検索の考え方を説明する"}, {"text": "トピック：同じ仕組みを、スクリプトか Notebook で動かす", "sub": "検索の結果や順位は、スライドではなく手元で見る"}, {"text": "各ページの下の「確かめる」が、そのページのトピック", "sub": "例：確かめる　基礎 05 検索の良し悪しを数字で測る"}], "notes": "言いたいこと：スライドは仕組みの説明に集中し、コードの結果と検索の振る舞いはトピックのスクリプトと Notebook で確かめる。\n・スライドの各ページの下に「確かめる」の欄があり、対応するトピックのフォルダを示す。\n・結果の読み方は、Notebook のセルの間の説明に書いてある。", "check": []}, {"id": "i01a", "type": "flow", "section": "A", "title": "RAG は、==探してから答える==仕組み", "rows": [{"label": "準備", "nodes": [{"t": "文書", "s": "規程の PDF など"}, {"t": "チャンク", "s": "検索の単位に切った断片"}, {"t": "埋め込み", "s": "意味を数の並び（ベクトル）にしたもの"}, {"t": "インデックス", "s": "探せるように整理して置いた場所", "tone": "accent"}], "arrows": [{"text": "切る"}, {"text": "ベクトルにする"}, {"text": "入れる"}]}, {"label": "質問のとき", "nodes": [{"t": "質問", "s": "利用者が聞いたこと"}, {"t": "検索", "s": "近いチャンクをインデックスから探す", "tone": "accent"}, {"t": "LLM", "s": "大規模言語モデル。チャンクを読んで文章で答える"}, {"t": "答え", "s": "出典つきで返す"}], "arrows": [{"text": ""}, {"text": "チャンクを渡す"}, {"text": ""}]}], "banners": [{"text": "第1部：検索　／　第2部：準備（取り込み）　／　評価：検索と答えの良し悪し", "tone": "info"}], "notes": "言いたいこと：RAG は、先に文書をチャンクに切り、ベクトルにしてインデックスに入れておく。質問のときは、近いチャンクを探して LLM に渡し、文章で答えさせる。\n・インデックス：検索できるように整理して置いた、チャンクの集まり。本の巻末の索引のようなもの。\n・チャンク：文書を検索の単位に切った断片。大きすぎると答えがぼやけ、小さすぎると文脈が消える。\n・埋め込み：文を、意味が近いほど近くなる数の並び（ベクトル）にしたもの。ベクトル検索で使う。\n・LLM：大規模言語モデル。渡されたチャンクを読んで、文章で答える。渡した文以外の知識も混ざることがある。\n・このハンズオン資料は、検索（第1部）から入り、準備（第2部）、評価と進む。最後の p.48 で、この図に戻る。", "check": []}, {"id": "i02", "type": "compare", "section": "A", "title": "チームは、==構築する人==と==メンバー==で進める", "cols": [{"title": "構築する人", "tone": "accent", "rows": [{"text": "AI Search の管理者キーを使う"}, {"text": "インデックスと同義語マップを作り、データを入れる"}, {"text": "`--role builder` で設定を作る"}]}, {"title": "メンバー", "rows": [{"text": "検索だけのキーを使う"}, {"text": "構築する人が作ったインデックスを、検索して読む"}, {"text": "`--role member` で設定を作る"}]}], "verdict": {"text": "チームごとに AI Search と Foundry を持つ。役ごとに、できることが決まっている"}, "notes": "言いたいこと：チームは自分たちの AI Search と Foundry を持ち、構築する人とメンバーに役を分けて進める。\n・構築する人：AI Search の管理者キーで、インデックスと同義語マップを作り、データを登録する（基礎 01 の create_index.py・upload.py、03 の embed.py など）。\n・メンバー：検索だけのキーで、構築する人が作ったインデックスを検索して、結果を読む。\n・メンバーの設定で、作る・変える手順を実行すると、不透明なエラーになる前に「この手順は構築する人の設定で実行します」と止まる。その手順は、構築する人に実行してもらう。", "check": []}, {"id": "i03", "type": "steps", "section": "B", "title": "clone して、==.env.local== を作れば動く", "items": [{"t": "Repo を clone する", "s": "研修の Repo", "cmd": "git clone <Repo の URL>"}, {"t": "ライブラリを入れる", "s": "基礎編のフォルダの requirements.txt", "cmd": "pip install -r basic/requirements.txt"}, {"t": "接続の設定 .env.local を作る", "s": "Repo の直下で。構築する人は builder、メンバーは member", "cmd": "python tools/team.py env --role builder"}, {"t": "トピックのフォルダで実行する", "s": "例：基礎 01 キーワード検索", "cmd": "python load.py"}], "notes": "言いたいこと：接続先やキーをコピーしたり書き換えたりする手順はない。clone して、ライブラリを入れて、team.py で .env.local を作れば動く。\n・チームの名前は、--team か環境変数 WORKSHOP_TEAM で渡す。\n・スクリプトはトピックのフォルダで実行する。\n注意：Windows では python が見つからないとき py に置き換える。", "check": []}, {"id": "i04", "type": "compare", "section": "B", "title": "接続の設定は ==.env.local== の1つだけ", "cols": [{"title": "入っているもの", "tone": "accent", "rows": [{"text": "AI Search の接続先とキー（構築する人は管理者キー、メンバーは検索だけのキー）"}, {"text": "Azure OpenAI（Foundry）の接続先とキーと、モデルの名前"}, {"text": "Storage の接続先（構築する人だけ。応用編で使う）"}]}, {"title": "気をつけること", "tone": "warn", "rows": [{"text": "キーが入るので、人に渡さない（Git にも入らない）"}, {"text": "端末の環境変数 `AZURE_*` ではなく、このファイルを読む"}, {"text": "古くなったら、`team.py env` で作り直す"}]}], "verdict": {"text": "全部のスクリプトと Notebook が、Repo の直下の .env.local を読む"}, "notes": "言いたいこと：接続先とキーは Repo の直下の .env.local にまとめてあり、全部のスクリプトがここから読む。\n・キーが入るので、Repo の外に写さない、人に渡さない。Git にも入らない。\n・端末に別の Azure の設定が残っていても、.env.local の値を使う。\n・メンバーの .env.local には、AI Search の管理者キーと Storage の接続文字列は入らない。\n・キーが古くなったときは、team.py env で作り直せる。", "check": []}, {"id": "i05", "type": "compare", "section": "B", "title": "スクリプトと Notebook は==同じ中身==", "cols": [{"title": "スクリプト", "rows": [{"text": "python xxx.py で、上から順に動く"}, {"text": "質問は --q \"…\" で変える"}, {"text": "何度もやり直すのに向く"}]}, {"title": "Notebook", "tone": "accent", "rows": [{"text": "1セルずつ動かして、結果を見る"}, {"text": "質問はファイルの先頭の変数で変える"}, {"text": "セルの間に「どこを見るか」の説明"}]}], "verdict": {"text": "スクリプトが正本。Notebook はスクリプトから作る"}, "notes": "言いたいこと：スクリプトと Notebook は同じ処理で、どちらで動かしてもよい。\n・スクリプトは引数で、Notebook は先頭の変数で質問を変える。引数があれば引数が優先する。\n・Notebook はスクリプトから作るので、中身がずれない。", "check": []}, {"id": "i06", "type": "points", "section": "B", "title": "前のトピックの状態がなければ、==止まって案内==する", "items": [{"text": "各トピックの最初に、必要なインデックスがあるかを確かめる"}, {"text": "なければ、先に動かすものを1行出して止まる", "sub": "思いがけない作り直しを防ぐ"}, {"text": "作り直すときは、reset のコマンドで状態をそろえる", "sub": "例：python basic/tools/reset.py --to 04（構築する人の設定で実行）"}], "notes": "言いたいこと：トピックはどの順で動かしてもよいが、前提のインデックスがないときは止まって案内する。\n・案内に出たコマンドを、そのまま貼って実行すればよい。\n・reset は、そのトピックを始める直前の状態を作り直す。埋め込み済みのファイルを使うので早い。\n・メンバーの設定では、構築する人に実行してもらう。", "check": []}, {"id": "i07", "type": "table", "section": "B", "title": "インデックスの名前は==決まっていて==、作るのは構築する人", "head": ["作る人", "名前", "使うトピック"], "rows": [["構築する人", "`sengoku`（インデックス）", "基礎 01〜06（武将）"], ["構築する人", "`sengoku-synonyms`（同義語マップ）", "基礎 02"], ["構築する人", "`hr-docs`（インデックス）", "応用 14〜20（採用）"], ["構築する人", "`hr-docs-ds`・`hr-docs-ss`・`hr-docs-ixr`", "応用 15（データソース・スキルセット・インデクサー）"], ["構築する人", "`hr-docs-ks`・`hr-docs-kb`", "応用 19・20（知識ソース・知識ベース）"]], "colW": ["16%", "40%", "44%"], "notes": "言いたいこと：チームの AI Search に、インデックスなどが決まった名前で入る。名前が決まっているので、スクリプトは接続先だけで動く。\n・作るのは構築する人。武将は基礎 01〜03 のスクリプト、採用は applied/tools の build_hr_index.py と build_hr_kb.py。\n・メンバーは、できあがったものを検索して読む。\n・AI Search の Basic では、同義語マップはサービス全体で3つまで。ここで作るのは sengoku-synonyms の1つだけ。", "check": []}, {"id": "i08", "type": "table", "section": "B", "title": "使うデータは==2つ==", "head": ["データ", "中身", "トピック"], "rows": [["武将", "戦国武将など150人の名前・別名・合戦・プロフィール、正解つきの質問60問", "基礎 01〜06"], ["採用", "架空の会社の求人票・職務経歴書・面接の評価・メール・スキャン 23件", "応用 14〜20"]], "colW": ["12%", "64%", "24%"], "notes": "言いたいこと：基礎編は武将、応用編は採用のデータを使う。どちらも研修用に作ったデータで、採用は架空の会社の文書。\n・武将は、言い換えや固有名詞で検索方式の違いを見るのに使う。\n・採用は、形式の違う文書（PDF・Word・Excel・メール・スキャン）で、業務の場面を体験する。", "check": []}, {"id": "i09", "type": "table", "section": "C", "title": "基礎編：武将で==検索の方式==を学ぶ", "head": ["番号", "トピック", "データ", "フォルダ"], "rows": [["基礎 01", "キーワード検索", "武将", "basic/topics/01-keyword-search"], ["基礎 02", "言い換えと日本語の分かれ方", "武将", "basic/topics/02-analyzers-synonyms"], ["基礎 03", "ベクトル検索", "武将", "basic/topics/03-vector-search"], ["基礎 04", "ハイブリッドとランカー", "武将", "basic/topics/04-hybrid-ranker"], ["基礎 05", "検索の良し悪しを数字で測る", "武将", "basic/topics/05-measure-search"], ["基礎 06", "検索結果から答えを作る", "武将", "basic/topics/06-answer-from-results"]], "colW": ["11%", "38%", "10%", "41%"], "notes": "トピックの一覧（基礎編）。番号はデータと前提の順で、この順なら必ず動く。各ページの「確かめる」のトピックを開く。"}, {"id": "i10", "type": "table", "section": "C", "title": "応用編：採用の文書で==業務の場面==を体験する", "head": ["番号", "トピック", "データ", "フォルダ"], "rows": [["応用 14", "種類の違う文書をまとめて取り込む", "採用", "applied/topics/14-mixed-documents"], ["応用 15", "Azure の仕組みに置き換える", "採用", "applied/topics/15-azure-indexer"], ["応用 16", "見せてよい人で絞る", "採用", "applied/topics/16-security-filter"], ["応用 17", "更新と削除", "採用", "applied/topics/17-update-delete"], ["応用 18", "関係で探す（紹介）", "採用", "applied/topics/18-relations"], ["応用 19", "エージェント型検索のデモ", "採用", "applied/topics/19-agentic-retrieval"], ["応用 20", "答えを評価する", "採用", "applied/topics/20-answer-evaluation"]], "colW": ["11%", "38%", "10%", "41%"], "notes": "トピックの一覧（応用編）。応用編の番号は 14 から始まる（07〜13 はこの Repo にはない）。前提は、基礎編の検索と、構築する人が作った hr-docs。"}, {"id": "i11", "type": "table", "section": "C", "title": "部とトピックの==対応==", "head": ["部", "ページ", "確かめるトピック"], "rows": [["第1部 検索方法", "p.1〜15", "01・02・03・04"], ["第2部 取り込み", "p.16〜30", "14・15・16・17"], ["第3部 関係とエージェント型検索", "p.31〜38", "18・19"], ["評価", "p.39〜45", "05・20"], ["比較と締め", "p.46〜52", "06・19"]], "colW": ["38%", "26%", "36%"], "notes": "進行は部の順。各部のページから、右の列のトピックを開いて振る舞いを確かめる。部の順とトピックの番号は別。"}, {"id": "i12", "type": "recap", "section": "C", "title": "進め方のまとめ", "items": [{"text": "部の順に進め、トピックで振る舞いを確かめる"}, {"text": "トピックの番号は、データと前提の順（この順なら必ず動く）"}, {"text": "構築する人が作り、メンバーが検索して確かめる"}], "notes": "言いたいこと：部の順とトピックの番号は別。番号はデータと前提の順で、どの順で来ても、前提がなければ止まって案内する。", "check": []}]};
+const META = DECK.meta || {};
+
+const E = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
+// 段階の指定は 0 以上の整数だけ（tools/_common.py の is_step と同じ決まり）。正しくない値は 0（最初から見える）として扱う。
+// 正しくない値は tools/build_deck.py が不合格にする
+const isStep = v => typeof v === 'number' && Number.isInteger(v) && v >= 0;
+const stepOf = v => isStep(v) ? v : 0;
+// data-step 属性（文字列）：数字だけの文字列を段階に読む。それ以外は 0
+const attrStep = a => /^[0-9]+$/.test(a == null ? '' : String(a)) ? parseInt(a, 10) : 0;
+const vis = (o, step) => stepOf(o && o.step) <= step;
+const hv = (o, step) => vis(o, step) ? '' : ' hide';
+const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+// 描画中のスライドの links。本文の [[ラベル]] を、同じ label を持つ links の位置に結びつける
+let LINKS = [];
+const linkHtml = lab => {
+  const k = LINKS.findIndex(l => l && l.label === lab);
+  return k < 0 ? lab : `<span class="lnk" data-link="${k}">${lab}</span>`;
+};
+// ==強調（赤。外れ・注意）==、++強調（緑。当たり）++、**太字**、`コード`、[[リンク]]。コードの中の [[ ]] はリンクにしない
+const fmt = s => s == null ? '' : String(s)
+  .replace(/`[^`]*`|\[\[(.+?)\]\]/g, (m, lab) => lab == null ? m : linkHtml(lab))
+  .replace(/==(.+?)==/g, '<span class="em">$1</span>')
+  .replace(/\+\+(.+?)\+\+/g, '<span class="em ok">$1</span>')
+  .replace(/\*\*(.+?)\*\*/g, '<span class="b">$1</span>')
+  .replace(/`([^`]+)`/g, '<code>$1</code>');
+// 題名などをプレイヤーへ渡すときに、飾りの記法を外す（<br> は空白に）
+const plain = s => s == null ? '' : String(s)
+  .replace(/<br\s*\/?>/gi, ' ')
+  .replace(/\[\[(.+?)\]\]/g, '$1')
+  .replace(/==(.+?)==/g, '$1')
+  .replace(/\+\+(.+?)\+\+/g, '$1')
+  .replace(/\*\*(.+?)\*\*/g, '$1')
+  .replace(/`([^`]+)`/g, '$1')
+  .trim();
+
+// スライドの中で使われている step の最大値
+function maxStep(o) {
+  let m = 0;
+  const walk = v => {
+    if (Array.isArray(v)) v.forEach(walk);
+    else if (v && typeof v === 'object') { if (isStep(v.step)) m = Math.max(m, v.step); Object.values(v).forEach(walk); }
+  };
+  walk(o);
+  if (o.type === 'quiz') m = Math.max(m, 1);
+  if (o.type === 'run') m = Math.max(m, stepOf(o.expectStep), stepOf(o.checkStep));
+  if (Array.isArray(o.rowSteps)) o.rowSteps.forEach(x => { m = Math.max(m, stepOf(x)); });
+  // SVG は HTML として読む（= の前後の空白、一重・二重・なしの引用符を、ブラウザの読み方で扱う）
+  if (o.type === 'diagram' && typeof o.svg === 'string') {
+    const t = document.createElement('template');
+    t.innerHTML = o.svg;
+    t.content.querySelectorAll('[data-step]').forEach(e => { m = Math.max(m, attrStep(e.getAttribute('data-step'))); });
+  }
+  return m;
+}
+
+const LEVEL_BADGE = { must: '全員で実行', demo: '進行役が見せる', extra: '発展' };
+const LEVEL_NOTE = { must: '必須（全員で行う）', demo: '進行役が見せる', extra: '発展（時間の合計に入れない）' };
+
+const C = {};
+
+C.agenda = (s, st) => {
+  const w = E('div', 'agenda');
+  s.items.forEach((it, i) => {
+    const d = E('div', 'it' + hv(it, st));
+    d.innerHTML = `<div class="k">${esc(it.k || String.fromCharCode(65 + i))}</div><div><div class="t">${fmt(it.t)}</div>${it.s ? `<div class="s">${fmt(it.s)}</div>` : ''}</div>${it.minutes ? `<div class="m">${it.minutes}分</div>` : ''}`;
+    w.append(d);
+  });
+  return w;
+};
+
+C.points = (s, st) => {
+  const w = E('div', 'points');
+  s.items.forEach((it, i) => {
+    const d = E('div', 'p' + hv(it, st));
+    d.innerHTML = `<div class="dot">${esc(it.k || i + 1)}</div><div>${fmt(it.text)}${it.sub ? `<span class="sub">${fmt(it.sub)}</span>` : ''}</div>`;
+    w.append(d);
+  });
+  return w;
+};
+
+C.compare = (s, st) => {
+  const wrap = E('div', 'cwrap');
+  const w = E('div', 'compare');
+  s.cols.forEach(col => {
+    const c = E('div', 'col ' + (col.tone || '') + hv(col, st));
+    c.append(E('h2', '', fmt(col.title)));
+    (col.rows || []).forEach(r => c.append(E('div', 'row' + hv(r, st), (r.label ? `<span class="lab">${fmt(r.label)}</span>` : '') + fmt(r.text))));
+    w.append(c);
+  });
+  wrap.append(w);
+  if (s.verdict) wrap.append(E('div', 'verdict' + hv(s.verdict, st), fmt(s.verdict.text)));
+  return wrap;
+};
+
+C.flow = (s, st) => {
+  const w = E('div', 'flow');
+  (s.rows || [{ nodes: s.nodes, arrows: s.arrows }]).forEach(r => {
+    const row = E('div', 'flow-row' + hv(r, st));
+    if (r.label) row.append(E('div', 'rl', fmt(r.label)));
+    r.nodes.forEach((n, i) => {
+      if (i > 0) { const a = (r.arrows || [])[i - 1] || {}; row.append(E('div', 'arrow' + hv(a, st), `<div class="ar">${a.down ? '↓' : '→'}</div><div class="at">${fmt(a.text || '')}</div>`)); }
+      const d = E('div', 'node ' + (n.tone || '') + hv(n, st), `${n.badge ? `<div class="badge">${esc(n.badge)}</div>` : ''}<div class="t">${fmt(n.t)}</div>${n.s ? `<div class="s">${fmt(n.s)}</div>` : ''}`);
+      if (n.grow) d.style.flex = n.grow;
+      row.append(d);
+    });
+    w.append(row);
+  });
+  (s.banners || []).forEach(b => w.append(E('div', 'banner ' + (b.tone || '') + hv(b, st), fmt(b.text))));
+  return w;
+};
+
+C.diagram = (s, st) => {
+  const w = E('div', 'diagram');
+  const box = E('div', '', s.svg);
+  box.style.width = '100%'; box.style.flex = '1'; box.style.minHeight = '0'; box.style.display = 'flex';
+  box.querySelectorAll('[data-step]').forEach(el => { if (attrStep(el.getAttribute('data-step')) > st) el.style.visibility = 'hidden'; });
+  w.append(box);
+  if (s.caption) w.append(E('div', 'cap', fmt(s.caption)));
+  return w;
+};
+
+C.code = (s, st) => {
+  const w = E('div', 'code');
+  w.append(E('div', 'file', esc(s.file || '') + (s.lang ? `　<span style="opacity:.6">${esc(s.lang)}</span>` : '')));
+  const pre = E('pre');
+  const start = s.start || 1;
+  const hls = (s.highlight || []).filter(h => vis(h, st));
+  const cur = hls.length ? hls[hls.length - 1] : null;
+  s.lines.forEach((l, i) => {
+    const n = start + i;
+    const on = cur && n >= cur.from && n <= cur.to;
+    pre.append(E('span', 'ln' + (on ? ' hl' : (cur && s.dimOthers !== false ? ' dim' : '')), `<span class="no">${n}</span>${esc(l)}`));
+  });
+  w.append(pre);
+  return w;
+};
+
+C.table = (s, st) => {
+  const t = E('table', 'tb');
+  const hl = new Set((s.highlight || []).filter(h => vis(h, st)).map(h => h.row));
+  t.innerHTML = `<tr>${s.head.map((h, i) => `<th${s.colW ? ` style="width:${s.colW[i]}"` : ''}>${fmt(h)}</th>`).join('')}</tr>` +
+    s.rows.map((r, i) => { const step = stepOf((s.rowSteps || [])[i]); return `<tr class="${hl.has(i) ? 'hl' : ''}${step > st ? ' hide' : ''}">${r.map(c => `<td>${fmt(c)}</td>`).join('')}</tr>`; }).join('');
+  const w = E('div', ''); w.style.width = '100%'; w.append(t);
+  return w;
+};
+
+C.stat = (s, st) => {
+  const w = E('div', 'stat');
+  s.items.forEach(it => w.append(E('div', 'it ' + (it.tone || '') + hv(it, st), `<div class="v">${fmt(it.value)}</div><div class="l">${fmt(it.label)}</div>${it.sub ? `<div class="s">${fmt(it.sub)}</div>` : ''}`)));
+  return w;
+};
+
+C.bars = (s, st) => {
+  const w = E('div', 'bars');
+  const area = E('div', 'area'), labels = E('div', 'labels');
+  const max = s.max || Math.max(...s.items.map(i => i.value));
+  s.items.forEach(it => {
+    const ratio = s.invert ? (max - it.value + 1) / max : it.value / max;
+    const b = E('div', 'bar ' + (it.tone || '') + hv(it, st));
+    b.innerHTML = `<div class="val">${fmt(it.display || it.value)}</div><div class="col" style="height:${Math.max(4, ratio * 78)}%"></div>`;
+    area.append(b);
+    labels.append(E('div', hv(it, st).trim(), `${fmt(it.label)}${it.sub ? `<small>${fmt(it.sub)}</small>` : ''}`));
+  });
+  w.append(area, labels);
+  return w;
+};
+
+C.quote = (s, st) => {
+  const w = E('div', 'quote');
+  w.append(E('div', 'q', fmt(s.text)), E('div', 'by', fmt(s.by || '')));
+  return w;
+};
+
+C.quiz = (s, st) => {
+  const w = E('div', 'quiz');
+  w.append(E('div', 'qq', fmt(s.question)));
+  const chs = E('div', 'chs');
+  (s.choices || []).forEach((c, i) => chs.append(E('div', 'ch' + (st >= 1 && i === s.answer ? ' right' : ''), `<span class="k">${'ABCD'[i]}</span>${fmt(c)}`)));
+  w.append(chs);
+  w.append(E('div', 'ex' + (st >= 1 ? '' : ' hide'), fmt(s.explain)));
+  return w;
+};
+
+C.steps = (s, st) => {
+  const w = E('div', 'stepl');
+  s.items.forEach((it, i) => w.append(E('div', 'it' + hv(it, st), `<div class="n">${esc(it.n || i + 1)}</div><div><div class="t">${fmt(it.t)}</div>${it.s ? `<div class="s">${fmt(it.s)}</div>` : ''}</div>${it.cmd ? `<div class="cmd">${esc(it.cmd)}</div>` : ''}`)));
+  if (s.foot) w.append(E('div', 'foot', fmt(s.foot)));   // 小さな注（1行）
+  return w;
+};
+
+C.recap = (s, st) => {
+  const w = E('div', 'recap');
+  s.items.forEach(it => w.append(E('div', 'p' + hv(it, st), `<div>${fmt(it.text)}</div>`)));
+  if (s.next) w.append(E('div', 'next' + hv(s.next, st), fmt(s.next.text)));
+  return w;
+};
+
+// ---- ハンズオン資料で足した部品 ----
+// kw：キーワードのページ。cols: [{title, groups: [{h, items: [文字列]}]}]、sub（サブタイトル）。文字はあとで fitKw が枠に収まる大きさに縮める
+C.kw = (s, st) => {
+  const w = E('div', 'kw');
+  if (s.sub) w.append(E('div', 'ksub', fmt(s.sub)));
+  const cols = E('div', 'kcols kfit');
+  (s.cols || []).forEach(col => {
+    const c = E('div', 'kcol');
+    c.append(E('h2', '', fmt(col.title)));
+    (col.groups || []).forEach(g => {
+      if (g.h) c.append(E('h3', '', fmt(g.h)));
+      if ((g.items || []).length) c.append(E('ul', '', g.items.map(t => `<li>${fmt(t)}</li>`).join('')));
+    });
+    cols.append(c);
+  });
+  w.append(cols);
+  return w;
+};
+
+// kw の段組みを、どちらの段もはみ出さない文字の大きさに縮める（26px から 17px まで）
+function fitKw(stage) {
+  stage.querySelectorAll('.kfit').forEach(box => {
+    const cols = [...box.querySelectorAll('.kcol')];
+    const over = () => cols.some(c => c.scrollHeight > c.clientHeight + 1);
+    let fs = 26;
+    box.style.fontSize = fs + 'px';
+    while (fs > 17 && over()) { fs -= 1; box.style.fontSize = fs + 'px'; }
+  });
+}
+
+// 「確かめる」の欄：s.check は [{ed, no, name, dir}]、s.checkNote は補足
+const chkHtml = s => `<span class="ck">確かめる</span>` +
+  s.check.map(c => {
+    // トピックが2つ以上並ぶときは、フォルダ名を省いて1行に収める
+    const inner = `<b>${esc(c.ed)} ${esc(c.no)}</b>${esc(c.name)}` + (s.check.length > 1 ? '' : `<code>${esc(c.dir)}</code>`);
+    return `<span class="tp">${inner}</span>`;
+  }).join('<span class="nt">／</span>') +
+  (s.checkNote ? `<span class="nt">（${esc(s.checkNote)}）</span>` : '');
+
+// ---- 操作のページ（run）と、実測の出力のページ（output）----
+const termHead = (label, right) => `<div class="thead"><span class="dots"><i></i><i></i><i></i></span><span class="tl">${label}</span>${right ? `<span class="tr">${right}</span>` : ''}</div>`;
+// 行が少ないときは字を大きくする（8行まで 32px、11行まで 28px、それより多いと 24px）。build_deck.py の幅の見積もりも同じ
+const termSize = n => n <= 8 ? ' fs-l' : n <= 11 ? ' fs-m' : '';
+const termLines = (lines, cls) => lines.map((l, i) => `<span class="ln${cls ? cls(i + 1) : ''}">${esc(l) || '&nbsp;'}</span>`).join('');
+
+C.run = (s, st) => {
+  const w = E('div', 'run');
+  const card = E('div', 'cmdcard');
+  card.append(E('div', 'rhead', `<span class="rfile">${esc(s.file || '')}</span>${s.level ? `<span class="lvl ${esc(s.level)}">${esc(LEVEL_BADGE[s.level] || s.level)}</span>` : ''}`));
+  // where：そのフォルダで最初に打つコマンドの上に、うす字で場所と移り方を出す
+  if (s.where) card.append(E('div', 'rwhere', fmt(s.where)));
+  card.append(E('div', 'rcmd', `<span class="ps">${esc(s.prompt || 'PS>')}</span><span class="ctext" data-link="${(s.links || []).length}">${esc(s.cmd || '')}</span>`));
+  w.append(card);
+  w.append(E('div', 'term' + hv({ step: s.expectStep }, st), termHead('実行すると、こう表示される（一部）') + `<pre class="${termSize((s.expect || []).length).trim()}">${termLines(s.expect || [])}</pre>`));
+  w.append(E('div', 'rcheck' + hv({ step: s.checkStep }, st), `<span class="rk">確かめること</span>${fmt(s.check)}`));
+  return w;
+};
+
+C.output = (s, st) => {
+  const w = E('div', 'term outp');
+  // 光る行：いま見えている highlight のうち、いちばん新しい段階のものだけ。ほかの行は暗くする
+  const hls = (s.highlight || []).filter(h => vis(h, st));
+  const top = hls.length ? Math.max(...hls.map(h => stepOf(h.step))) : -1;
+  const on = new Set(hls.filter(h => stepOf(h.step) === top).map(h => h.line));
+  w.innerHTML = termHead('実行すると、こう表示される', s.measure ? `実測の記録：${esc(s.measure)}` : '') +
+    `<pre class="${termSize((s.lines || []).length).trim()}">${termLines(s.lines || [], n => on.has(n) ? ' hl' : (hls.length ? ' dim' : ''))}</pre>` +
+    `<div class="tcap">${fmt(s.caption)}</div>`;
+  return w;
+};
+
+// ノートに出す文字列：時間・区分・出典を先頭に、そのあとに notes
+function noteText(s) {
+  const t = [];
+  if (s.minutes != null) t.push(`話す ${s.minutes} 分`);
+  if (s.opMinutes != null) t.push(`操作 ${s.opMinutes} 分`);
+  if (s.level) t.push(LEVEL_NOTE[s.level] || s.level);
+  if (s.ref) t.push(plain(s.ref));
+  return (t.length ? t.join('　') + '\n\n' : '') + (s.notes || '（ノートなし）');
+}
+
+// プレイヤーへ渡すリンク。run は、コマンドを写す copy リンクを最後に自動で足す（番号は links の長さ。作者の links の番号は変わらない）
+const slideLinks = s => {
+  const base = s.links || [];
+  return s.type === 'run' && typeof s.cmd === 'string' && s.cmd ? base.concat([{ label: 'コマンド', kind: 'copy', text: s.cmd }]) : base;
+};
+
+// メインの舞台以外に描いたとき、描いた中の id と、その参照（url(#id)、href="#id"）に描画先ごとの接尾辞を付ける（CONTRACT §2.5）。
+// 新しい中身は SVG に id を使わない（build_deck.py が不合格にする）ので、ふだんは何もしない。念のための処理
+let TARGET_SEQ = 0;
+const TARGET_NO = new WeakMap();
+function suffixIds(target) {
+  const els = target.querySelectorAll('[id]');
+  if (!els.length) return;
+  if (!TARGET_NO.has(target)) TARGET_NO.set(target, ++TARGET_SEQ);
+  const suf = `-t${TARGET_NO.get(target)}`;
+  const ids = new Set([...els].map(e => e.id));
+  els.forEach(e => { e.id = e.id + suf; });
+  const fix = v => v
+    .replace(/url\(\s*(['"]?)#([^)'"\s]+)\1\s*\)/g, (m, q, id) => ids.has(id) ? `url(${q}#${id}${suf}${q})` : m)
+    .replace(/^#([^\s]+)$/, (m, id) => ids.has(id) ? `#${id}${suf}` : m);
+  target.querySelectorAll('*').forEach(e => {
+    for (const a of [...e.attributes]) {
+      if (a.name === 'id' || !a.value.includes('#')) continue;
+      const nv = fix(a.value);
+      if (nv !== a.value) e.setAttribute(a.name, nv);
+    }
+  });
+}
+
+const sectionTitle = id => { const x = (META.sections || []).find(s => s.id === id); return x ? `${x.id}　${x.title}` : ''; };
+
+function draw(i, st, stage) {
+  const s = DECK.slides[i];
+  stage.replaceChildren();
+  stage.style.setProperty('--accent', META.accent || '#0b6bcb');
+  if (META.accentSoft) stage.style.setProperty('--accent-soft', META.accentSoft); else stage.style.removeProperty('--accent-soft');
+  if (s.type === 'cover') {
+    const c = E('div', 'cover');
+    c.innerHTML = `<div class="lab">${fmt(s.label || '')}</div><h1>${fmt(s.title)}</h1><div class="lead">${fmt(s.lead || '')}</div><div class="meta">${(s.meta || []).map(m => `<div>${fmt(m)}</div>`).join('')}</div>`;
+    stage.append(c);
+    return;
+  }
+  if (s.type === 'section') {
+    const c = E('div', 'sectionpg');
+    c.innerHTML = `<div class="no">${esc(s.no || '')}</div><div><h1>${fmt(s.title)}</h1><div class="lead">${fmt(s.lead || '')}</div>${s.minutesLabel ? `<div class="mins">${fmt(s.minutesLabel)}</div>` : ''}</div>`;
+    stage.append(c);
+  } else {
+    if (!C[s.type]) throw new Error(`未知の type: ${s.type}（${s.id}）`);
+    const h = E('header');
+    h.innerHTML = `<div class="kick"><span class="chip">${fmt(META.short || '')}</span><span>${fmt(s.kicker || sectionTitle(s.section) || '')}</span><span class="ref">${fmt(s.ref || '')}</span></div><h1>${fmt(s.title)}</h1>`;
+    stage.append(h);
+    const callouts = s.callouts || [];
+    const hasChk = Array.isArray(s.check) && s.check.length > 0;
+    const m = E('main', (s.layout === 'below' ? 'below' : '') + (hasChk ? ' withchk' : '') + (s.source ? ' withsrc' : ''));
+    const v = E('div', 'visual');
+    v.append(C[s.type](s, st));
+    m.append(v);
+    if (callouts.length) {
+      const side = E('div', 'side');
+      // items があれば、体言止めの箇条として出す（折り返しても字下げがそろう）
+      callouts.forEach(c => side.append(E('div', 'call ' + (c.tone || '') + hv(c, st), (c.title ? `<div class="ct">${fmt(c.title)}</div>` : '') +
+        (c.items ? `<ul class="cl">${c.items.map(x => `<li>${fmt(x)}</li>`).join('')}</ul>` : fmt(c.text)))));
+      m.append(side);
+    }
+    stage.append(m);
+    // source：出典をうす字で小さく（「確かめる」の行の上）
+    if (s.source) stage.append(E('div', 'srcnote' + (hasChk ? ' withchk' : ''), '出典：' + fmt(s.source)));
+    if (hasChk) stage.append(E('div', 'chkbar', chkHtml(s)));
+    fitKw(stage);
+  }
+  const f = E('footer');
+  const secs = META.sections || [];
+  const ci = secs.findIndex(x => x.id === s.section);
+  secs.forEach((x, k) => f.append(E('div', 'sec' + (k === ci ? ' on' : k < ci ? ' done' : ''), `${esc(x.id)}　${fmt(x.title)}`)));
+  f.append(E('div', 'pg', `${i + 1} / ${DECK.slides.length}`));
+  stage.append(f);
+}
+
+const steps = DECK.slides.map(maxStep);
+
+// render(ref, step, target)：ref は 0 から数えた位置か id。target を省くと #stage
+function render(ref, step, target) {
+  const i = typeof ref === 'number' ? ref : DECK.slides.findIndex(x => x.id === ref);
+  if (!Number.isInteger(i) || i < 0 || i >= DECK.slides.length) throw new Error(`render: スライドがない（${ref}）`);
+  const stage = target || document.getElementById('stage');
+  stage.classList.add('sp-target');
+  const st = Math.max(0, Math.min(steps[i], step | 0));
+  LINKS = slideLinks(DECK.slides[i]);
+  try { draw(i, st, stage); } finally { LINKS = []; }
+  if (stage !== document.getElementById('stage')) suffixIds(stage);
+}
+
+const deckId = META.id || `s-${String(META.session || 0).padStart(2, '0')}`;
+window.slideDeck = {
+  contract: 1,
+  info: {
+    id: deckId,
+    title: plain(META.title),
+    label: plain(META.short),
+    home: META.home || '../index.html',
+    color: META.accent,
+    sections: (META.sections || []).map(x => ({ id: x.id, title: plain(x.title) })),
+    slides: DECK.slides.map((s, i) => ({
+      id: s.id, title: plain(s.title), section: s.section, steps: steps[i],
+      notes: noteText(s), minutes: s.minutes, links: slideLinks(s)
+    }))
+  },
+  render
+};
+// 動画づくり（tools/build_deck.py --check、tools/build_video.py）が使う。?render のときも通常のときも同じ名前で残す
+window.renderSlide = (i, st) => render(i, st);
+window.deckInfo = () => DECK.slides.map((s, i) => ({ id: s.id, steps: steps[i] }));
+if (new URLSearchParams(location.search).has('render')) document.body.classList.add('render');
+</script>
+<script src="../player.js"></script>
+</body>
+</html>
