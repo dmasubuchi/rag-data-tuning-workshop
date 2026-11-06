@@ -1,4 +1,4 @@
-"""（作る人用）セル形式（# %%）のスクリプトから、同じ名前の Notebook（.ipynb）を作る。参加者は実行しなくてよい。
+"""（教材を直す人用）セル形式（# %%）のスクリプトから、同じ名前の Notebook（.ipynb）を作る。参加者は実行しなくてよい。
 
 実行（Repo 直下で）：python tools/make_notebooks.py            全部を作り直す
           python tools/make_notebooks.py --check    作り直さず、ずれているものを一覧にする（ずれがあれば終了コード 1）
@@ -17,7 +17,7 @@ Notebook は .py から作るもの。Notebook の側は編集しない（.py �
   余分        .ipynb はあるが、元になるセル形式の .py がない
 
 終了コード：0 = 問題なし（作り直しの成功）／ 1 = --check でずれがあった／ 2 = jupytext が入っていない
-jupytext は作る人の道具なので、basic/requirements.txt と applied/requirements.txt には入れない（requirements-dev.txt に入れる）。
+jupytext は教材を直す人の道具なので、basic/requirements.txt と applied/requirements.txt には入れない（requirements-dev.txt に入れる）。
 """
 import argparse
 import hashlib
@@ -136,14 +136,14 @@ def build(scripts: list) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="セル形式のスクリプトから Notebook を作る（作る人用）")
+    parser = argparse.ArgumentParser(description="セル形式のスクリプトから Notebook を作る（教材を直す人用）")
     parser.add_argument("--check", action="store_true", help="作り直さず、ずれているものを一覧にする（ずれがあれば終了コード 1）")
     args = parser.parse_args()
 
     try:
         import jupytext  # noqa: F401
     except ImportError:
-        print("jupytext が入っていません。pip install -r requirements-dev.txt で入れてください（作る人の道具です。参加者の requirements.txt には入れません）。")
+        print("jupytext が入っていません。pip install -r requirements-dev.txt で入れてください（教材を直す人の道具です。参加者の requirements.txt には入れません）。")
         return 2
 
     scripts = cell_scripts()

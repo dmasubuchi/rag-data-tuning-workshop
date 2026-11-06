@@ -8,7 +8,7 @@
            （「確かめる」のリンクは、そこから Repo の直下への相対パスで書く）
   両方を作り直す：python3 docs/lecture/tools/build.py --out site/lecture --md docs/lecture/md
 HTML も Markdown も、同じ原稿（keywords.md・decks.json・diagrams/）を同じ関数で読んで作る。
-確認の check.py は playwright も使う（作る人の道具。参加者は要らない）。
+確認の check.py は playwright も使う（教材を直す人の道具。参加者は要らない）。
 
 読むもの（docs/lecture/）
 - keywords.md   キーワードのページ（本文・サブタイトル・スピーカーノート。直すときはここ）

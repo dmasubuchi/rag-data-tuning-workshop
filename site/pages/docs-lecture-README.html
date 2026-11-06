@@ -54,7 +54,7 @@
 </ul>
 <p>図を直すときは、<code>figs_*.py</code> を直して <code>python3 docs/lecture/diagrams/figures.py</code> で <code>pNN.json</code> を書き出し、<code>build.py</code> で作り直す（ページ番号を渡すと、そのページだけ書き出す）。</p>
 <h2 id="作り方">作り方</h2>
-<p>Repo の直下で実行します。<code>build.py</code> は Python 3.10 以上の標準ライブラリだけで動きます。確認の <code>check.py</code> には <code>playwright</code>（Chromium）が要ります（作る人の道具で、参加者は要りません）。</p>
+<p>Repo の直下で実行します。<code>build.py</code> は Python 3.10 以上の標準ライブラリだけで動きます。確認の <code>check.py</code> には <code>playwright</code>（Chromium）が要ります（教材を直す人の道具で、参加者は要りません）。</p>
 <pre><code>python3 docs/lecture/tools/build.py
 python3 docs/lecture/tools/build.py --md docs/lecture/md
 python3 docs/lecture/tools/check.py --out &lt;静止画の置き場&gt;

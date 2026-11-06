@@ -196,6 +196,7 @@ class ScanTextTests(unittest.TestCase):
             "test の後ろに続く": "a@" + "x.test.corp.net",
             "invalid の後ろに続く": "a@" + "x.invalid.com",
             "example の別の TLD": "a@" + "sampletech.company",
+            "example.co.jp は予約名の一覧にない": "c@" + "example.co.jp",
         }
         for label, text in cases.items():
             with self.subTest(label):

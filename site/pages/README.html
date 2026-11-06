@@ -12,10 +12,85 @@
 <main>
 <article class="doc">
 <h1 id="データに着目した-rag-の研修">データに着目した RAG の研修</h1>
+<nav class="toc"><details><summary>このページの目次</summary>
+<ul>
+<li class="l2"><a href="#目的">目的</a></li>
+<li class="l2"><a href="#対象">対象</a></li>
+<li class="l2"><a href="#始め方">始め方</a></li>
+<li class="l2"><a href="#構成">構成</a></li>
+<li class="l2"><a href="#ポータル">ポータル</a></li>
+<li class="l2"><a href="#教材を直す人へ">教材を直す人へ</a></li>
+<li class="l2"><a href="#ライセンス">ライセンス</a></li>
+</ul>
+</details></nav>
 
+<p>A hands-on training on the data side of RAG: processing, operating and evaluating data on top of a search foundation (Azure AI Search).
+The R in RAG is Retrieve: collect, rank, and search step by step. Keep it in mind from the day you build the foundation.
+Everything is in Japanese: slides, step-by-step guides, scripts and sample data.</p>
 <h2 id="目的">目的</h2>
+<p>検索の基盤（Azure AI Search）を作るだけでは、よい検索になりません。この研修では、基盤の上にある、データの加工・運営・評価を、手を動かして学びます。</p>
+<ul>
+<li>RAG の R は Retrieve（取ってくる）です。集める、順位を付ける、段階的に探す。この考え方を、基盤を作る段階から意識します</li>
+<li>検索のしかたを変え、結果を数字で測り、直す。この繰り返しを、ホテル・戦国武将・採用の文書で体験します</li>
+</ul>
 <h2 id="対象">対象</h2>
+<ul>
+<li>Azure の SI パートナー（とくにインフラ寄りの人）</li>
+<li>企業の情報システム部門、DX 推進</li>
+<li>データ・IR・BI・分析の担当</li>
+</ul>
 <h2 id="始め方">始め方</h2>
+<p>チームで進めます。1人が構築する人（Azure にリソースを作る）、ほかの人はメンバー（検索と読み取り）です。人数は自由です。研修を進める人を進行役、研修に出る人を参加者と呼びます。</p>
+<p>要るもの：Azure のサブスクリプション、Python 3.11 か 3.12、Git、VS Code、az（Azure CLI）。</p>
+<p>手順書は、<a href="guide-README.html">guide/README.md</a> の順に進めます。</p>
+<ol>
+<li><a href="guide-setup-windows-pc.html">Windows PC の設定</a></li>
+<li><a href="guide-setup-azure-setup.html">Azure の準備</a></li>
+<li><a href="guide-hotel.html">ホテル</a></li>
+<li><a href="guide-sengoku.html">武将</a>（基礎編）</li>
+<li><a href="guide-hr.html">応用（人事）</a>（応用編）</li>
+</ol>
+<p>2 の Azure の準備は、次の流れです。</p>
+<ol>
+<li><code>config/workshop.example.config</code> を <code>workshop.config</code> にコピーし、進行役から受け取った値を書く</li>
+<li><code>python tools/team.py names --team &lt;team&gt;</code>：チームの名前から、リソースの名前を表示する</li>
+<li><code>python tools/team.py check-names</code>：作る前に、名前が使えるかを確かめる</li>
+<li>Azure のポータルで、表示された名前のとおりにリソースを作る</li>
+<li><code>python tools/team.py health</code>：作ったものの状態を見る</li>
+<li><code>python tools/team.py env --role builder</code>（メンバーは <code>--role member</code>）：接続の設定 <code>.env.local</code> を作る</li>
+</ol>
+<h2 id="構成">構成</h2>
+<ul>
+<li><code>guide/</code>：手順書（Windows PC、Azure、ホテル、武将、応用、検索デモ、進行役の手引き）</li>
+<li><code>basic/</code>：基礎編。トピック 01〜06。戦国武将のデータで、キーワード検索、同義語、ベクトル検索、ハイブリッド、測る、答えの生成</li>
+<li><code>applied/</code>：応用編。トピック 14〜20。採用の文書で、形式の違う文書、インデクサー、見せてよい人、更新と削除、関係、エージェント型検索、答えの評価。採用アシスタント（<code>applied/assistant/</code>）</li>
+<li><code>docs/lecture/</code>：ハンズオン資料（スライド）の原稿と、作る道具。読む形の Markdown は <code>docs/lecture/md/</code></li>
+<li><code>site/</code>：スライド（<code>site/lecture/</code>）と、読む形のページ（<code>site/pages/</code>）。入口は <code>site/index.html</code></li>
+<li><code>tools/</code>：チームの設定（<code>team.py</code>）、検索デモ、ページを作る道具、公開前の検査</li>
+<li><code>config/</code>：接続の設定のひな形</li>
+</ul>
+<p>トピックの番号は、基礎編が 01〜06、応用編が 14〜20 です。07〜13 はありません。</p>
+<h2 id="ポータル">ポータル</h2>
+<p>入口は <a href="../index.html">site/index.html</a> です。目的、始め方、スライド、基礎編・応用編のページへのリンクを1枚にまとめています。スライドは <a href="../lecture/index.html">site/lecture/index.html</a> から開きます。</p>
+<p>GitHub Pages での公開を予定しています。いまは、Repo を手元に取り込み、ブラウザで開いてください。</p>
+<h2 id="教材を直す人へ">教材を直す人へ</h2>
+<p>通信しない試験は、仮想環境を作って流します（Windows では <code>.venv\Scripts\python</code>）。</p>
+<pre><code>python3 -m venv .venv
+.venv/bin/pip install -r basic/requirements.txt -r applied/requirements.txt -r requirements-dev.txt
+.venv/bin/python -m unittest discover -s tests
+.venv/bin/python -m unittest discover -s basic/tests
+cd applied &amp;&amp; ../.venv/bin/python -m unittest discover -s tests
+</code></pre>
+<ul>
+<li>README や手順書の Markdown を直したら、<code>.venv/bin/python tools/build_site.py</code> で <code>site/</code> を作り直して、いっしょにコミットします（試験が、作り直したものと同じかを確かめます）</li>
+<li>スライドの原稿の直し方は <a href="docs-lecture-README.html">docs/lecture/README.md</a> にあります</li>
+</ul>
+<h2 id="ライセンス">ライセンス</h2>
+<ul>
+<li>コード：MIT License（<a href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/LICENSE">LICENSE</a>）</li>
+<li>文書とこの Repo のために作ったデータ：CC BY 4.0（<a href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/LICENSE-docs.md">LICENSE-docs.md</a>）</li>
+<li>第三者のデータ：<a href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/NOTICE.md">NOTICE.md</a></li>
+</ul>
 </article>
 </main>
 <footer class="bar"><a class="home" href="../index.html">← 入口に戻る</a><a class="source" href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/README.md">元の Markdown（GitHub）</a></footer>

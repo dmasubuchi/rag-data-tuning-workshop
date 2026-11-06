@@ -3,7 +3,7 @@
 
 実行（Repo の直下で）：python3 docs/lecture/tools/check.py [--out <静止画の置き場>] [--site <調べるフォルダー>] [--decks <decks の JSON>] [デッキの id …]
 - --site と --decks を省くと、site/lecture と docs/lecture/decks.json を調べる
-- 要るもの：playwright と Chromium（作る人の道具）。一覧の画像（contact.png）は ffmpeg があるときだけ作る
+- 要るもの：playwright と Chromium（教材を直す人の道具）。一覧の画像（contact.png）は ffmpeg があるときだけ作る
 - 静止画は --out（既定は OS の一時フォルダーの lecture-check/）に、デッキごとに 01_<id>.png … と contact.png（一覧）を作る。Repo には置かない
 - はみ出し（kw の段が 18px まで縮めても収まらない、など）と JS のエラーを画面に出す。終了コードは、JS のエラーがあれば 1
 - プレイヤーの操作も1つずつ確かめる（目次が開く、→ キーで進む、N でノートが出る）

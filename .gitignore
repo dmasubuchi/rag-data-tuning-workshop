@@ -7,9 +7,14 @@ workshop.local.env
 # 設定ファイルを書いている途中の一時ファイル（team.py env）
 .*.tmp
 
-# Python
+# Python・Notebook・試験
 .venv/
 __pycache__/
+.ipynb_checkpoints/
+.pytest_cache/
+
+# OS
+.DS_Store
 
 # 作業用
 _work/

@@ -184,7 +184,7 @@ class IndexNamesTest(Base):
         self.assertEqual(config.sengoku_index_name(), "sengoku")
         self.assertEqual(config.synonym_map_name(), "sengoku-synonyms")
         self.assertEqual(config.index_names(), ["sengoku"])
-        for removed in ("get_group", "set_group_command", "check_group", "group_file_path", "attendee_index_names",
+        for removed in ("get_group", "set_" + "group_command", "check_group", "group_file_path", "attendee_index_names",
                         "shared_index_names", "kitei_index_name", "mini_index_name", "refuse_shared"):
             self.assertFalse(hasattr(config, removed), removed)
 

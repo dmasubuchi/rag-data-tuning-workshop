@@ -167,6 +167,12 @@ def prepare(lines: list, stash) -> list:
     - コードのかたまり（```）：一覧の中のものも含めて全部ここで HTML にして stash に預け、前後に空行を置く
     - 段落の直後の一覧：GitHub は一覧として読む。Python-Markdown は空行を求めるので足す
     - <details>：中の Markdown も読ませるため markdown="1" を付ける
+
+    既知の制限（この Repo の Markdown には、どれも使っていない。使うときは試験を足す）：
+    - 引用（>）の中のコードのかたまり（```）は、HTML にしない
+    - 行末の空白2つによる改行は、読み替えない（行末の空白を落とす）
+    - 表の中の、`|` を含むコード（`a|b` など）は、列の区切りと読まれることがある
+    - 字下げのタブは、読み替えない（空白で書く）
     """
     out = Lines()
     stack = []  # 開いている一覧の項目の、元の文字の位置（本文の開始位置）
@@ -279,6 +285,7 @@ class SiteTreeprocessor(Treeprocessor):
 
     見出しの id は toc に任せない。toc は見出しの空白（全角の空白も）を半角1つにまとめてから id を作るので、GitHub の
     飛び先（全角の空白は消える）と違ってしまう。toc は、先に付いている id を上書きしない。
+    コードの中の `<`・`&` は、木の中では &lt;・&amp; の形なので、html.unescape で戻してから id にする。
     """
 
     def __init__(self, md, linker, src_rel):
@@ -290,7 +297,7 @@ class SiteTreeprocessor(Treeprocessor):
     def run(self, root):
         for el in root.iter():
             if isinstance(el.tag, str) and re.fullmatch(r"h[1-6]", el.tag) and not el.get("id"):
-                el.set("id", self.slugger.slug("".join(el.itertext())))
+                el.set("id", self.slugger.slug(html.unescape("".join(el.itertext()))))
             elif el.tag == "a" and el.get("href"):
                 el.set("href", self.linker.link(el.get("href"), self.src_rel))
             elif el.tag == "img" and el.get("src"):
@@ -346,7 +353,6 @@ class Page:
     body: str
     toc: list  # [(level, id, text)] の h2・h3
     mermaid: bool
-    assets: dict
 
 
 def render_markdown(text: str, rel: str, linker: Linker) -> tuple:
@@ -373,7 +379,7 @@ def make_page(rel: str, repo: Path, linker: Linker) -> Page:
     text = (repo / rel).read_text(encoding="utf-8")
     body, tokens = render_markdown(text, rel, linker)
     title = plain(tokens[0]["name"]) if tokens and tokens[0]["level"] == 1 else Path(rel).stem
-    return Page(rel, title, body, flatten_toc(tokens), '<pre class="mermaid">' in body, {})
+    return Page(rel, title, body, flatten_toc(tokens), '<pre class="mermaid">' in body)
 
 
 # ------------------------------------------------------------------ ページの HTML
@@ -474,9 +480,9 @@ def build_index(pages: dict, repo: Path) -> str:
 <h2>この研修について</h2>
 <dl>
 <dt>何を学ぶか</dt>
-<dd>基盤（Azure AI Search）を作るだけでは、よい検索になりません。データに合わせて検索を組み、結果を数字で測り、直します。この繰り返しを、ホテル・戦国武将・採用の文書で体験します。</dd>
+<dd>基盤（Azure AI Search）を作るだけでは、よい検索になりません。基盤の上にある、データの加工・運営・評価を、手を動かして学びます。検索のしかたを変え、結果を数字で測り、直す。この繰り返しを、ホテル・戦国武将・採用の文書で体験します。</dd>
 <dt>RAG の R</dt>
-<dd>R は Retrieve、取ってくるの R です。集める、順位を付ける、段階的に探す。この考え方が土台です。</dd>
+<dd>R は Retrieve（取ってくる）です。集める、順位を付ける、段階的に探す。この考え方を、基盤を作る段階から意識します。</dd>
 <dt>だれ向けか</dt>
 <dd>Azure の SI パートナー（とくにインフラ寄りの人）、企業の情報システム部門・DX 推進、データ・IR・BI・分析の担当。</dd>
 </dl>
@@ -484,7 +490,7 @@ def build_index(pages: dict, repo: Path) -> str:
 
 <section>
 <h2>始め方</h2>
-<p>手順書を、番号の順に進めます。チームで進め、1人が構築する人、ほかの人はメンバーになります。</p>
+<p>チームで進めます。1人が構築する人（Azure にリソースを作る）、ほかの人はメンバー（検索と読み取り）です。人数は自由です。研修を進める人を進行役、研修に出る人を参加者と呼びます。手順書を、番号の順に進めます。</p>
 <ol class="links">
 {items(steps)}</ol>
 <p class="more">{a("guide/README.md", "手順書の一覧")}</p>

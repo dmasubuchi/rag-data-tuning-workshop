@@ -1,4 +1,4 @@
-"""作る人用の tools/make_embeddings.py と、同梱の埋め込み済みファイル（embeddings/sengoku.json）の整合を確かめる（通信なし）。
+"""教材を直す人用の tools/make_embeddings.py と、同梱の埋め込み済みファイル（embeddings/sengoku.json）の整合を確かめる（通信なし）。
 
   ・埋め込む文字列は、武将ごとの「名前。本文」
   ・同梱のファイルが、いまの武将の全員分のベクトルを持っている（本文を書き換えたのに作り直し忘れると、ここで気づく）

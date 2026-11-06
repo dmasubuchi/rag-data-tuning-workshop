@@ -60,7 +60,7 @@ class PipelineTest(EnvCase):
         self.assertEqual(pipeline.blob_metadata(f)["application_ids"], "APP-0471")
 
     def test_blob_names_have_no_group_folder(self):
-        """Storage の名前は、入れ物の直下に、manifest の相対パスのまま。shared/ や <組>/ のフォルダはない。"""
+        """Storage の名前は、入れ物の直下に、manifest の相対パスのまま。shared/ や、チームごとのフォルダはない。"""
         self.assertEqual(pipeline.blob_name("jobs/JOB-REQ042-v3.pdf"), "jobs/JOB-REQ042-v3.pdf")
         for f in config.manifest_files():
             self.assertEqual(pipeline.blob_name(f["path"]), f["path"])

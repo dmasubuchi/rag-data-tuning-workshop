@@ -1,6 +1,6 @@
-"""作る人用の道具 tools/make_notebooks.py（セル形式の .py から .ipynb を作る）の動きを確かめる（通信なし）。
+"""教材を直す人用の道具 tools/make_notebooks.py（セル形式の .py から .ipynb を作る）の動きを確かめる（通信なし）。
 
-jupytext は作る人の道具なので、参加者の環境（basic/requirements.txt）には入っていない（requirements-dev.txt に入れる）。入っていなければ、この試験は飛ばす。
+jupytext は教材を直す人の道具なので、参加者の環境（basic/requirements.txt）には入っていない（requirements-dev.txt に入れる）。入っていなければ、この試験は飛ばす。
 
 実行（Repo 直下で）：python -m unittest discover -s basic/tests
 """
@@ -42,7 +42,7 @@ def load_tool():
     return mod
 
 
-@unittest.skipUnless(HAVE_JUPYTEXT, "jupytext が入っていないので飛ばす（作る人の道具。requirements-dev.txt）")
+@unittest.skipUnless(HAVE_JUPYTEXT, "jupytext が入っていないので飛ばす（教材を直す人の道具。requirements-dev.txt）")
 class MakeNotebooksTest(unittest.TestCase):
     def setUp(self):
         self.tool = load_tool()

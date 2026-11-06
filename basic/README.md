@@ -29,7 +29,7 @@ LangChain は使いません。使うのは `azure-search-documents`、`openai`�
 - Notebook：同じ名前の `xxx.ipynb` を開き、上のセルから順に実行します。VS Code の Jupyter 拡張と、`requirements.txt` に入っている `ipykernel` を使います
 - 質問や件数は、先頭近くの「変えてよい値」のセルで変えます。スクリプトでは引数でも変えられます（引数があれば引数、なければ変数）
 - 前のトピックが終わっていないと、最初のセルで止まります。構築する人の設定なら、`REBUILD = True` にして実行し直すと、武将のインデックスを作り直してから進みます。作り直せたら `REBUILD = False` に戻します（`True` のままだと、実行のたびに作り直します）。メンバーの設定では、構築する人に実行してもらいます
-- 中身を直すときは `.py` を直します。Notebook は `.py` から作ったものです（作る人用の `tools/make_notebooks.py`）
+- 中身を直すときは `.py` を直します。Notebook は `.py` から作ったものです（教材を直す人用の `tools/make_notebooks.py`）
 
 ## トピックの一覧
 
@@ -90,9 +90,9 @@ Free プランの無料枠には月ごとの上限があり、チームの AI Se
 
 - 武将の JSON → `data/sengoku/bushou.json`（項目 `id`、`name`、`aliases`、`battles`、`profile` など）。項目を変えるときは、`lib/sengoku.py` の `build_index()` と `FIELDS`、`lib/data.py` の `embedding_text()` を合わせる
 - 質問と正解（任意）→ `data/sengoku/questions.json`。ないときは、正解の順位を省略して動きます
-- 資料を差し替えたら、埋め込み済みファイルは作り直す（作る人用 `tools/make_embeddings.py`）。古い分は使われず、その場で埋め込まれる
+- 資料を差し替えたら、埋め込み済みファイルは作り直す（教材を直す人用 `tools/make_embeddings.py`）。古い分は使われず、その場で埋め込まれる
 
-## 作る人・進行役向け
+## 教材を直す人・進行役向け
 
 - `python basic/tools/make_embeddings.py`：武将の埋め込み済みファイルを作る。`--check` で、いまの `.env.local` と合っているかを確かめる。本文を変えたら作り直す
 - `python basic/tools/reset.py --to 04`：構築する人の設定で、トピックの開始の状態を作り直す
@@ -121,6 +121,6 @@ Free プランの無料枠には月ごとの上限があり、チームの AI Se
   - トピックの部品：同義語マップ `synonyms.py`、指標 `metrics.py`、検索結果からのプロンプト `rag_prompt.py`
 - `data/`：武将の JSON と質問（`sengoku/`）
 - `embeddings/`：埋め込み済みファイル（text-embedding-3-small、1536 次元。時間が足りないとき用）
-- `tools/`：作る人用と再開用（`reset.py`、`make_embeddings.py`）
+- `tools/`：教材を直す人用と再開用（`reset.py`、`make_embeddings.py`）
 - `tests/`：通信なしのテスト
 - `requirements.txt`

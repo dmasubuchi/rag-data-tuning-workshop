@@ -57,7 +57,7 @@ class Base(EnvCase):
 class BuiltStateTest(Base):
     def test_build_makes_every_document_available(self):
         self.assertEqual(len(self.az.blobs), 23)
-        self.assertEqual(sorted(self.az.blobs), sorted(f["path"] for f in config.manifest_files()))     # shared/ や <組>/ のフォルダはない
+        self.assertEqual(sorted(self.az.blobs), sorted(f["path"] for f in config.manifest_files()))     # shared/ や、チームごとのフォルダはない
         self.assertFalse([n for n in self.az.blobs if n.split("/")[0] in ("shared", "g1")])
         titles = {d["title"] for d in self.az.chunks.values()}
         self.assertEqual(titles, {Path(f["path"]).name for f in config.manifest_files()})

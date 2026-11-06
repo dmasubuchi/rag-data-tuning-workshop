@@ -35,7 +35,7 @@ HTML のスライド（`site/lecture/`）と Markdown（`docs/lecture/md/`）の
 
 ## 作り方
 
-Repo の直下で実行します。`build.py` は Python 3.10 以上の標準ライブラリだけで動きます。確認の `check.py` には `playwright`（Chromium）が要ります（作る人の道具で、参加者は要りません）。
+Repo の直下で実行します。`build.py` は Python 3.10 以上の標準ライブラリだけで動きます。確認の `check.py` には `playwright`（Chromium）が要ります（教材を直す人の道具で、参加者は要りません）。
 
 ```
 python3 docs/lecture/tools/build.py

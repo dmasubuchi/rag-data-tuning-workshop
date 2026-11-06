@@ -6,6 +6,7 @@
 """
 
 import html
+import json
 import re
 import sys
 import tempfile
@@ -29,7 +30,8 @@ except ImportError:
 
 GITHUB_FILE = re.compile(r"^https://github\.com/dmasubuchi/rag-data-tuning-workshop/(blob|tree)/main/(.+)$")
 MERMAID_SCRIPT = re.compile(r'<script src="https://cdn\.jsdelivr\.net/npm/mermaid@(\d+\.\d+\.\d+)/dist/mermaid\.min\.js"')
-REMOVED_TERMS = re.compile("講師|受講生|受講者|講義")
+# 消した呼び名。このファイル自身が grep に当たらないように、2つに分けて書く
+REMOVED_TERMS = re.compile("|".join(a + b for a, b in [("講", "師"), ("受講", "生"), ("受講", "者"), ("講", "義")]))
 
 
 def expected_sources() -> list:
@@ -60,12 +62,19 @@ def refs_of(path: Path) -> Refs:
     return Refs(path.read_text(encoding="utf-8"))
 
 
+def deck_slide_ids(slides_html: Path) -> set:
+    """HTML のスライド（site/lecture/<部>/slides.html）の `const DECK = {…};` から、各スライドの id を集める。"""
+    found = re.search(r"^const DECK = (\{.*\});\s*$", slides_html.read_text(encoding="utf-8"), re.M)
+    assert found, f"{slides_html}: DECK がない"
+    return {slide["id"] for slide in json.loads(found.group(1))["slides"]}
+
+
 def render(text: str, rel: str = "guide/x.md", repo: Path = REPO_DIR, pages=("guide/x.md", "guide/other.md")):
     linker = build_site.Linker(repo, set(pages))
     return build_site.render_markdown(text, rel, linker)[0]
 
 
-@unittest.skipUnless(HAVE_MARKDOWN, "markdown が入っていないので飛ばす（作る人の道具。requirements-dev.txt）")
+@unittest.skipUnless(HAVE_MARKDOWN, "markdown が入っていないので飛ばす（教材を直す人の道具。requirements-dev.txt）")
 class SiteOutputTest(unittest.TestCase):
     """今の site/index.html と site/pages/ の確認。"""
 
@@ -119,6 +128,23 @@ class SiteOutputTest(unittest.TestCase):
                         problems.append(f"{shown}: 飛び先の見出しがない {value}")
         self.assertGreater(checked, 500)
         self.assertEqual(problems, [])
+
+    def test_slide_links_point_to_slides_that_exist(self):
+        """`../lecture/<部>/slides.html#pNN` の #pNN が、その部の slides.html の DECK にあるスライドの id。"""
+        ids_cache, problems, checked = {}, [], 0
+        for html_file in [SITE / "index.html", *sorted(PAGES.glob("*.html"))]:
+            for _, _, value in refs_of(html_file).refs:
+                parts = urllib.parse.urlsplit(value)
+                target = (html_file.parent / urllib.parse.unquote(parts.path)).resolve() if parts.path and not parts.scheme else None
+                if target is None or target.name != "slides.html" or (SITE / "lecture") not in target.parents or not parts.fragment:
+                    continue
+                checked += 1
+                if target not in ids_cache:
+                    ids_cache[target] = deck_slide_ids(target)
+                if parts.fragment not in ids_cache[target]:
+                    problems.append(f"{html_file.relative_to(SITE).as_posix()}: {value}")
+        self.assertGreaterEqual(checked, 20)
+        self.assertEqual(problems, [], "スライドの id にない飛び先")
 
     def test_every_page_is_reachable_from_the_portal(self):
         seen, queue = set(), [SITE / "index.html"]
@@ -220,7 +246,7 @@ class SiteOutputTest(unittest.TestCase):
         self.assertEqual(stale, [], "古いファイルがある：python tools/build_site.py で作り直す")
 
 
-@unittest.skipUnless(HAVE_MARKDOWN, "markdown が入っていないので飛ばす（作る人の道具。requirements-dev.txt）")
+@unittest.skipUnless(HAVE_MARKDOWN, "markdown が入っていないので飛ばす（教材を直す人の道具。requirements-dev.txt）")
 class BuildTest(unittest.TestCase):
     def test_build_is_deterministic(self):
         with tempfile.TemporaryDirectory() as a, tempfile.TemporaryDirectory() as b:
@@ -250,7 +276,7 @@ class BuildTest(unittest.TestCase):
         self.assertEqual(modules - allowed, set())
 
 
-@unittest.skipUnless(HAVE_MARKDOWN, "markdown が入っていないので飛ばす（作る人の道具。requirements-dev.txt）")
+@unittest.skipUnless(HAVE_MARKDOWN, "markdown が入っていないので飛ばす（教材を直す人の道具。requirements-dev.txt）")
 class HeadingIdTest(unittest.TestCase):
     def test_heading_ids_match_github(self):
         html = render("# 手順\n\n## 4. 接続の設定を作る\n\n## 3-4. Cosmos DB（NoSQL）\n\n## `.env.local` を作る\n\n"
@@ -259,13 +285,18 @@ class HeadingIdTest(unittest.TestCase):
         self.assertEqual(ids, ["手順", "4-接続の設定を作る", "3-4-cosmos-dbnosql", "envlocal-を作る", "5-補助az-で作る",
                                "手順-1", "手順-2"])
 
+    def test_angle_brackets_and_ampersands_in_code_follow_github(self):
+        """見出しのコードの中の `<`・`&` は、GitHub と同じく id から消える（&lt; の文字が残らない）。"""
+        html = render("# 題\n\n## `rg-<org>` を開く\n\n## `a&b` を読む\n")
+        self.assertEqual(re.findall(r'<h\d id="([^"]*)"', html), ["題", "rg-org-を開く", "ab-を読む"])
+
     def test_anchor_links_to_japanese_headings_resolve_on_the_page(self):
         html = render("# 題\n\n[下へ](#2-つまずいたとき)\n\n## 2. つまずいたとき\n")
         self.assertIn('href="#2-つまずいたとき"', html)
         self.assertIn('id="2-つまずいたとき"', html)
 
 
-@unittest.skipUnless(HAVE_MARKDOWN, "markdown が入っていないので飛ばす（作る人の道具。requirements-dev.txt）")
+@unittest.skipUnless(HAVE_MARKDOWN, "markdown が入っていないので飛ばす（教材を直す人の道具。requirements-dev.txt）")
 class LinkRewriteTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -326,7 +357,7 @@ class LinkRewriteTest(unittest.TestCase):
         self.assertIn('<img alt="図" src="img/p01.svg">', html)
 
 
-@unittest.skipUnless(HAVE_MARKDOWN, "markdown が入っていないので飛ばす（作る人の道具。requirements-dev.txt）")
+@unittest.skipUnless(HAVE_MARKDOWN, "markdown が入っていないので飛ばす（教材を直す人の道具。requirements-dev.txt）")
 class GithubMarkdownTest(unittest.TestCase):
     """GitHub で読める書き方が、同じ構造で読まれる。"""
 

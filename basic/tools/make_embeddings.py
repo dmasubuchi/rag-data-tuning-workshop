@@ -1,4 +1,4 @@
-"""（作る人用）武将の埋め込み済みファイルを作る。参加者は実行しなくてよい。
+"""（教材を直す人用）武将の埋め込み済みファイルを作る。参加者は実行しなくてよい。
 
 実行（Repo 直下で）：python basic/tools/make_embeddings.py             武将の埋め込み済みファイルを作る
           python basic/tools/make_embeddings.py --check            いまのファイルが、いまの .env.local と合っているか確かめる（作らない）
@@ -47,7 +47,7 @@ def check(path, texts: list, label: str) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="埋め込み済みファイルを作る（作る人用）")
+    parser = argparse.ArgumentParser(description="埋め込み済みファイルを作る（教材を直す人用）")
     parser.add_argument("--check", action="store_true", help="作らずに、いまのファイルを確かめる")
     args = parser.parse_args()
     s = get_settings()

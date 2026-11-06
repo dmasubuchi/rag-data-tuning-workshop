@@ -22,7 +22,7 @@
 <li class="l2"><a href="#困ったときに見る中間結果">困ったときに見る中間結果</a></li>
 <li class="l2"><a href="#セマンティックランカーの使いすぎに注意">セマンティックランカーの使いすぎに注意</a></li>
 <li class="l2"><a href="#自分の資料に差し替えるとき">自分の資料に差し替えるとき</a></li>
-<li class="l2"><a href="#作る人進行役向け">作る人・進行役向け</a></li>
+<li class="l2"><a href="#教材を直す人進行役向け">教材を直す人・進行役向け</a></li>
 <li class="l2"><a href="#フォルダ">フォルダ</a></li>
 </ul>
 </details></nav>
@@ -52,7 +52,7 @@
 <li>Notebook：同じ名前の <code>xxx.ipynb</code> を開き、上のセルから順に実行します。VS Code の Jupyter 拡張と、<code>requirements.txt</code> に入っている <code>ipykernel</code> を使います</li>
 <li>質問や件数は、先頭近くの「変えてよい値」のセルで変えます。スクリプトでは引数でも変えられます（引数があれば引数、なければ変数）</li>
 <li>前のトピックが終わっていないと、最初のセルで止まります。構築する人の設定なら、<code>REBUILD = True</code> にして実行し直すと、武将のインデックスを作り直してから進みます。作り直せたら <code>REBUILD = False</code> に戻します（<code>True</code> のままだと、実行のたびに作り直します）。メンバーの設定では、構築する人に実行してもらいます</li>
-<li>中身を直すときは <code>.py</code> を直します。Notebook は <code>.py</code> から作ったものです（作る人用の <code>tools/make_notebooks.py</code>）</li>
+<li>中身を直すときは <code>.py</code> を直します。Notebook は <code>.py</code> から作ったものです（教材を直す人用の <code>tools/make_notebooks.py</code>）</li>
 </ul>
 <h2 id="トピックの一覧">トピックの一覧</h2>
 <p>番号の順に進めます。各トピックの README に、前提のトピック、実行するコマンド、見るところが書いてあります。
@@ -105,9 +105,9 @@
 <ul>
 <li>武将の JSON → <code>data/sengoku/bushou.json</code>（項目 <code>id</code>、<code>name</code>、<code>aliases</code>、<code>battles</code>、<code>profile</code> など）。項目を変えるときは、<code>lib/sengoku.py</code> の <code>build_index()</code> と <code>FIELDS</code>、<code>lib/data.py</code> の <code>embedding_text()</code> を合わせる</li>
 <li>質問と正解（任意）→ <code>data/sengoku/questions.json</code>。ないときは、正解の順位を省略して動きます</li>
-<li>資料を差し替えたら、埋め込み済みファイルは作り直す（作る人用 <code>tools/make_embeddings.py</code>）。古い分は使われず、その場で埋め込まれる</li>
+<li>資料を差し替えたら、埋め込み済みファイルは作り直す（教材を直す人用 <code>tools/make_embeddings.py</code>）。古い分は使われず、その場で埋め込まれる</li>
 </ul>
-<h2 id="作る人進行役向け">作る人・進行役向け</h2>
+<h2 id="教材を直す人進行役向け">教材を直す人・進行役向け</h2>
 <ul>
 <li><code>python basic/tools/make_embeddings.py</code>：武将の埋め込み済みファイルを作る。<code>--check</code> で、いまの <code>.env.local</code> と合っているかを確かめる。本文を変えたら作り直す</li>
 <li><code>python basic/tools/reset.py --to 04</code>：構築する人の設定で、トピックの開始の状態を作り直す</li>
@@ -139,7 +139,7 @@
 </li>
 <li><code>data/</code>：武将の JSON と質問（<code>sengoku/</code>）</li>
 <li><code>embeddings/</code>：埋め込み済みファイル（text-embedding-3-small、1536 次元。時間が足りないとき用）</li>
-<li><code>tools/</code>：作る人用と再開用（<code>reset.py</code>、<code>make_embeddings.py</code>）</li>
+<li><code>tools/</code>：教材を直す人用と再開用（<code>reset.py</code>、<code>make_embeddings.py</code>）</li>
 <li><code>tests/</code>：通信なしのテスト</li>
 <li><code>requirements.txt</code></li>
 </ul>
