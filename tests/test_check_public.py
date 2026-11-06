@@ -12,6 +12,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 from unittest import mock
 
@@ -162,6 +163,17 @@ class ScanTextTests(unittest.TestCase):
         text = "a@example.com と b@example.jp と C@EXAMPLE.COM"
         self.assertEqual(scan_text("a.txt", text, []), [])
 
+    def test_full_width_and_half_width_forms_match_banned_terms(self):
+        # 全角の英字・半角のカナも、禁止語に当てる（NFKC でそろえる）
+        self.assertEqual(kinds(scan_text("a.txt", "ＡＣＭＥ 社", ["acme"])), ["banned"])
+        self.assertEqual(kinds(scan_text("a.txt", "ｱｲｳ 社", ["アイウ"])), ["banned"])
+        self.assertEqual(kinds(scan_text("a.txt", "acme 社", ["ＡＣＭＥ"])), ["banned"])
+        self.assertEqual(kinds(scan_text("a.txt", "アイウ 社", ["ｱｲｳ"])), ["banned"])
+
+    def test_full_width_forms_of_other_kinds_are_found_too(self):
+        full = "".join(chr(ord(c) + 0xFEE0) if "!" <= c <= "~" else c for c in "someone@" + "corp.test")
+        self.assertEqual(kinds(scan_text("a.txt", full, [])), ["email"])
+
     def test_clean_text_passes(self):
         text = "# はじめに\n\nこの研修では、データを整えると検索の結果がどう変わるかを体験します。\n"
         self.assertEqual(scan_text("a.txt", text, ["acme"]), [])
@@ -211,6 +223,10 @@ class MainTests(unittest.TestCase):
             code = main(list(args))
         return code, out.getvalue(), err.getvalue()
 
+    def scrub(self, out):
+        """出力から、調べる場所の絶対パス（一時フォルダーのでたらめな名前）を除く。"""
+        return out.replace(str(self.target), "").replace(self.target.as_posix(), "")
+
     def git(self, *args, cwd=None):
         subprocess.run(
             ["git", "-c", "user.name=t", "-c", "user.email=t@example.com",
@@ -237,6 +253,33 @@ class MainTests(unittest.TestCase):
             self.assertEqual(check_public.default_banned_path(), self.banned)
             code, _, _ = self.run_main(str(self.target))
         self.assertEqual(code, 1)
+
+    def test_banned_list_is_required_there_is_no_personal_default(self):
+        self.write("a.md", "ふつう\n")
+        with mock.patch.dict(os.environ, {}, clear=True):
+            self.assertIsNone(check_public.default_banned_path())
+            code, out, err = self.run_main(str(self.target))
+        self.assertEqual(code, 2)
+        self.assertIn("禁止語のリストの場所を --banned か PUBLIC_CHECK_BANNED で渡す", out + err)
+        self.assertNotIn("OK", out)
+        # 個人の置き場所を、コードにも説明にも書かない
+        self.assertFalse(hasattr(check_public, "BANNED_DEFAULT"))
+        self.assertNotIn("public-check", check_public.__doc__ or "")
+        self.assertNotIn("runtime", check_public.__doc__ or "")
+
+    def test_empty_environment_variable_counts_as_not_given(self):
+        with mock.patch.dict(os.environ, {"PUBLIC_CHECK_BANNED": "  "}):
+            self.assertIsNone(check_public.default_banned_path())
+
+    def test_tilde_in_banned_path_is_expanded(self):
+        self.write("a.md", "ACME 社\n")
+        home = {"HOME": str(self.tmp), "USERPROFILE": str(self.tmp)}
+        with mock.patch.dict(os.environ, {**home, "PUBLIC_CHECK_BANNED": "~/banned.txt"}):
+            self.assertEqual(check_public.default_banned_path(), self.banned)
+            code, _, _ = self.run_main(str(self.target))
+            self.assertEqual(code, 1)
+            code, _, _ = self.run_main("--banned", "~/banned.txt", str(self.target))
+            self.assertEqual(code, 1)
 
     def test_nonexistent_scan_path_fails(self):
         code, out, err = self.run_main("--banned", str(self.banned), str(self.tmp / "nothing"))
@@ -266,13 +309,206 @@ class MainTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("banned", out)
 
-    def test_binary_and_non_utf8_files_are_skipped(self):
+    # --- 読めずに飛ばしたファイル ---
+
+    def write_unreadable(self):
         (self.target / "a.bin").write_bytes(b"\x00\x01ACME\x02")
         (self.target / "b.txt").write_bytes("ACME".encode("utf-16"))
-        (self.target / "c.txt").write_bytes(b"\xff\xfe\xfa ACME")
+        (self.target / "sub").mkdir(exist_ok=True)
+        (self.target / "sub" / "c.txt").write_bytes(b"\xff\xfe\xfa ACME")
+
+    def test_skipped_files_fail_and_are_listed_one_by_one(self):
+        self.write("ok.md", "ふつうの文章です。\n")
+        self.write_unreadable()
+        code, out, err = self.run_main("--banned", str(self.banned), str(self.target))
+        self.assertEqual(code, 1)
+        for name in ("a.bin", "b.txt", "sub/c.txt"):
+            self.assertEqual(sum(1 for line in out.splitlines() if line.startswith("飛ばした") and line.endswith(name)), 1, out)
+        self.assertNotIn("ok.md", "".join(line for line in out.splitlines() if line.startswith("飛ばした")))
+        self.assertIn("--allow-skipped", out + err)
+
+    def test_allow_skipped_lets_them_pass_but_still_lists_them(self):
+        self.write("ok.md", "ふつうの文章です。\n")
+        self.write_unreadable()
+        code, out, _ = self.run_main("--banned", str(self.banned), "--allow-skipped", str(self.target))
+        self.assertEqual(code, 0, out)
+        self.assertIn("OK", out)
+        self.assertEqual(sum(1 for line in out.splitlines() if line.startswith("飛ばした")), 3, out)
+
+    def test_allow_skipped_does_not_hide_findings(self):
+        self.write("bad.md", "ACME 社\n")
+        self.write_unreadable()
+        code, out, _ = self.run_main("--banned", str(self.banned), "--allow-skipped", str(self.target))
+        self.assertEqual(code, 1)
+        self.assertIn("banned", out)
+
+    # --- 検査したファイルが 0 件 ---
+
+    def test_empty_directory_is_not_ok(self):
+        code, out, err = self.run_main("--banned", str(self.banned), str(self.target))
+        self.assertEqual(code, 2)
+        self.assertIn("0 件", out + err)
+        self.assertNotIn("OK", out)
+
+    def test_nothing_scanned_even_with_allow_skipped_is_not_ok(self):
+        self.write_unreadable()
+        code, out, err = self.run_main("--banned", str(self.banned), "--allow-skipped", str(self.target))
+        self.assertEqual(code, 2)
+        self.assertIn("0 件", out + err)
+
+    @unittest.skipUnless(HAS_GIT, "git がない環境")
+    def test_git_repo_without_files_is_not_ok(self):
+        self.git("init", "-q")
+        code, out, err = self.run_main("--banned", str(self.banned), "--history", str(self.target))
+        self.assertEqual(code, 2)
+        self.assertNotIn("OK", out)
+
+    # --- ファイルとフォルダのパス ---
+
+    def test_banned_word_in_a_file_name_is_found(self):
+        self.write("ACME-notes.md", "ふつうの文章です。\n")
         code, out, _ = self.run_main("--banned", str(self.banned), str(self.target))
-        self.assertEqual(code, 0)
-        self.assertIn("飛ばした", out)
+        self.assertEqual(code, 1)
+        self.assertIn("banned", out)
+        self.assertNotIn("ACME", self.scrub(out))   # 禁止語そのものは、出力にも出さない
+        self.assertIn("notes.md", out)
+
+    def test_banned_word_in_a_folder_name_is_found(self):
+        self.write("docs/acme/readme.md", "ふつうの文章です。\n")
+        code, out, _ = self.run_main("--banned", str(self.banned), str(self.target))
+        self.assertEqual(code, 1)
+        self.assertIn("banned", out)
+        self.assertNotIn("acme", self.scrub(out).lower())
+        self.assertIn("readme.md", out)   # どのファイルかは分かる
+
+    def test_full_width_banned_word_in_a_name_is_found(self):
+        self.write("ＡＣＭＥ.md", "ふつうの文章です。\n")
+        code, out, _ = self.run_main("--banned", str(self.banned), str(self.target))
+        self.assertEqual(code, 1)
+        self.assertIn("banned", out)
+
+    def test_guid_and_secret_in_a_name_are_found(self):
+        self.write(GUID + ".md", "ふつうの文章です。\n")
+        self.write(ADMIN_KEY_LINE.replace("=", "-") + ".md", "ふつうの文章です。\n")   # = は名前に使いにくいので - にする
+        self.write("subscrip" + "tions-" + GUID + "/a.md", "ふつうの文章です。\n")
+        code, out, _ = self.run_main("--banned", str(self.banned), str(self.target))
+        self.assertEqual(code, 1)
+        self.assertIn("guid", out)
+        self.assertNotIn(GUID, out)
+
+    def test_the_scanned_places_own_name_is_not_checked(self):
+        """調べる場所の名前（自分で指定した絶対パスなど）は、中のファイルのパスではない。"""
+        place = self.tmp / "acme-place"
+        place.mkdir()
+        self.write("a.md", "ふつうの文章です。\n", base=place)
+        code, out, _ = self.run_main("--banned", str(self.banned), str(place))
+        self.assertEqual(code, 0, out)
+        code, out, _ = self.run_main("--banned", str(self.banned), str(place / "a.md"))
+        self.assertEqual(code, 0, out)
+
+    def test_single_file_name_is_checked(self):
+        p = self.write("acme.md", "ふつうの文章です。\n")
+        code, out, _ = self.run_main("--banned", str(self.banned), str(p))
+        self.assertEqual(code, 1)
+        self.assertIn("banned", out)
+
+    @unittest.skipUnless(HAS_GIT, "git がない環境")
+    def test_file_name_in_git_repo_is_found(self):
+        self.git("init", "-q")
+        self.write("ACME-notes.md", "ふつうの文章です。\n")
+        self.git("add", "-A")
+        code, out, _ = self.run_main("--banned", str(self.banned), str(self.target))
+        self.assertEqual(code, 1)
+        self.assertIn("banned", out)
+
+    @unittest.skipUnless(HAS_GIT, "git がない環境")
+    def test_history_finds_a_removed_file_name(self):
+        self.git("init", "-q")
+        self.write("acme-plan.md", "ふつうの文章です。\n")
+        self.write("keep.md", "ふつうの文章です。\n")
+        self.git("add", "-A")
+        self.git("commit", "-q", "-m", "add")
+        self.git("rm", "-q", "acme-plan.md")
+        self.git("commit", "-q", "-m", "remove")
+        code, out, _ = self.run_main("--banned", str(self.banned), str(self.target))
+        self.assertEqual(code, 0, out)
+        code, out, _ = self.run_main("--banned", str(self.banned), "--history", str(self.target))
+        self.assertEqual(code, 1)
+        self.assertIn("banned", out)
+        self.assertNotIn("acme", self.scrub(out).lower())
+
+    # --- Office の文書 ---
+
+    def make_office(self, name, parts):
+        path = self.target / name
+        with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
+            for member, body in parts.items():
+                z.writestr(member, body)
+        return path
+
+    WORD = ('<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://example.invalid/w"><w:body><w:p>'
+            '<w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">{}</w:t></w:r></w:p></w:body></w:document>')
+
+    def test_office_documents_are_read_as_text(self):
+        cases = {
+            "a.docx": {"word/document.xml": self.WORD.format("これは ACME 社の資料")},
+            "b.xlsx": {"xl/sharedStrings.xml": "<sst><si><t>ACME</t></si></sst>"},
+            "c.pptx": {"ppt/slides/slide1.xml": "<p:sld><a:p><a:r><a:t>ACME</a:t></a:r></a:p></p:sld>"},
+        }
+        for name, parts in cases.items():
+            with self.subTest(name=name):
+                for old in self.target.iterdir():
+                    old.unlink()
+                self.make_office(name, parts)
+                code, out, _ = self.run_main("--banned", str(self.banned), str(self.target))
+                self.assertEqual(code, 1, out)
+                self.assertIn("banned", out)
+                self.assertNotIn("飛ばした", out)
+
+    def test_word_that_is_split_across_runs_is_still_found(self):
+        split = ('<w:p><w:r><w:t>AC</w:t></w:r><w:r><w:rPr><w:b/></w:rPr><w:t>ME</w:t></w:r></w:p>')
+        self.make_office("a.docx", {"word/document.xml": split})
+        code, out, _ = self.run_main("--banned", str(self.banned), str(self.target))
+        self.assertEqual(code, 1, out)
+        self.assertIn("banned", out)
+
+    def test_document_properties_and_alt_text_are_read(self):
+        core = "<cp:coreProperties><dc:creator>ACME Person</dc:creator></cp:coreProperties>"
+        alt = '<p:pic><p:cNvPr id="2" name="Picture 1" descr="ACME logo"/></p:pic>'
+        for member, body in (("docProps/core.xml", core), ("ppt/slides/slide1.xml", alt)):
+            with self.subTest(member=member):
+                for old in self.target.iterdir():
+                    old.unlink()
+                self.make_office("a.pptx", {member: body})
+                code, out, _ = self.run_main("--banned", str(self.banned), str(self.target))
+                self.assertEqual(code, 1, out)
+
+    def test_markup_alone_is_not_a_finding(self):
+        # タグの名前や属性（キーのような長い名前、GUID のような ID）は、文字ではない
+        xml = ('<w:document w:rsidR="00A1B2C3" mc:Ignorable="w14 w15" w15:docId="{' + GUID + '}">'
+               '<w:p><w:r><w:t>ふつうの文章です。</w:t></w:r></w:p></w:document>')
+        self.make_office("a.docx", {"word/document.xml": xml})
+        code, out, _ = self.run_main("--banned", str(self.banned), str(self.target))
+        self.assertEqual(code, 0, out)
+        self.assertNotIn("飛ばした", out)
+
+    def test_clean_office_document_counts_as_scanned(self):
+        self.make_office("a.docx", {"word/document.xml": self.WORD.format("ふつうの文章です。")})
+        code, out, _ = self.run_main("--banned", str(self.banned), str(self.target))
+        self.assertEqual(code, 0, out)
+        self.assertIn("1 ファイルを検査", out)
+
+    def test_office_entities_are_decoded(self):
+        self.make_office("a.docx", {"word/document.xml": self.WORD.format("A&#67;ME")})
+        code, out, _ = self.run_main("--banned", str(self.banned), str(self.target))
+        self.assertEqual(code, 1, out)
+
+    def test_broken_office_file_is_skipped_and_fails(self):
+        (self.target / "broken.docx").write_bytes(b"PK\x03\x04 this is not a zip file")
+        self.write("ok.md", "ふつうの文章です。\n")
+        code, out, _ = self.run_main("--banned", str(self.banned), str(self.target))
+        self.assertEqual(code, 1)
+        self.assertIn("broken.docx", out)
 
     def test_outside_git_every_file_is_checked(self):
         self.write(".hidden/a.md", "ACME 社\n")
@@ -354,6 +590,91 @@ class MainTests(unittest.TestCase):
         self.git("add", "-A")
         self.git("commit", "-q", "-m", "add")
         code, out, _ = self.run_main("--banned", str(self.banned), "--history", str(self.target))
+        self.assertEqual(code, 0, out)
+
+    # --- 履歴の作成者・メッセージ・ブランチ・タグ ---
+
+    def git_as(self, name, email, *args):
+        subprocess.run(
+            ["git", "-c", f"user.name={name}", "-c", f"user.email={email}", "-c", "commit.gpgsign=false",
+             "-c", "tag.gpgsign=false", *args],
+            cwd=self.target, check=True, capture_output=True,
+        )
+
+    def history_repo(self, name="t", email="t@example.com", message="add", tag=None, branch=None, tag_message=None):
+        self.git("init", "-q")
+        self.write("a.md", "ふつうの文章です。\n")
+        self.git("add", "-A")
+        self.git_as(name, email, "commit", "-q", "-m", message)
+        if branch:
+            self.git("branch", branch)
+        if tag and tag_message:
+            self.git_as(name, email, "tag", "-a", tag, "-m", tag_message)
+        elif tag:
+            self.git("tag", tag)
+
+    def history_codes(self):
+        _, plain, _ = self.run_main("--banned", str(self.banned), str(self.target))
+        code, out, _ = self.run_main("--banned", str(self.banned), "--history", str(self.target))
+        return code, plain, out
+
+    @unittest.skipUnless(HAS_GIT, "git がない環境")
+    def test_history_checks_author_name_and_email(self):
+        cases = {
+            "作成者の名前": dict(name="Acme Person"),
+            "作成者のメール": dict(email="someone@" + "corp.test"),
+        }
+        for label, kwargs in cases.items():
+            with self.subTest(label):
+                shutil.rmtree(self.target / ".git", ignore_errors=True)
+                self.history_repo(**kwargs)
+                code, plain, out = self.history_codes()
+                self.assertIn("OK", plain)
+                self.assertEqual(code, 1, out)
+                self.assertNotIn("Acme", self.scrub(out))
+                self.assertNotIn("someone", self.scrub(out))
+
+    @unittest.skipUnless(HAS_GIT, "git がない環境")
+    def test_history_checks_committer_name_and_email(self):
+        self.git("init", "-q")
+        self.write("a.md", "ふつうの文章です。\n")
+        self.git("add", "-A")
+        env = {**os.environ, "GIT_COMMITTER_NAME": "Acme Person", "GIT_COMMITTER_EMAIL": "t@example.com"}
+        subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@example.com", "-c", "commit.gpgsign=false",
+                        "commit", "-q", "-m", "add"], cwd=self.target, check=True, capture_output=True, env=env)
+        code, plain, out = self.history_codes()
+        self.assertEqual(code, 1, out)
+        self.assertIn("banned", out)
+
+    @unittest.skipUnless(HAS_GIT, "git がない環境")
+    def test_history_checks_commit_message(self):
+        self.history_repo(message="ACME 向けの追加\n\n2行目にも ACME")
+        code, plain, out = self.history_codes()
+        self.assertIn("OK", plain)
+        self.assertEqual(code, 1, out)
+        self.assertIn("banned", out)
+        self.assertNotIn("ACME", self.scrub(out))
+
+    @unittest.skipUnless(HAS_GIT, "git がない環境")
+    def test_history_checks_tag_message_and_names_of_branches_and_tags(self):
+        cases = {
+            "注釈つきタグのメッセージ": dict(tag="v1", tag_message="ACME 向け"),
+            "ブランチの名前": dict(branch="acme-work"),
+            "タグの名前": dict(tag="acme-1"),
+        }
+        for label, kwargs in cases.items():
+            with self.subTest(label):
+                shutil.rmtree(self.target / ".git", ignore_errors=True)
+                self.history_repo(**kwargs)
+                code, plain, out = self.history_codes()
+                self.assertIn("OK", plain)
+                self.assertEqual(code, 1, out)
+                self.assertNotIn("acme", self.scrub(out).lower())
+
+    @unittest.skipUnless(HAS_GIT, "git がない環境")
+    def test_history_ignores_clean_commit_info(self):
+        self.history_repo(message="はじめの追加", tag="v1", tag_message="最初の版", branch="work")
+        code, _, out = self.history_codes()
         self.assertEqual(code, 0, out)
 
     def test_history_outside_git_fails(self):
