@@ -48,7 +48,7 @@ EXAMPLE_DOMAINS = {"example.com", "example.jp"}
 # 秘密らしい文字列の型。このファイル自身に引っかからないよう、リテラルの "=" は [=] と書く。
 # 名前の規則（最後の型）は、AZURE_SEARCH_ADMIN_KEY、"primaryKey"、"key1"、Ocp-Apim-Subscription-Key のように、
 # 名前に key・secret・token・password・connection string を含み、そのあとに 20 文字以上の値が続くものを拾う。
-# \w*+ は、長い行で正規表現が遅くならないための「戻らない」繰り返し（Python 3.11 以上）。
+# \w{0,40}+ は、長い行で正規表現が遅くならないための「戻らない」繰り返し（Python 3.11 以上）。
 SECRET_PATTERNS = [
     re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"),
     re.compile(r"AKIA[0-9A-Z]{16}"),
@@ -58,7 +58,7 @@ SECRET_PATTERNS = [
     re.compile(r"SharedAccessSignature[=]|[?&]sig=[A-Za-z0-9%+/=]{20,}"),
     re.compile(r"""Authorization["']?\s*[:=]\s*["']?Bearer\s+[A-Za-z0-9+/_.=-]{20,}""", re.IGNORECASE),
     re.compile(
-        r"""(?:key|secret|token|password|passwd|connection_?string)\w*+["']?\s*[:=]\s*["']?[A-Za-z0-9+/_.-]{20,}""",
+        r"""(?:key|secret|token|password|passwd|connection_?string)\w{0,40}+["']?\s*[:=]\s*["']?[A-Za-z0-9+/_.-]{20,}""",
         re.IGNORECASE,
     ),
 ]
@@ -67,7 +67,8 @@ GUID_PATTERN = re.compile(
     r"(?<![0-9A-Fa-f])[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}(?![0-9A-Fa-f])"
 )
 ABS_PATH_PATTERN = re.compile(r"/Users/[A-Za-z0-9._-]+/")
-EMAIL_PATTERN = re.compile(r"[A-Za-z0-9._%+-]+@([A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,})")
+# 先頭の (?<!...) は、英数字の長い連なりの途中から何度も探し直して遅くならないための印
+EMAIL_PATTERN = re.compile(r"(?<![A-Za-z0-9._%+-])[A-Za-z0-9._%+-]+@([A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,})")
 
 BINARY_SNIFF_BYTES = 8192
 BATCH_BYTES = 64 * 1024 * 1024  # 履歴を読むとき、1回に git から受け取る量のめやす

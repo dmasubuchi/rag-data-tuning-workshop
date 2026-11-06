@@ -11,6 +11,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 import zipfile
 from pathlib import Path
@@ -173,6 +174,15 @@ class ScanTextTests(unittest.TestCase):
     def test_full_width_forms_of_other_kinds_are_found_too(self):
         full = "".join(chr(ord(c) + 0xFEE0) if "!" <= c <= "~" else c for c in "someone@" + "corp.test")
         self.assertEqual(kinds(scan_text("a.txt", full, [])), ["email"])
+
+    def test_long_lines_are_scanned_in_linear_time(self):
+        """base64 の塊や、1行にまとめた文書でも、検査が終わらなくならない（正規表現が二乗の時間にならない）。"""
+        for label, line in (("英数字の長い連なり", "a" * 300_000), ("key の連なり", "key" * 100_000),
+                            ("メール風の連なり", "a.b" * 100_000)):
+            with self.subTest(label):
+                started = time.monotonic()
+                scan_text("a.txt", line, ["acme"])
+                self.assertLess(time.monotonic() - started, 3.0)
 
     def test_clean_text_passes(self):
         text = "# はじめに\n\nこの研修では、データを整えると検索の結果がどう変わるかを体験します。\n"
