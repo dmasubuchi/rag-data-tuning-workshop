@@ -237,16 +237,45 @@ class HrSheetTest(unittest.TestCase):
         self.assertIn(spot_check.SCAN_CODE_LABEL, page)
         self.assertIn("<mark>月1回の夜間当番</mark>", page)
         self.assertNotIn("def make_", page)
-        # 印字する文字でなく、コードのコメントにだけある語句は、コードの行として出す（見つけたことが分かる）
+        # 「確認印」は、コメント（# 確認印の欄）にもあるが、印字する文字（d.text の "確認印"）にもある：印字する方を出す
         page = self.card("hr-35")
-        self.assertIn(spot_check.SCAN_CODE_RAW_LABEL, page)
+        self.assertIn(spot_check.SCAN_CODE_LABEL, page)
+        self.assertNotIn(spot_check.SCAN_CODE_RAW_LABEL, page)
         self.assertIn("<mark>確認印</mark>", page)
+        self.assertNotIn("の欄", page)
+        self.assertNotIn("gothic", page)
+        self.assertNotIn("anchor", page)
+
+    def test_scan_prefers_a_printed_literal_over_a_comment_and_falls_back_to_the_comment(self):
+        code = ('def make_memo():\n    # 確認印の欄\n    d.text((1, 2), "確認印", font=font("gothic", 22), anchor="mt")\n'
+                '    # 注意書きだけ\n')
+        parts = {"code": code, "json": "", "dates": ""}
+        shown = spot_check.scan_snippet(parts, "確認印")
+        self.assertEqual(shown["label"], spot_check.SCAN_CODE_LABEL)
+        self.assertEqual(shown["narrow"]["hit"], "確認印")
+        self.assertEqual((shown["narrow"]["before"], shown["narrow"]["after"]), ("", ""))     # 行はリテラルだけ
+        only_comment = spot_check.scan_snippet(parts, "注意書きだけ")
+        self.assertEqual(only_comment["label"], spot_check.SCAN_CODE_RAW_LABEL)
+        self.assertIn("# 注意書きだけ", only_comment["narrow"]["before"] + only_comment["narrow"]["hit"])
+        # コードになければ scans.json・補った日付へ。どこにもなければ narrow が None
+        parts = {"code": code, "json": "APP-1\nメモ", "dates": "2026.10.26"}
+        self.assertEqual(spot_check.scan_snippet(parts, "APP-1")["label"], spot_check.SCAN_JSON_LABEL)
+        self.assertEqual(spot_check.scan_snippet(parts, "2026.10.26")["label"], spot_check.SCAN_DATES_LABEL)
+        self.assertIsNone(spot_check.scan_snippet(parts, "ない語句")["narrow"])
 
     def test_scan_literals_drop_dict_keys_and_code(self):
         line = '("応募番号", f["application_id"]), ("入社予定日", "2026年12月1日")]'
         self.assertEqual(spot_check._literals(line), ["応募番号", "入社予定日", "2026年12月1日"])
         self.assertEqual(spot_check._literals("d.text((1, 2), f\"{x}年\", font=m)"), ["{x}年"])
         self.assertEqual(spot_check._literals("y = 860 + i * 84"), [])
+        # 行の終わりのコメントの中の引用符は読まない（コメントだけの行も）
+        self.assertEqual(spot_check._literals('x = "内容"  # "b" と \'c\' のメモ'), ["内容"])
+        self.assertEqual(spot_check._literals('    # "確認印" の欄'), [])
+        self.assertEqual(spot_check._literals('t = "# は文字"  # コメント'), ["# は文字"])    # 文字列の中の # はコメントでない
+        # キーワード引数の値・小文字だけの英単語（フォントの名前）は除く。代入（x = "…"）は残す。語句がその中にあれば残す
+        self.assertEqual(spot_check._literals('d.text((1, 2), "確認印", font=font("gothic", 22), anchor="mt")'), ["確認印"])
+        self.assertEqual(spot_check._literals('label = "印"'), ["印"])
+        self.assertEqual(spot_check._literals('f("gothic")', "gothic"), ["gothic"])
 
     def test_mail_label_is_neutral_and_shows_the_subject(self):
         page = self.card("hr-01")                                  # MAIL-09（内定の知らせ）

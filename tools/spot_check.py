@@ -208,7 +208,7 @@ SCAN_CODE_LABEL = "画像に印字する文字（make_scans.py の該当行か�
 SCAN_CODE_RAW_LABEL = "make_scans.py の該当行（コード）"
 SCAN_DATES_LABEL = "日付の書き方（道具が補った別の書き方）"
 SCAN_JSON_LABEL = "scans.json の項目"
-_LITERAL = re.compile(r"""f?"((?:[^"\\]|\\.)*)"|f?'((?:[^'\\]|\\.)*)'""")
+_LITERAL = re.compile(r"""f?"((?:[^"\\]|\\.)*)"|f?'((?:[^'\\]|\\.)*)'|(#)""")
 
 
 def _covering_lines(text, span):
@@ -219,25 +219,53 @@ def _covering_lines(text, span):
     return text.split("\n")[first:last + 1]
 
 
-def _literals(line):
-    """コードの 1 行にある文字列のリテラル（"…"・'…'）の中身。x["key"] の key は、印字する文字でないので除く。"""
+def _literals(line, phrase=None):
+    """コードの 1 行にある、画像に印字する文字（文字列のリテラル "…"・'…'）の中身。
+
+    行の終わりのコメント（# …）の中は読まない。x["key"] の key と、キーワード引数の値（anchor="mt"）、フォントの名前のような
+    小文字だけの英単語は、印字する文字でないので除く（phrase の語句がその中にあるときは残す）。
+    """
     found = []
     for match in _LITERAL.finditer(line):
-        if match.start() > 0 and line[match.start() - 1] == "[":
+        if match.group(3):            # 文字列の外の # から後は、コメント
+            break
+        text = match.group(1) if match.group(1) is not None else match.group(2)
+        before = line[:match.start()]
+        if before.endswith("[") or re.search(r"\w=$", before) or not text.strip():     # x["key"]、anchor="mt"（x = "…" は残す）
             continue
-        found.append(match.group(1) if match.group(1) is not None else match.group(2))
-    return [text for text in found if text.strip()]
+        if re.fullmatch(r"[a-z_]+", text) and not (phrase and _squash_text(phrase).lower() in text):
+            continue
+        found.append(text)
+    return found
+
+
+def _squash_text(text):
+    return "".join(ch for ch in text if not ch.isspace())
+
+
+def _code_hit(code, phrase):
+    """描く指示のコードの中の語句。印字する文字（文字列のリテラル）にある行を先に探し、なければコメントなどの行を出す。
+
+    返す値は (札, 出す文字)。なければ None。
+    """
+    for line in code.split("\n"):
+        text = " ｜ ".join(_literals(line, phrase))
+        if text and locate(text, phrase):
+            return SCAN_CODE_LABEL, text
+    span = locate(code, phrase)
+    if span is None:
+        return None
+    lines = _covering_lines(code, span)             # 語句が何行かにまたがるとき
+    text = "\n".join(x for x in (" ｜ ".join(_literals(line, phrase)) for line in lines) if x)
+    if locate(text, phrase):
+        return SCAN_CODE_LABEL, text
+    return SCAN_CODE_RAW_LABEL, "\n".join(x.strip() for x in lines)
 
 
 def scan_snippet(parts, phrase):
     """スキャンの語句が出る場所を、画像に近い順（描く指示 → scans.json → 補った日付の書き方）に探して、その行だけを返す。"""
-    shown = None
-    span = locate(parts["code"], phrase) if parts["code"] else None
-    if span:
-        lines = _covering_lines(parts["code"], span)
-        text = "\n".join(x for x in (" ｜ ".join(_literals(line)) for line in lines) if x)
-        shown = (SCAN_CODE_LABEL, text) if locate(text, phrase) else (SCAN_CODE_RAW_LABEL, "\n".join(x.strip() for x in lines))
-    else:
+    shown = _code_hit(parts["code"], phrase) if parts["code"] else None
+    if shown is None:
         for label, text in ((SCAN_JSON_LABEL, parts["json"]), (SCAN_DATES_LABEL, parts["dates"])):
             span = locate(text, phrase)
             if span:
