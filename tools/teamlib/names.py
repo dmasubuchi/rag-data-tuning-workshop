@@ -130,6 +130,7 @@ class Names(NamedTuple):
     search: str
     cosmos: str
     foundry: str
+    custom_group: bool = False   # true なら、resource_group は workshop.config の AZURE_RESOURCE_GROUP（既存のものを使う）
 
 
 def make_names(org: str, team: str, resource_group: str = "") -> Names:
@@ -145,4 +146,5 @@ def make_names(org: str, team: str, resource_group: str = "") -> Names:
         search=f"srch-{org}-{team}",
         cosmos=f"cosmos-{org}-{team}",
         foundry=f"ai-{org}-{team}",
+        custom_group=bool(resource_group),
     )

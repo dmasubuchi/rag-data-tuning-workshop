@@ -148,6 +148,9 @@ class LoadConfigTest(ConfigFileCase):
         self.assertEqual(n.resource_group, "day1-rg")
         self.assertEqual(n.search, "srch-acme-suika")     # ほかの名前は変わらない
         self.assertEqual(make_names("acme", "suika").resource_group, "rg-acme-suika")
+        self.assertTrue(n.custom_group)
+        self.assertFalse(make_names("acme", "suika").custom_group)
+        self.assertFalse(make_names("acme", "suika", "").custom_group)
         self.assertEqual(load_config(self.write(FULL_CONFIG + "AZURE_RESOURCE_GROUP=\n")).resource_group, "")
 
     def test_existing_resource_group_shape_is_checked(self):

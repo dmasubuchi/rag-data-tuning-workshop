@@ -423,6 +423,82 @@ class CheckNamesTest(MainCase):
         self.assertIn((("name", "srch-acme-suika"), ("type", "searchServices")), bodies)
 
 
+
+# ------------------------------------------------------------------ 既存のリソース グループ（AZURE_RESOURCE_GROUP）
+
+CUSTOM_RG = "day1-rg"
+
+
+class CustomGroupTest(MainCase):
+    """workshop.config に AZURE_RESOURCE_GROUP があるとき、names・check-names・health は、その名前（-n / -g）を使う。"""
+
+    def setUp(self):
+        super().setUp()
+        self.config = self.write_config(CONFIG_TEXT + f"AZURE_RESOURCE_GROUP={CUSTOM_RG}\n")
+
+    def test_names_shows_the_existing_group(self):
+        code, out, _ = self.run_main("names")
+        self.assertEqual(code, 0)
+        self.assertIn(f"リソース グループ：{CUSTOM_RG}（既存のものを使う", out)
+        self.assertNotIn("rg-acme-suika", out)
+        self.assertIn("stacmesuika", out)   # ほかの名前は変わらない
+
+    def test_names_without_the_key_shows_no_existing_note(self):
+        self.config = self.write_config(CONFIG_TEXT)
+        code, out, _ = self.run_main("names")
+        self.assertIn("リソース グループ：rg-acme-suika\n", out)
+        self.assertNotIn("既存のものを使う", out)
+
+    def test_check_names_existing_group_row_and_no_rename_advice(self):
+        az = FakeAz(override(names_free(), (("group", "exists"), True)))
+        code, out, _ = self.run_main("check-names", az=az)
+        self.assertEqual(code, 0, out)
+        self.assertIn(("group", "exists", "-n", CUSTOM_RG), az.calls)
+        self.assertNotIn(("group", "exists", "-n", "rg-acme-suika"), az.calls)
+        self.assertIn(f"リソース グループ {CUSTOM_RG}：既存のものを使う（AZURE_RESOURCE_GROUP）", out)
+        self.assertNotIn("作成済み", out)
+        self.assertNotIn("チームの名前を変え", out)
+        self.assertIn("Storage stacmesuika：使える", out)
+        self.assertIn("ほかの名前はすべて使えます", out)
+
+    def test_check_names_existing_group_with_taken_name_still_advises_rename(self):
+        taken = override(names_free(), (("group", "exists"), True),
+                         (("storage", "account", "check-name"), {"nameAvailable": False}), (("resource", "list"), []))
+        code, out, _ = self.run_main("check-names", az=FakeAz(taken))
+        self.assertEqual(code, 1)
+        self.assertIn(f"リソース グループ {CUSTOM_RG}：既存のものを使う（AZURE_RESOURCE_GROUP）", out)
+        self.assertIn("Storage stacmesuika：ほかで使われている", out)
+        self.assertIn("チームの名前を変えて", out)
+
+    def test_check_names_missing_existing_group_is_a_config_mistake(self):
+        az = FakeAz(names_free())   # group exists は False
+        code, out, _ = self.run_main("check-names", az=az)
+        self.assertEqual(code, 1)
+        self.assertIn(f"AZURE_RESOURCE_GROUP のリソース グループ {CUSTOM_RG} が見つかりません", out)
+        self.assertIn(f"リソース グループ {CUSTOM_RG}：見つかりません", out)
+        self.assertNotIn(f"リソース グループ {CUSTOM_RG}：使える", out)
+        self.assertNotIn("すべて使えます", out)
+        self.assertNotIn("チームの名前を変え", out)
+        self.assertIn("Storage stacmesuika：使える", out)   # ほかの名前の確認は続く
+
+    def test_check_names_without_the_key_still_treats_a_missing_group_as_free(self):
+        self.config = self.write_config(CONFIG_TEXT)
+        code, out, _ = self.run_main("check-names", az=FakeAz(names_free()))
+        self.assertEqual(code, 0)
+        self.assertIn("リソース グループ rg-acme-suika：使える", out)
+        self.assertNotIn("AZURE_RESOURCE_GROUP", out)
+
+    def test_health_uses_the_existing_group(self):
+        az = FakeAz(healthy())
+        code, out, _ = self.run_main("health", az=az)
+        self.assertEqual(code, 0, out)
+        self.assertIn(f"OK    リソース グループ {CUSTOM_RG}", out)
+        self.assertNotIn("rg-acme-suika", out)
+        self.assertIn(("group", "show", "-n", CUSTOM_RG), az.calls)
+        self.assertIn(("storage", "account", "show", "-n", "stacmesuika", "-g", CUSTOM_RG), az.calls)
+        self.assertIn(("search", "service", "show", "-n", "srch-acme-suika", "-g", CUSTOM_RG), az.calls)
+        self.assertIn(("cognitiveservices", "account", "show", "-n", "ai-acme-suika", "-g", CUSTOM_RG), az.calls)
+
 # ------------------------------------------------------------------ health
 
 class HealthTest(MainCase):

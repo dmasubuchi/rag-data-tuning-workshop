@@ -12,6 +12,8 @@
 --team を省略すると、環境変数 WORKSHOP_TEAM を使う（PowerShell では $env:WORKSHOP_TEAM = "suika"）。
 --config は組織の設定ファイル（既定は Repo 直下の workshop.config。どのフォルダーで実行しても同じ。雛形は
 config/workshop.example.config）。
+設定ファイルに AZURE_RESOURCE_GROUP（任意）があれば、リソース グループは rg-<org>-<team> でなく、その既存のグループを使う
+（check-names は「既存のものを使う」と表示し、グループがなければ「見つかりません」。作るのは手順書の az で、このツールは作らない）。
 
 env は az でキーを読み、設定ファイルに書く（画面には出さない）。書き先は、既定では Repo 直下の .env.local。
 --out PATH を付けると、そこに書く（構築する人が、メンバー用の設定を書き出して渡すとき）。Repo の中に書くなら、
@@ -69,7 +71,7 @@ def names_text(location: str, n: Names) -> str:
     return "\n".join([
         f"チームの名前：{n.team}（組織 {n.org}）",
         f"場所：{location}",
-        f"リソース グループ：{n.resource_group}",
+        f"リソース グループ：{n.resource_group}" + ("（既存のものを使う。AZURE_RESOURCE_GROUP）" if n.custom_group else ""),
         f"Storage：{n.storage}",
         f"AI Search：{n.search}（Basic、セマンティック ランカー Free）",
         f"Cosmos DB：{n.cosmos}",
@@ -119,6 +121,8 @@ def _keep_going(error: CheckError) -> None:
 FREE = "使える"
 TAKEN = "ほかで使われている（チームの名前を変える）"
 EXISTS = "このサブスクリプションに作成済み"
+USE_EXISTING = "既存のものを使う（AZURE_RESOURCE_GROUP）"   # workshop.config に AZURE_RESOURCE_GROUP があり、そのグループがある
+GROUP_MISSING = "見つかりません（AZURE_RESOURCE_GROUP の名前を確かめる）"   # AZURE_RESOURCE_GROUP のグループがない（綴りの誤りが多い）
 
 
 def _arm(az, provider, action):
@@ -139,7 +143,8 @@ def _available(answer, key) -> bool:
 
 
 def check_names(az, n: Names):
-    """名前ごとに (ラベル, 名前, 状態) を返す。状態は FREE、TAKEN、EXISTS、または「確認できない（理由）」。"""
+    """名前ごとに (ラベル, 名前, 状態) を返す。状態は FREE、TAKEN、EXISTS、または「確認できない（理由）」。
+    既存のリソース グループを使う設定（n.custom_group）のときは、そのグループの状態が USE_EXISTING か GROUP_MISSING になる（作るものではない）。"""
     def storage(name):
         return _available(az.run("storage", "account", "check-name", "-n", name), "nameAvailable")
 
@@ -161,7 +166,12 @@ def check_names(az, n: Names):
     rows = []
     group = n.resource_group
     try:
-        rows.append(("リソース グループ", group, EXISTS if _answer(az.run("group", "exists", "-n", group), bool) else FREE))
+        found = _answer(az.run("group", "exists", "-n", group), bool)
+        if n.custom_group:
+            state = USE_EXISTING if found else GROUP_MISSING
+        else:
+            state = EXISTS if found else FREE
+        rows.append(("リソース グループ", group, state))
     except CheckError as error:
         _keep_going(error)
         rows.append(("リソース グループ", group, f"確認できない（{_why(error)}）"))
@@ -183,14 +193,22 @@ def check_names_text(team: str, rows) -> tuple:
     lines = [f"チーム {team} の名前を確かめます（Azure には何も作りません）"]
     lines += [f"{label} {name}：{state}" for label, name, state in rows]
     states = [state for _, _, state in rows]
+    missing = [name for _, name, state in rows if state == GROUP_MISSING]
+    if missing:
+        lines.append(f"AZURE_RESOURCE_GROUP のリソース グループ {missing[0]} が見つかりません。workshop.config の名前を確かめます（このツールは作りません）。")
     if any(s.startswith("確認できない") for s in states):
         lines.append("確認できない名前があります。上の理由を直して、もう一度実行します。")
         code = 1
     elif TAKEN in states:
         lines.append("ほかで使われている名前があります。チームの名前を変えて、もう一度確かめます。")
         code = 1
+    elif missing:
+        code = 1
     elif EXISTS in states:
         lines.append("作成済みのものは、自分のチームが作りかけのときだけです。そうでなければ、チームの名前を変えます。")
+        code = 0
+    elif USE_EXISTING in states:
+        lines.append("リソース グループは既存のものを使い、ほかの名前はすべて使えます。names の表示どおりに作れます。")
         code = 0
     else:
         lines.append("すべて使えます。names の表示どおりに作れます。")
