@@ -78,7 +78,7 @@ def search_for_llm(question, flt):
 def ask_llm(question, hits):
     """hits を資料にして、question に答えさせる。プロンプトは悪い例も良い例も同じ。"""
     context = "\n\n".join(f"[{i}]（{h['title']}）{' '.join(h['chunk'].split())}" for i, h in enumerate(hits, start=1))
-    kwargs = {"max_completion_tokens": 1200}
+    kwargs = {"max_completion_tokens": 4000}
     if settings.reasoning_effort:
         kwargs["reasoning_effort"] = settings.reasoning_effort
     for attempt in range(4):

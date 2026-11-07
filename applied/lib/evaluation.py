@@ -105,7 +105,7 @@ def score_own(question: str, context: list, expect: list, answer: str) -> dict:
     messages = own_messages(question, context, expect, answer)
     total_in = total_out = 0
     for attempt in range(2):
-        text, usage = agentic.chat(messages, "score_own", max_tokens=1200, json_mode=True)
+        text, usage = agentic.chat(messages, "score_own", max_tokens=4000, json_mode=True)
         total_in += usage["input_tokens"]
         total_out += usage["output_tokens"]
         try:

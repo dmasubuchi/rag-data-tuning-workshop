@@ -84,7 +84,7 @@ python score_all.py --no-builtin            自前の採点だけ
   `groundedness_reason`・`groundedness_status`・`groundedness_threshold`・`groundedness_properties`。公式の古い例にある `gpt_groundedness` のような `gpt_` 付きの欄はありません。
   トークン数は `groundedness_properties` の中（`prompt_tokens`・`completion_tokens`）です。`lib/evaluation.py` の `parse_builtin` は、両方の名前を読みます。版を固定してあるのは、このためです
 - Groundedness に `query`（質問）も渡すと、質問なしのときと別の採点プロンプトが使われます（3 の意味も違う）。`context` は文字列で、複数の断片は `\n\n` でつなぎます
-- 1回の評価は LLM 1 回の呼び出しです（出力は最大 800 トークンに制限されています）
+- 組み込みの評価器は、1回の評価で LLM を 1 回呼びます（出力の上限 800 トークンは、組み込みの評価器が自分で決めている値です。自前の採点の上限は 4000 で、考える分も数えます）
 - 自前の採点も完全ではありません。たとえば、資料に書いてあることを「資料にありません」と答えた答えに、根拠への忠実さ 5 をつけることがありました（`score_one.py --answer "資料にありません。"` で試せる）。
   採点のプロンプトの基準は、実際の採点結果を読んで直していくもの。想定の要点（`questions.json`）も、同じように見直す
 - 評価器の `model_config` は、`azure_endpoint`・`api_key`・`azure_deployment`（と任意の `api_version`）で、キーで渡します。マネージド ID は使いません
