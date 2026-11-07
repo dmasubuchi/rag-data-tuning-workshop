@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>評価：3つのデータを、同じやり方で測る | データに着目した RAG の研修</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="bar"><a class="home" href="../index.html">← 入口に戻る</a><a class="source" href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/guide/evaluation.md">元の Markdown（GitHub）</a></header>
+<main>
+<article class="doc">
+<h1 id="評価3つのデータを同じやり方で測る">評価：3つのデータを、同じやり方で測る</h1>
+<nav class="toc"><details><summary>このページの目次</summary>
+<ul>
+<li class="l2"><a href="#何を測るか">何を測るか</a></li>
+<li class="l2"><a href="#1-測る前に">1. 測る前に</a></li>
+<li class="l2"><a href="#2-測る順番">2. 測る順番</a></li>
+<li class="l2"><a href="#3-結果の読み方">3. 結果の読み方</a></li>
+<li class="l2"><a href="#4-費用の見込みと単価のファイル">4. 費用の見込みと、単価のファイル</a></li>
+<li class="l2"><a href="#5-演習精度と費用の釣り合い">5. 演習：精度と費用の釣り合い</a></li>
+<li class="l3"><a href="#演習-aセマンティック-ランカーを使うか">演習 A：セマンティック ランカーを使うか</a></li>
+<li class="l3"><a href="#演習-b上位何件を-llm-に渡すか">演習 B：上位何件を LLM に渡すか</a></li>
+<li class="l2"><a href="#6-自分の組織のデータで質問を作る">6. 自分の組織のデータで質問を作る</a></li>
+<li class="l2"><a href="#つまずいたとき">つまずいたとき</a></li>
+</ul>
+</details></nav>
+
+<p>検索の方式（キーワード・ベクトル・ハイブリッド・セマンティック）を、質問と正解の文書で測り、表で比べます。武将・人事・ホテルを、同じ道具・同じ形の質問で測ります。検索するだけで、何も作らず、何も変えません。</p>
+<p>nDCG と再現率の考え方は、基礎編の <a href="basic-topics-05-measure-search-README.html">05</a> と<a href="docs-lecture-md-part4-evaluation.html">ハンズオン資料の評価</a>です。質問の形と種類は <a href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/evaluation/README.md">evaluation/README.md</a> にあります。</p>
+<h2 id="何を測るか">何を測るか</h2>
+<ul>
+<li>質問ごとに、取ってくるべき文書（正解）が、上位 k 件に入ったかを見ます（k は既定で 10）。<ul>
+<li>nDCG@k：正解が上にあるほど高い（0〜1）</li>
+<li>再現率@k：正解のうち、上位 k 件に入った割合</li>
+<li>1位：1位が正解だった質問の割合</li>
+</ul>
+</li>
+<li>人事の権限の質問（種類 <code>permission</code>）には、正解がありません。平均には入れず、見えてはいけない文書が上位 k 件に出た数（漏れ）を数えます。0 であるべき数です。</li>
+<li>方式は4つです：<code>keyword</code>・<code>vector</code>・<code>hybrid</code>・<code>semantic</code>（ハイブリッド＋セマンティック ランカー）。ホテルの <code>condition</code> の質問は、各方式に絞り込みを足した <code>+filter</code>（例 <code>hybrid+filter</code>）も測ります。</li>
+<li>数えるのは文書の単位です。人事は1つの文書が多くのチャンクになりますが、同じ文書は1回だけ、最初に出た順位で数えます。</li>
+</ul>
+<h2 id="1-測る前に">1. 測る前に</h2>
+<p>構築する人：</p>
+<ul>
+<li class="task"><input type="checkbox"> 測るデータのインデックスを作ってある<ul>
+<li>武将：<code>sengoku</code>（<a href="guide-sengoku.html">武将</a>の 01。ベクトルは 03）</li>
+<li>人事：<code>hr-docs</code>（<a href="guide-hr.html">応用（人事）</a>の「最初に1回」）</li>
+<li>ホテル：<code>hotels-blob</code>（<a href="guide-hotel.html">ホテル</a>の 2 章）と <code>hotels-cosmos</code>（5 章）。<code>keyword</code> が <code>hotels-blob</code>、<code>vector</code> と <code>hybrid</code> が <code>hotels-cosmos</code> を検索します</li>
+</ul>
+</li>
+<li class="task"><input type="checkbox"> <code>python tools/team.py health</code> で、インデックスの文書の数を見る（az にサインインした PC で実行します。メンバーは実行できません）<ul>
+<li>目安：<code>sengoku</code> 150、<code>hr-docs</code> 23 以上（文書 23 から作ったチャンクの数）、<code>hotels-blob</code> 50、<code>hotels-cosmos</code> 50</li>
+<li>目安と違うときは、測る前に直します（正解の文書が索引にないと、点が下がります）</li>
+</ul>
+</li>
+<li class="task"><input type="checkbox"> 人事で、応用編の 17 を試したあとなら、<code>applied/topics/17-update-delete/</code> のフォルダーで <code>python cleanup.py</code> を実行して、文書を元に戻す（構築する人の <code>.env.local</code> で）<ul>
+<li>旧い版の求人票 <code>JOB-REQ042-v1</code> が索引に残っていると、一般社員の「漏れ」に数えられます</li>
+</ul>
+</li>
+</ul>
+<p>メンバーも、構築する人も：</p>
+<ul>
+<li class="task"><input type="checkbox"> <code>.env.local</code> を Repo 直下に置く（検索だけのキーでよい。<a href="guide-setup-azure-setup.html#4-接続の設定を作る">Azure の準備の 4</a>）</li>
+<li class="task"><input type="checkbox"> ホテルを測るときは、ホテルのデータの JSON を、<a href="guide-hotel.html">ホテル</a>の 4-3 のとおり <code>_work/hotel-vectors/</code> に置く（別の場所なら、次の手順に <code>--hotel-data &lt;JSON の場所&gt;</code> を足します）</li>
+</ul>
+<p>pip で入れるものはありません（標準ライブラリだけです）。Windows で <code>python</code> が見つからないときは <code>py</code> に替えます。</p>
+<h2 id="2-測る順番">2. 測る順番</h2>
+<ol>
+<li>
+<p>質問を確かめる（通信しません）</p>
+<pre><code class="language-powershell">python tools/check_questions.py --dataset hr
+</code></pre>
+<ul>
+<li>「問題なし（60 問）」と出れば進みます。<code>--dataset</code> は <code>sengoku</code>・<code>hr</code>・<code>hotel</code></li>
+<li>ホテルは、データの場所を渡します：<code>python tools/check_questions.py --dataset hotel --hotel-data &lt;JSON の場所&gt;</code>（<code>_work/hotel-vectors/</code> にあれば省けます）</li>
+</ul>
+</li>
+<li>
+<p>方式ごとに測る。最初は数問だけで試します</p>
+<pre><code class="language-powershell">python tools/eval_search.py --dataset hr --limit 6
+python tools/eval_search.py --dataset hr
+</code></pre>
+<ul>
+<li><code>--limit 6</code>：先頭の6問だけ。人事は 6 の倍数、ホテルは 5 の倍数なら、質問の種類がそろいます</li>
+<li>画面に、質問ごとに1行（正解のある質問は nDCG、権限の質問は漏れの数）、最後に方式ごとの平均と、使った量（検索・セマンティック ランカーの回数、質問の埋め込みのトークン）が出ます</li>
+<li>結果は <code>_work/eval/&lt;データ&gt;-&lt;時刻&gt;.json</code> に書かれます（Git に入りません）。最後の「結果：」の行が、そのパスです</li>
+<li>人事・武将は、全部の質問・4方式で検索 240 回（うちセマンティック ランカー 60 回）です。セマンティック ランカーの無料枠は月ごとで、チームの AI Search 全体で使います。全部を測るのは、チームで1回にします</li>
+<li>方式を絞る：<code>--methods keyword,hybrid</code>。上位何件で採点するか：<code>--k 5</code></li>
+</ul>
+</li>
+<li>
+<p>結果を表にまとめる</p>
+<pre><code class="language-powershell">python tools/eval_report.py _work/eval/&lt;結果のファイル&gt;.json
+python tools/eval_report.py _work/eval/&lt;結果のファイル&gt;.json --md _work/eval/report.md
+</code></pre>
+<ul>
+<li>結果のファイルを2つ以上渡すと、同じ表の中で横に並べます（同じデータの結果だけ）。名前は <code>--label</code> で付けます</li>
+<li><code>--md</code> は、表を Markdown にも書きます</li>
+</ul>
+</li>
+</ol>
+<p>止まったとき、飛ばしたとき：</p>
+<ul>
+<li>チームがまだ作っていないインデックスや、設定のない方式（ホテルの <code>semantic</code>。手順書のインデックスに、セマンティックの設定がありません）は、その方式だけ飛ばして、理由を出します。ほかの方式は最後まで測ります。表にも「飛ばした」と出ます</li>
+<li>「エラー 403」で止まったとき：キーが合っているか、セマンティック ランカーの無料枠を使い切っていないかを確かめます。そこまでの結果は保存されます</li>
+<li>終了コード：0 は測れた、1 は止まった（そこまでの結果は保存）か、測れた方式がなかった、2 は質問・データ・引数が使えない</li>
+</ul>
+<h2 id="3-結果の読み方">3. 結果の読み方</h2>
+<p>表は2つ出ます。</p>
+<ul>
+<li>「方式ごと」：行は方式。列は、問（平均に入れた質問の数）・nDCG@k・再現率@k・1位。人事は、漏れ問（漏れがあった質問の数）・漏れ文書。さらに、検索・セマンティック ランカーの回数、埋め込みのトークン、費用の見込み</li>
+<li>「方式×質問の種類」：行は質問の種類、列は方式。値は nDCG@k の平均で、カッコの中は問の数</li>
+</ul>
+<p>見る順番：</p>
+<ol>
+<li>「方式ごと」で、全体の強さを見る。方式の差が小さければ、次の表へ</li>
+<li>「方式×質問の種類」で、得意・不得意を見る。全体の平均が同じでも、種類で分かれます<ul>
+<li>例：番号や固有名詞はキーワードが強く、言い換えはベクトルが強く、条件（ホテルの評価・駐車場など）は <code>+filter</code> を足した方式が強い、という見込みがあります。見込みどおりかは、自分で測って確かめます</li>
+<li>カッコの問の数が少ない種類は、1問で平均が大きく動きます。数を見てから判断します</li>
+</ul>
+</li>
+<li>人事は、漏れを見る。一般社員の質問で漏れが1以上なら、権限の絞り込みか、索引の文書が違っています（<a href="applied-topics-16-security-filter-README.html">応用編の 16</a>）。漏れが出た質問と方式は、測っている最中の画面に出ます</li>
+</ol>
+<p>「-」は、正解のある質問がない種類（人事の権限など）か、測っていない方式です。</p>
+<h2 id="4-費用の見込みと単価のファイル">4. 費用の見込みと、単価のファイル</h2>
+<p>費用の見込みは、使った回数 × 単価です。単価は、この Repo に書いていません（変わるため）。料金のページで確かめた値を、自分で書きます。</p>
+<ol>
+<li class="task">
+<p><input type="checkbox"> <code>config/prices.example.json</code> を <code>config/prices.json</code> に写す（<code>config/prices.json</code> は Git に入りません）</p>
+<pre><code class="language-powershell">Copy-Item config/prices.example.json config/prices.json
+</code></pre>
+</li>
+<li class="task">
+<p><input type="checkbox"> 料金のページで、次の単価を確かめて書く（ページの場所は、ファイルの <code>sources</code> にあります：<a href="https://azure.microsoft.com/ja-jp/pricing/details/search/">AI Search の料金</a>、<a href="https://azure.microsoft.com/ja-jp/pricing/details/cognitive-services/openai-service/">Azure OpenAI の料金</a>）</p>
+<ul>
+<li><code>semantic_per_1000</code>：セマンティック ランカー 1,000 回の単価</li>
+<li><code>embedding_per_1m_tokens</code>：埋め込み（<code>text-embedding-3-small</code>）100 万トークンの単価</li>
+<li><code>search_per_1000</code>：検索 1,000 回の単価。Basic の AI Search は時間で課金され、回数では増えないので <code>0</code></li>
+<li><code>currency</code>：料金のページの通貨（円なら <code>JPY</code>）。<code>checked</code>：単価を確かめた日の文字</li>
+<li>ページの単位が違うときは、上の単位に直して書きます</li>
+</ul>
+</li>
+</ol>
+<p>書いたあとで、<code>eval_report</code> を実行し直します。</p>
+<ul>
+<li>費用の列に、金額が出ます。検索は、セマンティックを除いた回数に <code>search_per_1000</code> を掛けます</li>
+<li>質問の埋め込みは、質問ごとに1回を方式で共用するので、「埋め込み（共通）」の行に分けて出ます</li>
+<li>単価が空（<code>null</code>）のままのときは、回数だけ出して「単価が未設定」と書きます。0 円とは書きません。一部だけ書いたときは、書いた分だけを足して、金額に「＊」が付きます（合計ではありません）</li>
+<li>この費用に入るのは、検索・セマンティック ランカー・質問の埋め込みだけです。LLM に渡す文書の分は入りません（下の演習 B）</li>
+</ul>
+<h2 id="5-演習精度と費用の釣り合い">5. 演習：精度と費用の釣り合い</h2>
+<p>測った数字で、次の2つを決めます。数字は、自分のチームの AI Search で測ったものを使います。</p>
+<h3 id="演習-aセマンティック-ランカーを使うか">演習 A：セマンティック ランカーを使うか</h3>
+<ol>
+<li class="task">
+<p><input type="checkbox"> 同じ質問・同じ k で、使わない方式（<code>hybrid</code>）と使う方式（<code>semantic</code>）を、1回で測る</p>
+<pre><code class="language-powershell">python tools/eval_search.py --dataset hr --methods hybrid,semantic
+</code></pre>
+</li>
+<li class="task">
+<p><input type="checkbox"> <code>eval_report</code> の「方式ごと」で、<code>hybrid</code> と <code>semantic</code> の行を比べる</p>
+<ul>
+<li>良くなった分：nDCG@10・再現率@10・1位の差</li>
+<li>増えた費用：「セマンティック」の回数と、費用の見込みの差</li>
+</ul>
+</li>
+<li class="task"><input type="checkbox"> 「方式×質問の種類」で、差が出た種類を見る。全体で差が小さくても、ある種類だけ大きく上がるなら、その種類の質問が多い業務にだけ使う、という決め方もあります</li>
+<li class="task"><input type="checkbox"> 実際に使うときの月の費用を、自分で見積もる：月の質問数 × <code>semantic_per_1000</code> ÷ 1,000（無料枠の中なら増えません。枠を超えたあとの単価は、料金のページで確かめます）</li>
+<li class="task"><input type="checkbox"> 「差がこれ以上なら使う」という基準を、先に決めてから、使う・使わないを決める（基準は、業務で許せる外れの量から決めます）</li>
+</ol>
+<h3 id="演習-b上位何件を-llm-に渡すか">演習 B：上位何件を LLM に渡すか</h3>
+<ol>
+<li class="task">
+<p><input type="checkbox"> 演習 A で選んだ方式を、k を変えて、同じ質問で3回測る（ここでは <code>hybrid</code> の例。<code>semantic</code> を選んだときは、3回でセマンティック ランカーを質問の数の3倍使うので、無料枠を確かめてから測ります）</p>
+<pre><code class="language-powershell">python tools/eval_search.py --dataset hr --methods hybrid --k 3
+python tools/eval_search.py --dataset hr --methods hybrid --k 5
+python tools/eval_search.py --dataset hr --methods hybrid --k 10
+</code></pre>
+</li>
+<li class="task">
+<p><input type="checkbox"> 3つの結果を、横に並べる</p>
+<pre><code class="language-powershell">python tools/eval_report.py _work/eval/&lt;k が 3 の結果&gt;.json _work/eval/&lt;k が 5 の結果&gt;.json _work/eval/&lt;k が 10 の結果&gt;.json --label k3 --label k5 --label k10
+</code></pre>
+</li>
+<li class="task">
+<p><input type="checkbox"> 再現率@k を見る。k を増やすと、正解が入る割合は上がりますが、ある所から伸びなくなります。伸びなくなった最初の k が、渡す件数の候補です</p>
+</li>
+<li class="task"><input type="checkbox"> 表の費用は、k では変わりません（検索の回数が同じです）。k の費用は、LLM に渡す文書の分です。自分で見積もる：月の質問数 × k × 文書1件のトークン数 × LLM の入力の単価（1 トークンあたり）</li>
+<li class="task"><input type="checkbox"> 渡す件数を決める。k を小さくすると、費用は減りますが、正解を渡し損ねる質問が増えます。k を大きくすると、渡す文書が増え、費用も、無関係な文書も増えます</li>
+</ol>
+<p>2つの演習のあとで、次の3行を書いて残します。</p>
+<ul>
+<li>選んだ方式と k</li>
+<li>根拠にした数字（自分で測った表のどの行か）</li>
+<li>月の費用の見込みと、その計算</li>
+</ul>
+<h2 id="6-自分の組織のデータで質問を作る">6. 自分の組織のデータで質問を作る</h2>
+<p>評価の質問を作る手間が、測るときのいちばんの手間です。手順は、この Repo の人事とホテルの質問を作ったときと同じです。</p>
+<ol>
+<li class="task"><input type="checkbox"> 1問を、<a href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/evaluation/README.md">evaluation/README.md</a> の形で書く<ul>
+<li><code>qid</code>（質問の番号）・<code>question</code>（検索に使う質問の文）・<code>type</code>（種類）・<code>answer_ids</code>（取ってくるべき文書の ID）・<code>why</code>・<code>evidence</code>（答えの根拠になる短い語句）</li>
+</ul>
+</li>
+<li class="task"><input type="checkbox"> 質問の種類を分ける。業務で起きる聞き方を、種類ごとに数問ずつ作る（この Repo は、1種類 6〜12 問）<ul>
+<li>例：文書に出てこない言い換えの語で聞く、番号や人名・社名で聞く、金額・日付・点数の条件で聞く、答えが2つ以上の文書にまたがる、画像だけの文書にしか答えがない、聞く人に見せてはいけない文書がある（権限）</li>
+<li>種類を分けると、「方式×質問の種類」の表で、得意・不得意が見えます</li>
+</ul>
+</li>
+<li class="task"><input type="checkbox"> 正解の文書を決める。答えが書いてある文書を、すべて入れる（どれが上位に出ても正解です）。権限の質問は、見える文書だけを <code>answer_ids</code> に入れ（なければ空）、見えてはいけない文書を <code>hidden_ids</code> に書く</li>
+<li class="task"><input type="checkbox"> <code>check_questions</code> で、形・ID・種類の数・根拠の語句を確かめる（通信しません）</li>
+<li class="task">
+<p><input type="checkbox"> 人が、抜き取りで確かめる。質問の一覧を1枚の HTML にして、ブラウザで開く</p>
+<pre><code class="language-powershell">python tools/spot_check.py --dataset hr --n 10 --seed 1 --out _work/spot-hr.html
+</code></pre>
+<ul>
+<li>種類ごとにほぼ均等に N 問を選び、問・種類・正解の文書（根拠の語句を黄色で強調）を1つの画面に出します。通信しません</li>
+<li>1問ずつ「正しい」か「直す」を付け、メモを書き、「Markdown に書き出す」で結果を残します</li>
+<li>「直す」の問を直したら、4 から繰り返します。<code>--seed</code> を変えると、別の問が選ばれます</li>
+<li>ホテルは <code>--dataset hotel</code>（<code>--hotel-data</code> も）、武将は <code>--dataset sengoku</code></li>
+</ul>
+</li>
+</ol>
+<p>この Repo の <code>check_questions</code>・<code>eval_search</code>・<code>spot_check</code> は、武将・人事・ホテルの3つのデータの設定（インデックスの名前、項目、種類の数）を持っています。自分の組織のデータで動かすときは、構築する人が、そのデータの設定を <code>tools/evallib/datasets.py</code> と <code>tools/evallib/questions.py</code> に、3つと同じ形で足します。</p>
+<h2 id="つまずいたとき">つまずいたとき</h2>
+<ul>
+<li>「.env.local が読めません」などの設定の案内が出る：Repo の直下で実行しているか、<code>.env.local</code> があるかを確かめます。キーは <code>.env.local</code> だけから読みます（端末の環境変数は読みません）</li>
+<li>「インデックス … がありません」と出て、その方式が飛ばされる：構築する人が、そのインデックスを作ってあるか確かめます（<code>python tools/team.py health</code>）</li>
+<li>ホテルの <code>semantic</code> が飛ばされる：手順書のインデックスにセマンティックの設定がないためで、正常です</li>
+<li>人事の一般社員の漏れが 0 にならない：17 を試したあとなら、<code>cleanup.py</code> で元に戻してから測り直します</li>
+<li>「単価が未設定」と出る：<code>config/prices.json</code> を作って、単価を書きます（4）</li>
+</ul>
+</article>
+</main>
+<footer class="bar"><a class="home" href="../index.html">← 入口に戻る</a><a class="source" href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/guide/evaluation.md">元の Markdown（GitHub）</a></footer>
+</body>
+</html>

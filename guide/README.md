@@ -16,8 +16,9 @@
 3. [ホテル](hotel.md)：ホテルのデータで、Azure AI Search をポータルで作って試す。Cosmos DB のベクトル検索も
 4. [武将](sengoku.md)：基礎編（01〜06）。キーワード検索からベクトル検索、ハイブリッド、答えの生成まで
 5. [応用（人事）](hr.md)：応用編（14〜20）と採用アシスタント。採用の文書で、業務の検索を見る
-6. [検索デモ](search-demo.md)：条件を変えると結果が変わるのを、AI Search だけで見る
-7. [進行役の手引き](facilitator.md)：進行役（研修を進める人）向け。開始前の準備、パートの順、各パートで見せるもの、つまずきやすい所
+6. [評価](evaluation.md)：武将・人事・ホテルの検索の方式を、同じやり方で測る。精度と費用の釣り合いを、数字で決める
+7. [検索デモ](search-demo.md)：条件を変えると結果が変わるのを、AI Search だけで見る
+8. [進行役の手引き](facilitator.md)：進行役（研修を進める人）向け。開始前の準備、パートの順、各パートで見せるもの、つまずきやすい所
 
 ## 道具
 
@@ -27,3 +28,7 @@
 - `python tools/team.py env --team <チーム> --role builder`：構築する人の `.env.local` を作る。`--role member --out member.local.env` で、メンバー用のファイルも作る
 - `python tools/search_demo.py`：条件を変えると結果が変わるのを見る（[検索デモ](search-demo.md)）
 - `python tools/hotel_vectors.py`：ホテルのデータにベクトルを足す（[ホテル](hotel.md)の 4 章）
+- `python tools/check_questions.py`：評価の質問の形を確かめる（通信しない。[評価](evaluation.md)）
+- `python tools/eval_search.py`：検索の方式を、質問のセットで測る（検索して採点する。読むだけ）
+- `python tools/eval_report.py`：測った結果を、方式ごと・質問の種類ごとの表にまとめる（費用の見込みつき。通信しない）
+- `python tools/spot_check.py`：評価の質問を、人が抜き取りで確かめる一覧（1枚の HTML）を作る（通信しない）

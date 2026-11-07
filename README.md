@@ -30,6 +30,7 @@ Everything is in Japanese: slides, step-by-step guides, scripts and sample data.
 3. [ホテル](guide/hotel.md)
 4. [武将](guide/sengoku.md)（基礎編）
 5. [応用（人事）](guide/hr.md)（応用編）
+6. [評価](guide/evaluation.md)（3つのデータの検索の方式を、同じやり方で測る）
 
 2 の Azure の準備は、次の流れです。
 
@@ -43,13 +44,14 @@ Everything is in Japanese: slides, step-by-step guides, scripts and sample data.
 
 ## 構成
 
-- `guide/`：手順書（Windows PC、Azure、ホテル、武将、応用、検索デモ、進行役の手引き）
+- `guide/`：手順書（Windows PC、Azure、ホテル、武将、応用、評価、検索デモ、進行役の手引き）
 - `basic/`：基礎編。トピック 01〜06。戦国武将のデータで、キーワード検索、同義語、ベクトル検索、ハイブリッド、測る、答えの生成
 - `applied/`：応用編。トピック 14〜20。採用の文書で、形式の違う文書、インデクサー、見せてよい人、更新と削除、関係、エージェント型検索、答えの評価。採用アシスタント（`applied/assistant/`）
 - `docs/lecture/`：ハンズオン資料（スライド）の原稿と、作る道具。読む形の Markdown は `docs/lecture/md/`
 - `site/`：スライド（`site/lecture/`）と、読む形のページ（`site/pages/`）。入口は `site/index.html`
-- `tools/`：チームの設定（`team.py`）、検索デモ、ページを作る道具、公開前の検査
-- `config/`：接続の設定（`env.example`）と組織の設定（`workshop.example.config`）のひな形
+- `evaluation/`：評価の質問と正解の文書（人事 60 問、ホテル 40 問。武将の 60 問は `basic/data/sengoku/`）。形と種類の説明つき
+- `tools/`：チームの設定（`team.py`）、検索デモ、評価の道具（質問の確かめ `check_questions.py`・測る `eval_search.py`・表にまとめる `eval_report.py`・人が抜き取りで確かめる `spot_check.py`）、ページを作る道具、公開前の検査
+- `config/`：接続の設定（`env.example`）、組織の設定（`workshop.example.config`）、評価の費用の単価（`prices.example.json`）のひな形
 
 トピックの番号は、基礎編が 01〜06、応用編が 14〜20 です。07〜13 はありません。
 

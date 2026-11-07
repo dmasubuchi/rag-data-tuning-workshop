@@ -256,11 +256,19 @@ OK    AI Search セマンティック ランカー（Free）
 OK    Foundry ai-acme-red
 OK    デプロイ text-embedding-3-small（GlobalStandard・容量50・Succeeded）
 OK    デプロイ gpt-5-mini（GlobalStandard・容量20・Succeeded）
+インデックスの文書の数（参考。下の OK・まだ・NG には入りません）：
+  sengoku        まだない
+  hr-docs        まだない
+  hotels-blob    まだない
+  hotels-cosmos  まだない
 OK 8・まだ 0・NG 0
 </code></pre>
 <ul>
 <li>「OK」はそのままです。「NG」は、かっこの中の理由を読んで直します。「まだ」は、まだ作っていないものです。</li>
 <li><code>health</code> は Cosmos DB を調べません。ポータルで確かめます。</li>
+<li>「インデックスの文書の数」は参考で、OK・まだ・NG の数には入りません。ここではインデックスをまだ作っていないので、4つとも「まだない」で正しいです。ホテル・武将・人事の手順を進めたあとで実行し直すと、件数が出ます。件数が目安と違うときは、手順を見直してから<a href="guide-evaluation.html">評価</a>に進みます。</li>
+<li>文書の数は、AI Search の検索用のキー（クエリ キー）で数えます。管理者キーは読みません。検索用のキーがないときは、数えない理由が1行出ます（キーの作り方は、4 の「構築する人」の 2）。</li>
+<li>AI Search につながらない（接続の失敗・時間切れ）インデックスが1つあると、残りは問い合わせず「数えられません（つながりません）」と出ます。</li>
 </ul>
 <h2 id="4-接続の設定を作る">4. 接続の設定を作る</h2>
 <p><code>.env.local</code> は、チームの AI Search と Foundry の接続先とキーを書いたファイルです。すべてのスクリプトが、Repo 直下のこのファイルを読みます。キーが入るので、Git には入りません。</p>

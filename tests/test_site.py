@@ -166,7 +166,8 @@ class SiteOutputTest(unittest.TestCase):
                        'href="lecture/index.html"', "06 の次は 14", "Retrieve"):
             self.assertIn(needle, text)
         order = [m for m in re.findall(r'<ol class="links">(.*?)</ol>', text, re.S)[0].split("<li>")[1:]]
-        self.assertEqual(len(order), 7, "始め方は手順書の7つ")
+        self.assertEqual(len(order), 8, "始め方は手順書の8つ")
+        self.assertIn("guide-evaluation.html", order[5])
         self.assertIn("guide-setup-windows-pc.html", order[0])
         self.assertIn("guide-facilitator.html", order[-1])
         self.assertNotIn("`", text, "説明の中の ` がそのまま出ている")

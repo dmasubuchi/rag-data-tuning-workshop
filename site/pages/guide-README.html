@@ -28,6 +28,7 @@
 <li><a href="guide-hotel.html">ホテル</a>：ホテルのデータで、Azure AI Search をポータルで作って試す。Cosmos DB のベクトル検索も</li>
 <li><a href="guide-sengoku.html">武将</a>：基礎編（01〜06）。キーワード検索からベクトル検索、ハイブリッド、答えの生成まで</li>
 <li><a href="guide-hr.html">応用（人事）</a>：応用編（14〜20）と採用アシスタント。採用の文書で、業務の検索を見る</li>
+<li><a href="guide-evaluation.html">評価</a>：武将・人事・ホテルの検索の方式を、同じやり方で測る。精度と費用の釣り合いを、数字で決める</li>
 <li><a href="guide-search-demo.html">検索デモ</a>：条件を変えると結果が変わるのを、AI Search だけで見る</li>
 <li><a href="guide-facilitator.html">進行役の手引き</a>：進行役（研修を進める人）向け。開始前の準備、パートの順、各パートで見せるもの、つまずきやすい所</li>
 </ol>
@@ -39,6 +40,10 @@
 <li><code>python tools/team.py env --team &lt;チーム&gt; --role builder</code>：構築する人の <code>.env.local</code> を作る。<code>--role member --out member.local.env</code> で、メンバー用のファイルも作る</li>
 <li><code>python tools/search_demo.py</code>：条件を変えると結果が変わるのを見る（<a href="guide-search-demo.html">検索デモ</a>）</li>
 <li><code>python tools/hotel_vectors.py</code>：ホテルのデータにベクトルを足す（<a href="guide-hotel.html">ホテル</a>の 4 章）</li>
+<li><code>python tools/check_questions.py</code>：評価の質問の形を確かめる（通信しない。<a href="guide-evaluation.html">評価</a>）</li>
+<li><code>python tools/eval_search.py</code>：検索の方式を、質問のセットで測る（検索して採点する。読むだけ）</li>
+<li><code>python tools/eval_report.py</code>：測った結果を、方式ごと・質問の種類ごとの表にまとめる（費用の見込みつき。通信しない）</li>
+<li><code>python tools/spot_check.py</code>：評価の質問を、人が抜き取りで確かめる一覧（1枚の HTML）を作る（通信しない）</li>
 </ul>
 </article>
 </main>

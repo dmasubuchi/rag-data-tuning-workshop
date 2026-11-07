@@ -23,14 +23,20 @@ REPO_DIR = Path(__file__).resolve().parent.parent
 GUIDE = REPO_DIR / "guide"
 sys.path.insert(0, str(REPO_DIR / "tools"))
 
+import check_questions  # noqa: E402
+import eval_report  # noqa: E402
+import eval_search  # noqa: E402
 import hotel_vectors  # noqa: E402
 import search_demo  # noqa: E402
+import spot_check  # noqa: E402
 import team  # noqa: E402
+from evallib.methods import METHODS  # noqa: E402
+from evallib.questions import DATASETS  # noqa: E402
 from githubmd import GithubSlugger, github_anchor  # noqa: E402
 from teamlib.names import make_names  # noqa: E402
 
 GUIDE_FILES = ["README.md", "setup/windows-pc.md", "setup/azure-setup.md", "hotel.md", "sengoku.md", "hr.md",
-               "search-demo.md", "facilitator.md"]
+               "evaluation.md", "search-demo.md", "facilitator.md"]
 FENCE = re.compile(r"^\s*(```|~~~)")
 LINK = re.compile(r"!?\[[^\]]*\]\(([^)\s]+)(?:\s+\"[^\"]*\")?\)")
 EXTERNAL = re.compile(r"https?://[^\s/]+\.[^\s/]+(/\S*)?$")
@@ -111,7 +117,7 @@ def guide_texts():
 class GuideTest(unittest.TestCase):
     def test_guide_files_exist_and_nothing_else_is_in_guide(self):
         found = sorted(str(p.relative_to(GUIDE)) for p in GUIDE.rglob("*") if p.is_file() and not p.name.startswith("."))
-        self.assertEqual(found, sorted(GUIDE_FILES), "guide/ には、この8つの Markdown だけを置く（画像は置かない）")
+        self.assertEqual(found, sorted(GUIDE_FILES), "guide/ には、この9つの Markdown だけを置く（画像は置かない）")
 
     def test_guide_links_resolve(self):
         problems = []
@@ -223,8 +229,41 @@ class GuideTest(unittest.TestCase):
                 team.Row(team.OK, f"Foundry {n.foundry}"),
                 team.Row(team.OK, "デプロイ text-embedding-3-small", "GlobalStandard・容量50・Succeeded"),
                 team.Row(team.OK, "デプロイ gpt-5-mini", "GlobalStandard・容量20・Succeeded")]
-        shown, _ = team.health_text("red", rows)
+        # 手順の3-7は、インデックスをまだ作っていない時点なので、文書の数は4つとも「まだない」
+        counts = team.Counts(items=tuple(team.IndexCount(expect) for expect in team.INDEX_EXPECTS))
+        shown, _ = team.health_text("red", rows, counts)
         self.assertIn(shown, guide_texts()["setup/azure-setup.md"])
+
+    def test_evaluation_guide_commands_match_the_tools(self):
+        """評価の手順書に書いたコマンドの引数（オプション・データ・方式）を、道具の本物の引数の定義と照らす。"""
+        parsers = {"check_questions": check_questions, "eval_search": eval_search, "eval_report": eval_report,
+                   "spot_check": spot_check}
+        text = guide_texts()["evaluation.md"]
+        seen = set()
+        for name, module in parsers.items():
+            accepted = set(module.build_parser()._option_string_actions)
+            for rest in re.findall(rf"tools/{name}\.py([^`\n]*)", text):
+                seen.add(name)
+                for option in re.findall(r"(?<!\S)(--[a-z][\w-]*)", rest):
+                    self.assertIn(option, accepted, f"{name}: {option}")
+                for dataset in re.findall(r"--dataset (\w+)", rest):
+                    self.assertIn(dataset, DATASETS, f"{name}: --dataset {dataset}")
+                for methods in re.findall(r"--methods ([\w,+]+)", rest):
+                    self.assertTrue(set(methods.split(",")) <= set(METHODS), f"{name}: --methods {methods}")
+        self.assertEqual(seen, set(parsers), "4つの道具が、すべて手順書に出ている")
+        everywhere = set().union(*(set(m.build_parser()._option_string_actions) for m in parsers.values()))
+        for option in set(re.findall(r"(?<![\w-])(--[a-z][\w-]*)", text)):   # 文の中のオプション（--limit など）も、どれかの道具にある
+            self.assertIn(option, everywhere, option)
+
+    def test_evaluation_guide_matches_prices_example_and_health_targets(self):
+        """単価の項目名は config/prices.example.json と、件数の目安は team.py の INDEX_EXPECTS と同じ。"""
+        text = guide_texts()["evaluation.md"]
+        example = json.loads((REPO_DIR / "config" / "prices.example.json").read_text(encoding="utf-8"))
+        for field in ("currency", "checked", "semantic_per_1000", "embedding_per_1m_tokens", "search_per_1000"):
+            self.assertIn(field, example, field)
+            self.assertIn(f"`{field}`", text, field)
+        for expect in team.INDEX_EXPECTS:
+            self.assertIn(f"`{expect.index}` {expect.wanted}", text, expect.index)
 
     def test_json_blocks_parse(self):
         """貼り付ける JSON が読める（ベクトルを貼る場所の見本は除く）。"""

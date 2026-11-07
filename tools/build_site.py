@@ -462,7 +462,8 @@ def build_index(pages: dict, repo: Path) -> str:
     topics = lambda group: [(pages[r].title, r, "") for r in sorted(pages) if re.match(rf"^{group}/topics/[^/]+/README\.md$", r)]  # noqa: E731
     sources = [("guide", "tree", "手順書（Markdown）"), ("basic", "tree", "基礎編のスクリプト・Notebook・データ"),
                ("applied", "tree", "応用編のスクリプト・Notebook・データ"),
-               ("docs/lecture", "tree", "スライドの原稿と、作る道具"), ("tools", "tree", "チームを作る道具、ページを作る道具"),
+               ("evaluation", "tree", "評価の質問と、正解の文書（人事・ホテル）"),
+               ("docs/lecture", "tree", "スライドの原稿と、作る道具"), ("tools", "tree", "チームを作る道具、評価の道具、ページを作る道具"),
                ("NOTICE.md", "blob", "データの出どころ、ライセンスの注意"), ("LICENSE", "blob", "コードのライセンス"),
                ("LICENSE-docs.md", "blob", "文書のライセンス")]
     source_items = "".join(

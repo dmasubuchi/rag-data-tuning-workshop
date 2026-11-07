@@ -112,6 +112,7 @@
 <li>確かめる（進行役の PC で、チームごとに）：<code>python tools/team.py health --team &lt;team&gt;</code>。8行がすべて「OK」で、<code>OK 8・まだ 0・NG 0</code><ul>
 <li>「NG」は理由を読んで直す。「まだ」は、まだ作っていないもの</li>
 <li>Cosmos DB は <code>health</code> が調べないので、ポータルで見る</li>
+<li>8行のあとに「インデックスの文書の数（参考）」が出る。判定には入らない。この時点は、4つとも「まだない」が正しい（取り込んだあとに実行し直すと、件数が出る）</li>
 </ul>
 </li>
 </ul>
@@ -167,7 +168,7 @@
 <li>映す：<a href="../lecture/part5-wrapup/slides.html#p46">p.46 作り方の比較</a>、<a href="../lecture/part5-wrapup/slides.html#p52">p.52 料金の構造</a></li>
 </ul>
 </li>
-<li class="task"><input type="checkbox"> 続きの手順を伝える：ホテルの章4〜5（Cosmos DB）、ハンズオン資料と各トピックの README</li>
+<li class="task"><input type="checkbox"> 続きの手順を伝える：ホテルの章4〜5（Cosmos DB）、<a href="guide-evaluation.html">評価</a>（3つのデータを測り、精度と費用の釣り合いを決める）、ハンズオン資料と各トピックの README</li>
 <li class="task"><input type="checkbox"> 質問の窓口を伝える（チャットなど、決めた場所）</li>
 </ul>
 <h2 id="終わったあと">終わったあと</h2>
@@ -188,6 +189,7 @@
 <li>ロールの割り当てが効かない：付けた直後は、反映に時間がかかる。5分ほど待って、インデクサーの次の実行を見る</li>
 <li>画面の名前が違う：Azure の画面は変わる。メニューの名前を探し、見つからなければ、進行役が確かめて伝える</li>
 <li>セマンティック ランカーの無料枠：チームの AI Search 全体で、月ごとに使う。05 の <code>measure_methods.py</code> は、1回の実行で質問の数（60回）使う</li>
+<li>評価の <code>eval_search.py</code>：人事・武将は、全部の質問・4方式で、セマンティック ランカーを60回使う（<a href="guide-evaluation.html">評価</a>）。確かめは <code>--limit 6</code>、全部を測るのはチームで1回にする</li>
 <li>17 は本物の文書を直す：動かしているあいだ、チームの検索の結果も変わる。メンバーが 15・16・18・19 を動かしていないときに、構築する人が実行する</li>
 <li>キーが古くなった：構築する人が <code>python tools/team.py env --team &lt;チーム&gt; --role builder</code>（自分の <code>.env.local</code>）と <code>--role member --out member.local.env</code>（メンバー用）を実行し直し、<code>member.local.env</code> をメンバーに渡し直す</li>
 <li>Azure OpenAI が「呼びすぎ（429）」と返す：自動で待って再試行する。続くときは、1分ほど待つ</li>
