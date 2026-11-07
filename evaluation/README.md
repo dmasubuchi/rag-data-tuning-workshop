@@ -100,9 +100,9 @@
   - 求人票・経歴書：`jobs/*.md`・`resumes/*.md`
   - メール：`mail.json` の件名と本文
   - 面接の評価の一覧：`evaluations.json` と `source_ats.json`（選考状況・選考履歴のシートの元の台帳）
-  - スキャン：次の3つを探します。`scans.json` の記述、画像を描く `_build/make_scans.py` の、そのスキャンを作る関数（`make_memo` など）、書類に書く事実を台帳から引く `scan_facts()` の、そのスキャンの分（応募番号・受付印の日付・FAX の上部の日時など、画像に見える文字）。`scan_facts()` は、`make_scans.py` を読み込んで呼ぶので、numpy・Pillow が要ります。なければ、最初の2つだけで探し、その旨が問題の文に出ます
+  - スキャン：`scans.json` の、そのスキャンの記述と、画像を描く `_build/make_scans.py` の、そのスキャンを作る関数（`make_memo` など）を探します。どちらも文字として読むだけで、`make_scans.py` は動かしません（確かめの道具は標準ライブラリだけで動きます）。画像には日付が `2026.10.26` のように印字されるので、`scans.json` の記述にある `2026-10-26` の形の日付は、`2026.10.26`・`2026/10/26`・`2026年10月26日`・`10月26日`・`10/26`（月日のゼロ埋めあり・なし）でも探します。応募番号（`APP-0471`）や FAX の上部の時刻（`10:52`）は、`scans.json` の記述にそのまま出ます
   - 本文のもとのフォルダーがないときは、語句を探す確かめだけが飛ばされます（語句がそろっているかは見ます）。そのとき、確かめの道具は「本文が見つからないので、evidence の照らし合わせを飛ばしました」と1行出します
-  - `mail.json`・`scans.json` の一番上の形が違うとき（`{"mails": [ ... ]}`・`{"scans": [ ... ]}` でないとき）や、知らない種類のスキャンのときは、落ちずに、そのことを問題の文に出します
+  - `mail.json`・`scans.json` の一番上の形が違うとき（`{"mails": [ ... ]}`・`{"scans": [ ... ]}` でないとき）は、質問の問題ではないので、確かめを止めて、理由を1行出して終了コード 2 で終わります。知らない種類のスキャン（`make_…` の関数がない）は、問題の文に出します
 - `scan`：`answer_ids` に、OCR が要る文書（manifest の `ocr_required` が true。`SCAN-01`〜`SCAN-03`）を含むこと。スキャンにしか書いていないことを聞きます
 - `permission`：次の節
 
@@ -113,7 +113,7 @@
 - `answer_ids`：`condition` でない質問は 1〜5 件。`condition` の質問は 1〜20 件で、0 件や 21 件以上になる条件は使いません
 - `condition`：答えの条件を、次のように書きます。**質問の意味を条件で表しきれる質問だけ**を、種類 `condition` にします。確かめの道具は、データのうち条件に合うホテルを計算して、`answer_ids` がその全部と同じ集合かを見ます。`answer_ids` は手で数えず、条件から作ります
   - 例：`{"Rating": {"ge": 4.5}, "ParkingIncluded": true, "Category_ja": "ブティック", "Rooms/BaseRate": {"le": 100}}`
-  - 値だけ書くと `eq`。`{"演算": 値}` の演算は `eq`・`ge`・`le`・`gt`・`lt`。1つの項目に演算を2つ書けます（`{"Rating": {"ge": 4, "lt": 4.5}}`）。真偽と文字列は `eq` だけです
+  - 値だけ書くと `eq`。`{"演算": 値}` の演算は `eq`・`ge`・`le`・`gt`・`lt`。1つの項目に演算を2つ書けます（`{"Rating": {"ge": 4, "lt": 4.5}}`）。真偽と文字列は `eq` だけです。数は有限の数で書きます（NaN・無限大は使えません）
   - 使える項目：`HotelId`・`Category`・`Category_ja`・`ParkingIncluded`・`IsDeleted`・`LastRenovationDate`・`Rating`、住所の `Address/City`・`Address/StateProvince`・`Address/PostalCode`・`Address/Country`、客室の `Rooms/Type`・`Rooms/Type_ja`・`Rooms/BaseRate`・`Rooms/BedOptions`・`Rooms/SleepsCount`・`Rooms/SmokingAllowed`。検索のインデックスで絞り込める項目だけで、説明やタグでは絞れません
   - `Rooms/…` は「どれかの客室が満たす」です。客室の条件を2つ以上書くと、**同じ客室が全部を満たす**ことになります（100ドル以下の部屋と、禁煙の部屋が別々にあるだけでは、合いません）
   - 改装日（`LastRenovationDate`）は、`{"ge": "2015-01-01T00:00:00Z"}` のように、`T` と `Z`（または時差）つきの日時の文字で書きます。データの日時と同じ順に比べ、検索の `$filter` では引用符のない日時になります
@@ -158,7 +158,7 @@ python tools/check_questions.py --dataset hotel --hotel-data <ホテルのデー
   - 種類ごとの数の違い
   - 人事は、上の「人事の決まり」（`permission`・`scan`・`multi-doc`）
   - ホテルは、上の「ホテルの決まり」：`condition` の形、`answer_ids` が条件に合うホテル全部であること（データを渡したとき）、答えの数、`evidence` がそろっていて語句がそのホテルにあること、`ja-en` の手がかり
-- 質問やデータのファイルが読めないときは、理由を出して終了コード 2 で終わります。質問のファイルがないときは、次の手（`--file` で渡すか、質問を作ります）も出します
+- 質問やデータのファイルが読めないとき（人事の本文のもとの形が違うときも）は、理由を出して終了コード 2 で終わります。質問のファイルがないときは、次の手（`--file` で渡すか、質問を作ります）も出します
 - `--file PATH` で質問のファイルを変えられます
 - ホテルのデータは、このリポジトリに写していません。ダウンロードした `HotelsData_toAzureBlobs_ja.json` を `_work/hotel-vectors/` に置くか、`--hotel-data` で場所を渡します
 - 人事の本文のもと（`applied/data/_build/content`）がないときは、語句を探す確かめを飛ばして、その旨を1行出します

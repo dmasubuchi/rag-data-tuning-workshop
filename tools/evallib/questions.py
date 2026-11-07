@@ -10,10 +10,9 @@
 （別のモジュールに置くと、tools/check_questions.py から呼ばれない）。人事の確かめは check_hr、ホテルは check_hotel。
 ホテルの condition（条件）は、condition_to_filter（検索の $filter の文字）と matches（データが条件に合うか）で扱う。
 """
-import importlib.util
 import json
+import math
 import re
-import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -45,6 +44,10 @@ DATA_FILES = {
 
 class DataError(Exception):
     """利用者に見せる日本語の理由つきの失敗（ファイルがない・読めない・形が違う）。"""
+
+
+class DataShapeError(DataError):
+    """文書の本文のもとのファイルの、一番上の形が違う（確かめの途中でも止めて、CLI は 1 行出して終了コード 2 にする）。"""
 
 
 def allowed_types(dataset):
@@ -279,52 +282,23 @@ def _read_items(path, key):
     data = read_json(path)
     items = data.get(key) if isinstance(data, dict) else None
     if not isinstance(items, list):
-        raise DataError(f"{_show(path)} の一番上の形が違います（{{\"{key}\": [ ... ]}} の形で読みます）")
+        raise DataShapeError(f"{_show(path)} の一番上の形が違います（{{\"{key}\": [ ... ]}} の形で読みます）")
     return items
 
 
-_SCAN_FACTS_CACHE = {}
+_ISO_DATE = re.compile(r"(?<!\d)(\d{4})-(\d{2})-(\d{2})(?!\d)")
 
 
-def _run_scan_facts(script):
-    """make_scans.py を（その場で）読み込んで scan_facts() を呼ぶ。読めなければ (None, 理由)。"""
-    name = "_evallib_make_scans"
-    folder = str(script.parent)
-    before = set(sys.modules)
-    sys.path.insert(0, folder)
-    try:
-        spec = importlib.util.spec_from_file_location(name, script)
-        module = importlib.util.module_from_spec(spec)
-        sys.modules[name] = module
-        spec.loader.exec_module(module)
-        function = getattr(module, "scan_facts", None)
-        if not callable(function):
-            return None, "make_scans.py に scan_facts() がありません"
-        facts = function()
-        if not isinstance(facts, dict):
-            return None, "scan_facts() の結果が {scan の id: {...}} の形ではありません"
-        return facts, None
-    except Exception as error:   # numpy・Pillow がない、台帳が読めない、など
-        return None, f"{type(error).__name__}：{str(error)[:60]}"
-    finally:
-        if folder in sys.path:
-            sys.path.remove(folder)
-        for added in set(sys.modules) - before:   # 同じ置き場の lib_common・scan_effects も、次の読み込みに残さない
-            module_file = getattr(sys.modules[added], "__file__", None)
-            if added == name or (module_file and Path(module_file).resolve().parent == script.parent.resolve()):
-                sys.modules.pop(added, None)
+def _date_notations(text):
+    """text の中の ISO の日付（2026-10-26）の、ほかの書き方を並べた文字。画像に印字された日付を探すため。
 
-
-def _load_scan_facts(script):
-    """scan_facts()（書類に書く事実。応募番号・受付印の日付など、画像に見える文字のもと）の結果と、読めなかった理由。"""
-    try:
-        stat = script.stat()
-    except OSError:
-        return None, "make_scans.py が読めません"
-    key = (str(script), stat.st_mtime_ns, stat.st_size)
-    if key not in _SCAN_FACTS_CACHE:
-        _SCAN_FACTS_CACHE[key] = _run_scan_facts(script)
-    return _SCAN_FACTS_CACHE[key]
+    2026.10.26・2026/10/26・2026年10月26日・10月26日・10/26。月と日は、ゼロ埋めあり（01）となし（1）の両方。
+    """
+    found = []
+    for year, month, day in _ISO_DATE.findall(text):
+        for m, d in dict.fromkeys(((month, day), (str(int(month)), str(int(day))))):
+            found += [f"{year}.{m}.{d}", f"{year}/{m}/{d}", f"{year}年{m}月{d}日", f"{m}月{d}日", f"{m}/{d}"]
+    return "\n".join(dict.fromkeys(found))
 
 
 def hr_content_available():
@@ -337,10 +311,10 @@ def hr_source_text(doc_id, file, content_dir):
 
     求人票・経歴書は content/jobs・resumes の Markdown、メールは mail.json の件名と本文、
     面接の評価の一覧は evaluations.json と source_ats.json（選考状況・選考履歴のシートの元の台帳）、
-    スキャンは scans.json の記述と、画像を描く make_scans.py の、そのスキャンを作る関数、
-    書類に書く事実を台帳から引く scan_facts() の結果（応募番号・受付印の日付など、画像に見える文字）。
-    numpy・Pillow がなく scan_facts() を呼べないときは、最初の2つだけを探す（その旨を場所の名前に書く）。
-    読めない・見つからない・一番上の形が違うときは DataError。
+    スキャンは scans.json の記述と、画像を描く make_scans.py の、そのスキャンを作る関数（文字として読むだけで、実行しない）。
+    画像には日付が 2026.10.26 のような書き方で印字されるので、scans.json の記述にある ISO の日付（2026-10-26）は、
+    ほかの書き方（_date_notations）でも探せるようにする。
+    読めない・見つからないときは DataError。一番上の形が違うときは DataShapeError（DataError の一種）。
     """
     content_dir = Path(content_dir)
     kind = file.get("kind")
@@ -378,13 +352,8 @@ def hr_source_text(doc_id, file, content_dir):
             text += "\n" + match.group(0)
         else:
             notes.append(f"スキャンの種類「{scan_kind}」の make_{scan_kind} が make_scans.py にありません")
-        facts, reason = _load_scan_facts(script)
-        if facts is not None:
-            text += "\n" + "\n".join(_all_strings(facts.get(doc_id)))
-        else:
-            notes.append(f"scan_facts() は読めませんでした（{reason}）")
-        label = "scans.json・make_scans.py" + ("・scan_facts()" if facts is not None else "")
-        return text, label + "".join(f" ※{note}" for note in notes)
+        text += "\n" + _date_notations(text)
+        return text, "scans.json・make_scans.py" + "".join(f" ※{note}" for note in notes)
     raise DataError(f"{doc_id} の種類「{kind}」は本文のもとが決まっていません")
 
 
@@ -411,6 +380,8 @@ def _check_hr_evidence(who, q, ids, known_ids, files, content_dir, cache):
         if doc_id not in cache:
             try:
                 cache[doc_id] = hr_source_text(doc_id, files[doc_id], content_dir)
+            except DataShapeError:
+                raise   # 本文のもとのファイルの形が違う：質問の問題ではないので、止める（CLI は 1 行出して終了コード 2）
             except DataError as error:
                 cache[doc_id] = error
         found = cache[doc_id]
@@ -515,6 +486,8 @@ def _parse_ops(key, spec):
             ok = isinstance(value, str) and bool(value) and op == "eq"
             how = "文字列（演算は eq だけ）"
         elif kind == "number":
+            if _is_number(value) and not math.isfinite(value):
+                raise ValueError(f"「{key}」の {op} に NaN・無限大は使えません（有限の数で書きます。今は {value!r}）")
             ok = _is_number(value)
             how = "数"
         else:
