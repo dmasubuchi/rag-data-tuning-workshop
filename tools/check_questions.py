@@ -36,10 +36,13 @@ def main(argv=None) -> int:
     if args.hotel_data and args.dataset != "hotel":
         print("--hotel-data は --dataset hotel のときだけ使えます。", file=sys.stderr)
         return 2
+    question_file = args.file or QUESTION_FILES[args.dataset]
     try:
-        questions = load_questions(args.file or QUESTION_FILES[args.dataset])
+        questions = load_questions(question_file)
     except DataError as error:
         print(f"NG    {error}", file=sys.stderr)
+        if not Path(question_file).exists():
+            print("      質問のファイルは、--file で渡すか、質問を作ります（作り方は evaluation/README.md）。", file=sys.stderr)
         return 2
     try:
         data = load_data(args.dataset, args.hotel_data)

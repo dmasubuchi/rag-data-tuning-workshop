@@ -6,7 +6,8 @@
   ids_of(dataset, data) そのデータにある文書の ID の集合
   validate(...)         質問の形と中身を確かめる。問題の文の一覧を返す（空なら合格）
 
-人事・ホテルに固有の確かめは、@dataset_check("hr") のように、この下の DATASET_CHECKS に足す。
+人事・ホテルに固有の確かめは、@dataset_check("hr") のように、このファイルの中に書いて、DATASET_CHECKS に足す
+（別のモジュールに置くと、tools/check_questions.py から呼ばれない）。人事の確かめは check_hr。
 """
 import json
 from pathlib import Path
@@ -113,6 +114,9 @@ def dataset_check(dataset):
 
     確かめは check(questions, *, known_ids, data) -> list[str]（問題の文の一覧）で、共通の確かめのあとに
     呼ばれる。questions は、質問の形をなしているもの（辞書）だけ。
+    置き場所：このファイル（tools/evallib/questions.py）の中。ほかのモジュールに置くと、読み込まれず、CLI から呼ばれない。
+    data：validate に渡したもの（CLI は人事なら manifest、ホテルならホテルの並び）。validate を data なしで呼ぶと None
+    なので、データを使う確かめは、None のときの扱い（飛ばす）を決めておく。
     """
     def register(check):
         DATASET_CHECKS[dataset].append(check)
@@ -149,15 +153,21 @@ def _check_question(index, q, known, types):
         return [f"{who}：質問の形（{{ ... }}）ではありません"]
     problems = []
     qid = q.get("qid")
-    if not isinstance(qid, str) or not qid.strip():
+    if "qid" in q and not isinstance(qid, str):
+        problems.append(f"{who}：qid は文字列で書きます（今は {type(qid).__name__}。例 \"hr-01\"）")
+    elif not isinstance(qid, str) or not qid.strip():
         problems.append(f"{who}：qid がありません")
     elif qid != qid.strip() or any(ch.isspace() for ch in qid):
         problems.append(f"{who}：qid「{qid}」に空白があります")
     text = q.get("question")
-    if not isinstance(text, str) or not text.strip():
+    if "question" in q and not isinstance(text, str):
+        problems.append(f"{who}：question は文字列で書きます（質問の文。今は {type(text).__name__}）")
+    elif not isinstance(text, str) or not text.strip():
         problems.append(f"{who}：question（質問の文）がありません")
     kind = q.get("type")
-    if not isinstance(kind, str) or not kind:
+    if "type" in q and not isinstance(kind, str):
+        problems.append(f"{who}：type は文字列で書きます（種類の名前。今は {type(kind).__name__}）")
+    elif not isinstance(kind, str) or not kind:
         problems.append(f"{who}：type（種類）がありません")
     elif kind not in types:
         problems.append(f"{who}：type「{kind}」は使えません（使える種類：{'・'.join(types)}）")
@@ -165,6 +175,8 @@ def _check_question(index, q, known, types):
         problems.append(f"{who}：answer_ids がありません（正解がなければ []）")
     else:
         problems += _check_ids("answer_ids", who, q["answer_ids"], known)
+        if isinstance(kind, str) and kind != "permission" and _is_ids(q["answer_ids"]) and not q["answer_ids"]:
+            problems.append(f"{who}：{kind} の質問の answer_ids が空です（空でよいのは permission だけ。正解の文書を 1 件以上書きます）")
     for name in ("why", "note"):
         if name in q and not isinstance(q[name], str):
             problems.append(f"{who}：{name} は文字列で書きます")
@@ -187,7 +199,8 @@ def _check_question(index, q, known, types):
 def validate(dataset, questions, *, known_ids, data=None):
     """質問の形と中身を確かめて、問題の文の一覧を返す。空なら合格。
 
-    共通の確かめ：qid が一意・question・type がそのデータで使える種類・answer_ids と hidden_ids が known_ids にある・
+    共通の確かめ：項目の形（qid・question・type は文字列）・qid が一意・type がそのデータで使える種類・
+    answer_ids と hidden_ids が known_ids にある・answer_ids と hidden_ids が重ならない・answer_ids が空なのは permission だけ・
     permission には as_role と hidden_ids。人事・ホテルは、種類ごとの数が TYPE_TARGETS と同じこと
     （武将は既存のデータなので、数は確かめない）。そのあとに DATASET_CHECKS のデータ固有の確かめを足す。
     data は、データ固有の確かめに渡す（人事は manifest、ホテルはホテルの並び）。
@@ -215,4 +228,65 @@ def validate(dataset, questions, *, known_ids, data=None):
     shaped = [q for q in questions if isinstance(q, dict)]
     for check in DATASET_CHECKS[dataset]:
         problems += check(shaped, known_ids=known, data=data)
+    return problems
+
+
+# ------------------------------------------------------------------ 人事に固有の確かめ
+
+HR_PERMISSION_ROLE = "role:employee"   # 一般社員。applied/lib/acl.py：一般社員に見えるのは求人票（job_posting）だけ
+HR_JOB_KIND = "job_posting"
+
+
+def _strs(value):
+    """ID の並びから、文字列だけを重複なしで取り出す（形の誤りは共通の確かめが言うので、ここでは読み飛ばす）。"""
+    return list(dict.fromkeys(x for x in value if isinstance(x, str))) if isinstance(value, list) else []
+
+
+def _hr_files(data):
+    """manifest の files を {doc_id: 文書の記述} にする。manifest が渡されていない・形が違うときは None。"""
+    try:
+        return {str(f["doc_id"]): f for f in data["files"]}
+    except (KeyError, TypeError):
+        return None
+
+
+@dataset_check("hr")
+def check_hr(questions, *, known_ids, data):
+    """人事の質問に固有の確かめ（種類ごとの決まり）。
+
+    - permission：as_role は role:employee だけ。hidden_ids は求人票でない文書（一般社員に見えない文書）。
+      answer_ids は求人票だけ（なければ空）
+    - scan：answer_ids に、OCR が要る文書（manifest の ocr_required が true）が 1 件以上ある
+    - multi-doc：answer_ids が 2 件以上（どれか 1 件だけでは答えきれない）
+    answer_ids・hidden_ids が manifest にあることは、共通の確かめ（known_ids）が見る。
+    data は manifest。None（validate を data なしで呼んだ）のときは、文書の種類・OCR が分からないので、
+    それを使う確かめ（permission の求人票、scan の OCR）は飛ばす。役割と multi-doc の数は、data なしでも確かめる。
+    """
+    files = _hr_files(data)
+    problems = []
+    for index, q in enumerate(questions, 1):
+        who = label(q, index)
+        kind = q.get("type")
+        answers = _strs(q.get("answer_ids"))
+        if kind == "permission":
+            role = q.get("as_role")
+            if isinstance(role, str) and role.strip() and role != HR_PERMISSION_ROLE:
+                problems.append(f"{who}：permission の as_role は {HR_PERMISSION_ROLE} だけを使います（今は「{role}」。"
+                                "一般社員には求人票だけが見える決まりです）")
+            if files is not None:
+                for doc_id in _strs(q.get("hidden_ids")):
+                    if doc_id in files and files[doc_id].get("kind") == HR_JOB_KIND:
+                        problems.append(f"{who}：hidden_ids の「{doc_id}」は求人票です（求人票は一般社員にも見えるので、"
+                                        "hidden_ids には求人票でない文書を書きます）")
+                for doc_id in answers:
+                    if doc_id in files and files[doc_id].get("kind") != HR_JOB_KIND:
+                        problems.append(f"{who}：permission の answer_ids の「{doc_id}」は求人票ではありません"
+                                        "（一般社員に見える正解は求人票だけ。なければ空にして、hidden_ids に書きます）")
+        elif kind == "scan" and files is not None:
+            if not any(files.get(doc_id, {}).get("ocr_required") for doc_id in answers):
+                problems.append(f"{who}：scan の質問の answer_ids には、OCR が要る文書（スキャン）を 1 件以上書きます")
+        elif kind == "multi-doc":
+            if len(answers) < 2:
+                problems.append(f"{who}：multi-doc の質問の answer_ids は 2 件以上です（今は {len(answers)} 件。"
+                                "どれか 1 件だけで答えられる質問は、ほかの種類にします）")
     return problems
