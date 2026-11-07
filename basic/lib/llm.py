@@ -79,14 +79,14 @@ def embedding_model_name() -> str:
     return _model_name_cache["name"]
 
 
-def sent_conditions(max_tokens: int = 800) -> dict:
+def sent_conditions(max_tokens: int = 4000) -> dict:
     """chat が実際に送る条件（記録・表示用）。temperature は送らないので「未指定」と書く。"""
     s = get_settings()
     return {"temperature": "未指定（送っていない）", "reasoning_effort": s.reasoning_effort or "未指定",
             "max_completion_tokens": max_tokens}
 
 
-def chat(messages: list, temperature: float = 0.0, max_tokens: int = 800) -> str:
+def chat(messages: list, temperature: float = 0.0, max_tokens: int = 4000) -> str:
     """messages を Azure OpenAI に送り、回答の文章を返す。
 
     推論モデルは temperature を受け付けないので、temperature は渡さない（引数は呼ぶ側との互換のために残してある）。

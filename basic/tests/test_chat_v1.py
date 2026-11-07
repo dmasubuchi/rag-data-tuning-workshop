@@ -70,12 +70,12 @@ class ChatTest(unittest.TestCase):
             c = llm.sent_conditions()
         self.assertIn("未指定", c["temperature"])
         self.assertNotEqual(c["temperature"], 0.0)
-        self.assertEqual((c["reasoning_effort"], c["max_completion_tokens"]), ("none", 800))
+        self.assertEqual((c["reasoning_effort"], c["max_completion_tokens"]), ("none", 4000))
 
     def test_no_effort_not_passed(self):
         calls, _, _, _ = self.run_chat(response())
         self.assertNotIn("reasoning_effort", calls[0])
-        self.assertEqual(calls[0]["max_completion_tokens"], 800)
+        self.assertEqual(calls[0]["max_completion_tokens"], 4000)
 
     def test_empty_and_length_stop(self):
         _, a, err, out = self.run_chat(response("", "stop"))

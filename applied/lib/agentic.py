@@ -477,7 +477,7 @@ def openai_client():
     return OpenAI(base_url=s.openai_endpoint.rstrip("/") + "/openai/v1/", api_key=s.openai_key)
 
 
-def chat(messages: list, kind: str, max_tokens: int = 1500, json_mode: bool = False) -> tuple:
+def chat(messages: list, kind: str, max_tokens: int = 4000, json_mode: bool = False) -> tuple:
     """LLM（.env.local のチャットのデプロイ）に messages を送る。(返事の文章, 使ったトークンの辞書) を返す。
 
     推論モデルは temperature を受け付けないので送らない。考える量は .env.local の AZURE_OPENAI_REASONING_EFFORT があれば渡す。
