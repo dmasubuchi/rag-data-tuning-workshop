@@ -576,6 +576,32 @@ class EnvCommandTest(TempCase):
             self.assertNotIn(key, out)
         self.assertNotIn(ADMIN_CALL, [call[:3] for call in az.calls])
 
+    def test_existing_group_is_used_for_every_lookup_for_both_roles(self):
+        """workshop.config に AZURE_RESOURCE_GROUP があれば、builder も member も、すべての照会に -g <そのグループ> を付ける。"""
+        self.config.write_text(CONFIG_TEXT + "AZURE_RESOURCE_GROUP=day1-rg\n", encoding="utf-8")
+        wanted = {"builder": [ADMIN_CALL, AI_CALL, STORAGE_CALL], "member": [QUERY_CALL, AI_CALL]}
+        for role, calls in wanted.items():
+            with self.subTest(role=role):
+                az = answers()
+                code, out, _ = self.run_main(az=az, role=role)
+                self.assertEqual(code, 0, out)
+                lookups = [call for call in az.calls if call[:2] != ("account", "show")]
+                self.assertEqual(len(lookups), len(calls), lookups)
+                for call, prefix in zip(lookups, calls):
+                    self.assertEqual(call[: len(prefix)], prefix)
+                    self.assertEqual(call[call.index("-g") + 1], "day1-rg", call)
+                    self.assertNotIn("rg-acme-suika", call)
+
+    def test_default_group_is_used_without_the_key(self):
+        """AZURE_RESOURCE_GROUP がなければ、従来どおり rg-<org>-<team>（上の試験が、何もしなくても通る試験にならないための対照）。"""
+        az = answers()
+        code, out, _ = self.run_main(az=az, role="builder")
+        self.assertEqual(code, 0, out)
+        lookups = [call for call in az.calls if call[:2] != ("account", "show")]
+        self.assertEqual(len(lookups), 3)
+        for call in lookups:
+            self.assertEqual(call[call.index("-g") + 1], "rg-acme-suika", call)
+
     def test_builder_writes_admin_key_and_shows_no_key(self):
         code, out, _ = self.run_main(az=answers(), role="builder")
         self.assertEqual(code, 0, out)

@@ -499,6 +499,29 @@ class CustomGroupTest(MainCase):
         self.assertIn(("search", "service", "show", "-n", "srch-acme-suika", "-g", CUSTOM_RG), az.calls)
         self.assertIn(("cognitiveservices", "account", "show", "-n", "ai-acme-suika", "-g", CUSTOM_RG), az.calls)
 
+    def test_health_missing_existing_group_is_ng_and_points_to_the_config(self):
+        """既存のグループを使う設定で見つからない＝名前の間違いの疑い。そのグループの行だけ NG にして、終了コードは 1。"""
+        az = FakeAz(default=NOTFOUND)
+        code, out, _ = self.run_main("health", az=az)
+        self.assertEqual(code, 1, out)
+        rows = [line for line in out.splitlines() if line.startswith(tuple(PREFIX.values()))]
+        self.assertEqual(len(rows), 8)
+        self.assertTrue(rows[0].startswith(PREFIX[team.NG] + f"リソース グループ {CUSTOM_RG}"), rows[0])
+        for hint in ("見つかりません", "workshop.config", "AZURE_RESOURCE_GROUP"):
+            self.assertIn(hint, rows[0])
+        self.assertTrue(all(line.startswith(PREFIX[team.MADA]) for line in rows[1:]), out)
+        self.assertIn("OK 0・まだ 7・NG 1", out)
+        self.assertEqual(az.calls, [("account", "show"), ("group", "show", "-n", CUSTOM_RG)])   # グループがなければ、ほかは調べない
+
+    def test_health_missing_default_group_is_still_not_yet(self):
+        """設定に AZURE_RESOURCE_GROUP がなければ、グループがなくても、従来どおり「まだ」・終了コード 0（これから作る）。"""
+        self.config = self.write_config(CONFIG_TEXT)
+        code, out, _ = self.run_main("health", az=FakeAz(default=NOTFOUND))
+        self.assertEqual(code, 0, out)
+        self.assertIn(PREFIX[team.MADA] + "リソース グループ rg-acme-suika", out)
+        self.assertIn("OK 0・まだ 8・NG 0", out)
+        self.assertNotIn("AZURE_RESOURCE_GROUP", out)
+
 # ------------------------------------------------------------------ health
 
 class HealthTest(MainCase):

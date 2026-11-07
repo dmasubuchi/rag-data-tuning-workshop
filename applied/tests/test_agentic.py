@@ -3,16 +3,23 @@
 Azure には接続しない。要求の本文の形、activity・references・response の読み取り、答えの保存、採点の返事の読み取り、ぶれの計算を確かめる。
 サンプルの返事は、実際の返事（2026-08-01-preview）の形に合わせた作り物。
 """
+import contextlib
+import io
 import json
+import runpy
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest import mock
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE.parent))
+sys.path.insert(0, str(HERE))
 import lib  # noqa: E402
-from lib import agentic, config, evaluation  # noqa: E402
+from lib import agentic, clients, config, evaluation  # noqa: E402
+from envcase import EnvCase  # noqa: E402
 
 # 値は、公開前の検査（check_public）が「キーらしい文字列」と見ないように、20 文字より短くしてある
 FAKE_SETTINGS = config.Settings(
@@ -321,6 +328,83 @@ class OwnScoreTest(unittest.TestCase):
         with mock.patch.object(agentic, "chat", return_value=("だめ", {"input_tokens": 1, "output_tokens": 1})):
             with self.assertRaises(config.SetupError):
                 evaluation.score_own("q", [], ["e"], "a")
+
+
+class FakeOpenAI:
+    """openai.OpenAI の代わり。chat.completions.create に実際に渡された引数を記録して、決まった返事を返す（通信しない）。"""
+    calls = []
+    reply = "答えです"
+
+    def __init__(self, base_url=None, api_key=None, **kwargs):
+        self.chat = SimpleNamespace(completions=SimpleNamespace(create=self.create))
+
+    def create(self, **kwargs):
+        FakeOpenAI.calls.append(kwargs)
+        message = SimpleNamespace(content=FakeOpenAI.reply)
+        return SimpleNamespace(choices=[SimpleNamespace(message=message, finish_reason="stop")],
+                               usage=SimpleNamespace(prompt_tokens=7, completion_tokens=3))
+
+
+class OutputLimitSentTest(EnvCase):
+    """自前の採点（score_own）と 16 の漏れの実演（leak_demo の ask_llm）は、出力の上限 4000 を、実際の送信に載せる。
+
+    推論モデルは考える分も上限に数える。800・1200 に戻ると、返事が途中で切れて空になる。
+    ソースの文字列ではなく、偽のクライアントが受け取った引数（max_completion_tokens）を見る。
+    """
+
+    def setUp(self):
+        super().setUp()
+        FakeOpenAI.calls = []
+        patcher = mock.patch("openai.OpenAI", FakeOpenAI)      # agentic.openai_client も leak_demo も、ここから作る
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        usage = mock.patch.object(agentic, "USAGE", agentic.Usage())    # 使った量の記録を、ほかの試験に持ち越さない
+        usage.start()
+        self.addCleanup(usage.stop)
+
+    def test_score_own_sends_4000(self):
+        FakeOpenAI.reply = json.dumps(OwnScoreTest.GOOD, ensure_ascii=False)
+        got = evaluation.score_own("q", [{"title": "T.eml", "text": "本文"}], ["e"], "a")
+        self.assertEqual(got["coverage"]["score"], 3)
+        self.assertEqual(len(FakeOpenAI.calls), 1)
+        sent = FakeOpenAI.calls[0]
+        self.assertEqual(sent["max_completion_tokens"], 4000)
+        self.assertEqual(sent["response_format"], {"type": "json_object"})
+        self.assertEqual(sent["model"], "c")
+
+    def test_score_own_retry_also_sends_4000(self):
+        replies = iter(["これは JSON ではない", json.dumps(OwnScoreTest.GOOD, ensure_ascii=False)])
+
+        def create(**kwargs):
+            FakeOpenAI.calls.append(kwargs)
+            message = SimpleNamespace(content=next(replies))
+            return SimpleNamespace(choices=[SimpleNamespace(message=message, finish_reason="stop")],
+                                   usage=SimpleNamespace(prompt_tokens=1, completion_tokens=1))
+
+        with mock.patch.object(FakeOpenAI, "create", side_effect=create):
+            evaluation.score_own("q", [], ["e"], "a")
+        self.assertEqual([c["max_completion_tokens"] for c in FakeOpenAI.calls], [4000, 4000])
+
+    def test_make_answer_default_sends_4000(self):
+        FakeOpenAI.reply = "資料のとおりです [1]"
+        agentic.make_answer("質問", [{"title": "T.eml", "text": "本文"}])
+        self.assertEqual([c["max_completion_tokens"] for c in FakeOpenAI.calls], [4000])
+
+    def test_leak_demo_ask_llm_sends_4000(self):
+        """スクリプトを最後まで動かす（検索だけ偽）。悪い例・良い例の 2 回とも、4000 を送る。"""
+        FakeOpenAI.reply = "資料にありません。"
+        hits = [{"title": "JOB-REQ042-v3.pdf", "kind": "job_posting", "chunk": "求人票の本文"}]
+        search = SimpleNamespace(search=lambda *a, **k: list(hits))
+        path = HERE.parent / "topics" / "16-security-filter" / "leak_demo.py"
+        out = io.StringIO()
+        with mock.patch.object(clients, "search_client", return_value=search), \
+                mock.patch.object(sys, "argv", [str(path), "--question", "石田さんの評価は？"]), \
+                contextlib.redirect_stdout(out):
+            runpy.run_path(str(path), run_name="__main__")
+        self.assertEqual(len(FakeOpenAI.calls), 2, out.getvalue())
+        self.assertEqual([c["max_completion_tokens"] for c in FakeOpenAI.calls], [4000, 4000])
+        self.assertEqual(FakeOpenAI.calls[0]["reasoning_effort"], "low")        # .env.local の考える量もそのまま渡る
+        self.assertIn("石田さんの評価は？", FakeOpenAI.calls[0]["messages"][1]["content"])
 
 
 class BuiltinParseTest(unittest.TestCase):

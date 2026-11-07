@@ -261,7 +261,7 @@ def search_label(n: Names) -> str:
 
 
 def health(az, n: Names):
-    """読み取りだけの状態確認。Row のリストを返す。まだないものは「まだ」。エラーでは止まらない（サインイン切れは除く）。"""
+    """読み取りだけの状態確認。Row のリストを返す。まだないものは「まだ」（既存のグループを使う設定で、そのグループがないときだけ NG）。エラーでは止まらない（サインイン切れは除く）。"""
     rows = []
 
     def add(status, label, note=""):
@@ -289,7 +289,11 @@ def health(az, n: Names):
         rows.append(error_row(L_RG, error))
     else:
         if group is None:
-            later(L_RG, L_ST, L_SR, L_PRICE, L_SEM, L_FD, *L_DEP)
+            if n.custom_group:   # 既存のものを使う設定で見つからない＝作る前ではなく、名前の間違いの疑い。ここだけ NG
+                add(NG, L_RG, "見つかりません。workshop.config の AZURE_RESOURCE_GROUP を確かめます（名前の間違いかもしれません）")
+                later(L_ST, L_SR, L_PRICE, L_SEM, L_FD, *L_DEP)
+            else:
+                later(L_RG, L_ST, L_SR, L_PRICE, L_SEM, L_FD, *L_DEP)
             return rows
         state = _dict(group.get("properties")).get("provisioningState")
         add(state_status(state), L_RG, state or "状態が分かりません")   # Deleting などは OK にしない
