@@ -9,8 +9,10 @@
 人事・ホテルに固有の確かめは、@dataset_check("hr") のように、このファイルの中に書いて、DATASET_CHECKS に足す
 （別のモジュールに置くと、tools/check_questions.py から呼ばれない）。人事の確かめは check_hr。
 """
+import importlib.util
 import json
 import re
+import sys
 from pathlib import Path
 
 REPO_DIR = Path(__file__).resolve().parents[2]
@@ -270,13 +272,73 @@ def _all_strings(value):
             yield from _all_strings(item)
 
 
+def _read_items(path, key):
+    """{key: [ ... ]} の形の JSON から、その並びを取り出す。一番上の形が違えば DataError。"""
+    data = read_json(path)
+    items = data.get(key) if isinstance(data, dict) else None
+    if not isinstance(items, list):
+        raise DataError(f"{_show(path)} の一番上の形が違います（{{\"{key}\": [ ... ]}} の形で読みます）")
+    return items
+
+
+_SCAN_FACTS_CACHE = {}
+
+
+def _run_scan_facts(script):
+    """make_scans.py を（その場で）読み込んで scan_facts() を呼ぶ。読めなければ (None, 理由)。"""
+    name = "_evallib_make_scans"
+    folder = str(script.parent)
+    before = set(sys.modules)
+    sys.path.insert(0, folder)
+    try:
+        spec = importlib.util.spec_from_file_location(name, script)
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+        function = getattr(module, "scan_facts", None)
+        if not callable(function):
+            return None, "make_scans.py に scan_facts() がありません"
+        facts = function()
+        if not isinstance(facts, dict):
+            return None, "scan_facts() の結果が {scan の id: {...}} の形ではありません"
+        return facts, None
+    except Exception as error:   # numpy・Pillow がない、台帳が読めない、など
+        return None, f"{type(error).__name__}：{str(error)[:60]}"
+    finally:
+        if folder in sys.path:
+            sys.path.remove(folder)
+        for added in set(sys.modules) - before:   # 同じ置き場の lib_common・scan_effects も、次の読み込みに残さない
+            module_file = getattr(sys.modules[added], "__file__", None)
+            if added == name or (module_file and Path(module_file).resolve().parent == script.parent.resolve()):
+                sys.modules.pop(added, None)
+
+
+def _load_scan_facts(script):
+    """scan_facts()（書類に書く事実。応募番号・受付印の日付など、画像に見える文字のもと）の結果と、読めなかった理由。"""
+    try:
+        stat = script.stat()
+    except OSError:
+        return None, "make_scans.py が読めません"
+    key = (str(script), stat.st_mtime_ns, stat.st_size)
+    if key not in _SCAN_FACTS_CACHE:
+        _SCAN_FACTS_CACHE[key] = _run_scan_facts(script)
+    return _SCAN_FACTS_CACHE[key]
+
+
+def hr_content_available():
+    """文書の本文のもと（HR_CONTENT_DIR）があるか。ないと、evidence の語句を探す確かめは飛ばされる。"""
+    return Path(HR_CONTENT_DIR).is_dir()
+
+
 def hr_source_text(doc_id, file, content_dir):
     """文書の本文のもとの文字（evidence の語句を探す先）と、その場所の名前を返す。
 
     求人票・経歴書は content/jobs・resumes の Markdown、メールは mail.json の件名と本文、
     面接の評価の一覧は evaluations.json と source_ats.json（選考状況・選考履歴のシートの元の台帳）、
-    スキャンは scans.json の記述と、画像を描く make_scans.py の、そのスキャンを作る関数（画像の中の文字はここにある）。
-    読めない・見つからないときは DataError。
+    スキャンは scans.json の記述と、画像を描く make_scans.py の、そのスキャンを作る関数、
+    書類に書く事実を台帳から引く scan_facts() の結果（応募番号・受付印の日付など、画像に見える文字）。
+    numpy・Pillow がなく scan_facts() を呼べないときは、最初の2つだけを探す（その旨を場所の名前に書く）。
+    読めない・見つからない・一番上の形が違うときは DataError。
     """
     content_dir = Path(content_dir)
     kind = file.get("kind")
@@ -287,7 +349,7 @@ def hr_source_text(doc_id, file, content_dir):
         except (OSError, ValueError):
             raise DataError(f"{doc_id} の本文のもと {_show(path)} が読めません") from None
     if kind == "mail":
-        mails = read_json(content_dir / "mail.json").get("mails", [])
+        mails = _read_items(content_dir / "mail.json", "mails")
         mail = next((m for m in mails if isinstance(m, dict) and m.get("id") == doc_id), None)
         if mail is None:
             raise DataError(f"{doc_id} が mail.json にありません")
@@ -297,7 +359,7 @@ def hr_source_text(doc_id, file, content_dir):
         text += "\n" + "\n".join(_all_strings(read_json(content_dir / "source_ats.json")))
         return text, "evaluations.json・source_ats.json"
     if kind == "scan":
-        scans = read_json(content_dir / "scans.json").get("scans", [])
+        scans = _read_items(content_dir / "scans.json", "scans")
         scan = next((x for x in scans if isinstance(x, dict) and x.get("id") == doc_id), None)
         if scan is None:
             raise DataError(f"{doc_id} が scans.json にありません")
@@ -307,10 +369,20 @@ def hr_source_text(doc_id, file, content_dir):
             code = script.read_text(encoding="utf-8")
         except (OSError, ValueError):
             raise DataError(f"{doc_id} の画像を描くスクリプト {_show(script)} が読めません") from None
-        match = re.search(rf"^def make_{re.escape(str(scan.get('kind')))}\(.*?(?=^def |\Z)", code, re.S | re.M)
+        scan_kind = scan.get("kind")
+        match = re.search(rf"^def make_{re.escape(str(scan_kind))}\(.*?(?=^def |\Z)", code, re.S | re.M)
+        notes = []
         if match:
             text += "\n" + match.group(0)
-        return text, "scans.json・make_scans.py"
+        else:
+            notes.append(f"スキャンの種類「{scan_kind}」の make_{scan_kind} が make_scans.py にありません")
+        facts, reason = _load_scan_facts(script)
+        if facts is not None:
+            text += "\n" + "\n".join(_all_strings(facts.get(doc_id)))
+        else:
+            notes.append(f"scan_facts() は読めませんでした（{reason}）")
+        label = "scans.json・make_scans.py" + ("・scan_facts()" if facts is not None else "")
+        return text, label + "".join(f" ※{note}" for note in notes)
     raise DataError(f"{doc_id} の種類「{kind}」は本文のもとが決まっていません")
 
 
@@ -363,7 +435,7 @@ def check_hr(questions, *, known_ids, data):
     役割・multi-doc の数・evidence がそろっていることは、data なしでも確かめる。
     """
     files = _hr_files(data)
-    content_dir = HR_CONTENT_DIR if Path(HR_CONTENT_DIR).is_dir() else None
+    content_dir = HR_CONTENT_DIR if hr_content_available() else None
     cache = {}
     problems = []
     for index, q in enumerate(questions, 1):
@@ -394,3 +466,4 @@ def check_hr(questions, *, known_ids, data):
                                 "どれか 1 件だけで答えられる質問は、ほかの種類にします）")
         problems += _check_hr_evidence(who, q, list(dict.fromkeys(answers + hidden)), known_ids, files, content_dir, cache)
     return problems
+

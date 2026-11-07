@@ -10,14 +10,16 @@
   --file PATH         質問のファイルを変える
   --hotel-data PATH   ホテルのデータ（HotelsData_toAzureBlobs_ja.json）の場所。省くと _work/hotel-vectors/ の中
 
+人事は、文書の本文のもと（applied/data/_build/content）がないと、evidence の語句を探す確かめを飛ばして、その旨を1行出す。
+
 終了コード：0 = 問題なし／1 = 問題がある（一覧を出す）／2 = 質問かデータのファイルが読めない
 """
 import argparse
 import sys
 from pathlib import Path
 
-from evallib.questions import (DATASETS, QUESTION_FILES, DataError, ids_of, load_data, load_questions,
-                               validate)
+from evallib.questions import (DATASETS, QUESTION_FILES, DataError, hr_content_available, ids_of, load_data,
+                               load_questions, validate)
 
 
 def build_parser():
@@ -51,7 +53,14 @@ def main(argv=None) -> int:
         if args.dataset == "hotel" and not args.hotel_data:
             print("      ホテルのデータの JSON の場所は、--hotel-data で渡します。", file=sys.stderr)
         return 2
-    problems = validate(args.dataset, questions, known_ids=ids_of(args.dataset, data), data=data)
+    if args.dataset == "hr" and not hr_content_available():
+        print("注意  本文が見つからないので、evidence の照らし合わせを飛ばしました（applied/data/_build/content がありません）。",
+              file=sys.stderr)
+    try:
+        problems = validate(args.dataset, questions, known_ids=ids_of(args.dataset, data), data=data)
+    except DataError as error:
+        print(f"NG    {error}", file=sys.stderr)
+        return 2
     if not problems:
         print(f"問題なし（{len(questions)} 問）")
         return 0

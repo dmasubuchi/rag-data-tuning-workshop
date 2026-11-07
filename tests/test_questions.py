@@ -421,7 +421,9 @@ class HrEvidenceTest(unittest.TestCase):
                                             {"id": "SCAN-2", "kind": "offer", "what": "内定承諾書"}]})
         (root / "make_scans.py").write_text(
             'def make_memo():\n    items = ["・懸念：特になし。入社時期は要確認"]\n    label = "確認印"\n\n\n'
-            'def make_offer():\n    items = [("入社予定日", "2026年12月1日")]\n\n\ndef main():\n    pass\n', encoding="utf-8")
+            'def make_offer():\n    items = [("入社予定日", "2026年12月1日")]\n\n\ndef main():\n    pass\n\n\n'
+            'def scan_facts():\n    return {"SCAN-1": {"stamp": "2026.10.26", "application_id": "APP-0001"},\n'
+            '            "SCAN-2": {"sent_header": "2026-10-28 10:52　FAX　P.1/3"}}\n', encoding="utf-8")
         patch = mock.patch.object(ev, "HR_CONTENT_DIR", self.content)
         patch.start()
         self.addCleanup(patch.stop)
@@ -533,6 +535,65 @@ class HrEvidenceTest(unittest.TestCase):
         q = self.question(answer_ids=["JOB-1", "NOPE-1"])
         self.assertEqual(self.check(q), [])
 
+    def scan_question(self, doc_id, phrase):
+        return {"qid": "s1", "question": "スキャン", "type": "scan", "answer_ids": [doc_id], "evidence": {doc_id: phrase}}
+
+    def test_scan_phrase_may_come_from_scan_facts_of_that_scan(self):
+        # 画像に見える文字（受付印の日付・FAX の上部の日時）は、scan_facts() の、そのスキャンの分から探す
+        self.assertEqual(self.check(self.scan_question("SCAN-1", "2026.10.26")), [])
+        self.assertEqual(self.check(self.scan_question("SCAN-1", "APP-0001")), [])
+        self.assertEqual(self.check(self.scan_question("SCAN-2", "10:52")), [])
+        problems = self.check(self.scan_question("SCAN-2", "2026.10.26"))   # SCAN-1 の受付印の日付
+        self.assertEqual(len(problems), 1, problems)
+        self.assertIn("scans.json・make_scans.py・scan_facts()", problems[0])
+        self.assertNotIn("※", problems[0])
+
+    def test_scan_facts_that_cannot_be_read_are_named_in_the_problem(self):
+        script = self.content.parent / "make_scans.py"
+        script.write_text("import no_such_module_for_this_test\n\n\ndef scan_facts():\n    return {}\n", encoding="utf-8")
+        problems = self.check(self.scan_question("SCAN-1", "2026.10.26"))
+        self.assertEqual(len(problems), 1, problems)
+        self.assertIn("scan_facts() は読めませんでした", problems[0])
+        self.assertIn("ModuleNotFoundError", problems[0])
+        # 読めなくても、これまでの探し方で見つかる語句は通る
+        self.assertEqual(self.check(self.scan_question("SCAN-1", "手書きの面接メモ")), [])
+        # scan_facts() がない make_scans.py も同じ
+        script.write_text("def make_memo():\n    pass\n", encoding="utf-8")
+        problems = self.check(self.scan_question("SCAN-1", "2026.10.26"))
+        self.assertIn("make_scans.py に scan_facts() がありません", problems[0])
+
+    def test_reading_scan_facts_leaves_no_trace_in_the_process(self):
+        script = self.content.parent / "make_scans.py"
+        (self.content.parent / "helper_for_this_test.py").write_text("STAMP = '2026.10.26'\n", encoding="utf-8")
+        script.write_text("from helper_for_this_test import STAMP\n\n\ndef scan_facts():\n    return {'SCAN-1': {'stamp': STAMP}}\n",
+                          encoding="utf-8")
+        self.assertEqual(self.check(self.scan_question("SCAN-1", "2026.10.26")), [])
+        self.assertNotIn("helper_for_this_test", sys.modules)
+        self.assertNotIn("_evallib_make_scans", sys.modules)
+        self.assertNotIn(str(self.content.parent), sys.path)
+
+    def test_unknown_scan_kind_is_named_in_the_problem(self):
+        self.write("scans.json", {"scans": [{"id": "SCAN-1", "kind": "receipt", "what": "領収書"}]})
+        problems = self.check(self.scan_question("SCAN-1", "どこにもない語句"))
+        self.assertEqual(len(problems), 1, problems)
+        self.assertIn("スキャンの種類「receipt」", problems[0])
+        self.assertIn("make_receipt", problems[0])
+        # 種類が分からなくても、scans.json の記述にある語句は通る
+        self.assertEqual(self.check(self.scan_question("SCAN-1", "領収書")), [])
+
+    def test_wrong_top_level_shape_is_a_data_error_not_a_crash(self):
+        for name, doc_id, key in (("mail.json", "MAIL-1", "mails"), ("scans.json", "SCAN-1", "scans")):
+            for wrong in ([], "文字列", {key: "並びではない"}, {"other": []}):
+                with self.subTest(name=name, wrong=wrong):
+                    self.write(name, wrong)
+                    kind = "mail" if key == "mails" else "scan"
+                    with self.assertRaisesRegex(ev.DataError, rf"{name} の一番上の形が違います（.*{key}"):
+                        ev.hr_source_text(doc_id, {"kind": kind}, self.content)
+                    q = {**self.scan_question(doc_id, "x"), "type": "scan" if kind == "scan" else "numeric"}
+                    problems = self.check(q)
+                    self.assertEqual(len(problems), 1, problems)
+                    self.assertIn(f"{name} の一番上の形が違います", problems[0])
+
 
 class HrQuestionsTest(unittest.TestCase):
     """本物の evaluation/hr_questions.json（人事の 60 問）を、本物の manifest で確かめる。"""
@@ -602,6 +663,18 @@ class HrQuestionsTest(unittest.TestCase):
         self.assertTrue(all(count == 2 for count in used.values()), used)   # 3 つのスキャンを 2 回ずつ
         for q in scan:
             self.assertTrue(any(self.files[d]["ocr_required"] for d in q["answer_ids"]), q["qid"])
+
+    def test_hr_scan_evidence_is_text_you_can_see_in_the_image(self):
+        by_qid = {q["qid"]: q for q in self.questions}
+        self.assertEqual(by_qid["hr-55"]["evidence"]["SCAN-03"], "10:52")        # FAX の上部に印字された日時
+        self.assertEqual(by_qid["hr-23"]["evidence"]["SCAN-03"], "APP-0471")     # 手書きの応募番号
+        self.assertEqual(by_qid["hr-11"]["evidence"]["SCAN-02"], "2026.10.26")   # 受付印の日付
+        self.assertEqual(by_qid["hr-16"]["evidence"]["SCAN-02"], "2026.10.26")
+        # 受付 11:00（評価一覧）と取り違えない聞き方
+        self.assertIn("FAX の上部に印字された日時", by_qid["hr-55"]["question"])
+        self.assertNotIn("何時何分に届き", by_qid["hr-55"]["question"])
+        # 台帳・PDF の表示にないコロン付きの書き方をしない（PDF ではコロンが消える）
+        self.assertEqual(by_qid["hr-49"]["evidence"], {"JOB-REQ043-v1": "2026年9月2日", "JOB-REQ047-v2": "2026年9月29日"})
 
     def test_hr_multi_doc_questions_need_two_documents(self):
         multi = [q for q in self.questions if q["type"] == "multi-doc"]
@@ -721,6 +794,24 @@ class CliTest(unittest.TestCase):
     def test_hr_questions_pass_from_the_cli(self):
         code, out, err = run_cli("--dataset", "hr")
         self.assertEqual((code, out.strip(), err), (0, "問題なし（60 問）", ""))
+
+    def test_hr_says_when_the_content_folder_is_missing(self):
+        with mock.patch.object(ev, "HR_CONTENT_DIR", self.dir / "no-such-folder"):
+            code, out, err = run_cli("--dataset", "hr")
+        self.assertEqual((code, out.strip()), (0, "問題なし（60 問）"))
+        self.assertEqual(err.strip().count("\n"), 0)   # 1 行
+        self.assertIn("本文が見つからないので、evidence の照らし合わせを飛ばしました", err)
+        # 本文のもとがあるときは、何も言わない
+        self.assertEqual(run_cli("--dataset", "hr")[2], "")
+        # 人事以外には関係ない
+        with mock.patch.object(ev, "HR_CONTENT_DIR", self.dir / "no-such-folder"):
+            self.assertEqual(run_cli("--dataset", "sengoku")[2], "")
+
+    def test_a_data_error_that_escapes_validation_is_exit_2(self):
+        with mock.patch.object(check_questions, "validate", side_effect=ev.DataError("形が違います")):
+            code, out, err = run_cli("--dataset", "hr")
+        self.assertEqual((code, out), (2, ""))
+        self.assertIn("NG    形が違います", err)
 
     def test_hr_runs_against_the_manifest(self):
         path = self.write("hr.json", [{"qid": "hr-01", "question": "求人票は？", "type": "numeric",
