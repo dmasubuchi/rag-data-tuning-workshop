@@ -176,16 +176,18 @@ class Run:
         entry = {"qid": q["qid"], "type": q.get("type"), "results": {}}
         self.results.append(entry)
         vector = None
-        for name in self.names:
-            base, filtered = split_name(name)
-            if (filtered and not q["_condition_filter"]) or name in self.skipped:
-                continue
-            if needs_vector(self.dataset, base) and vector is None:
-                vector = self.embed(q["question"])
-            result = self.search(q, name, vector)
-            if result is not None:
-                entry["results"][name] = result
-        self.say(progress_line(entry, self.k, bool(q["answer_ids"])))
+        try:
+            for name in self.names:
+                base, filtered = split_name(name)
+                if (filtered and not q["_condition_filter"]) or name in self.skipped:
+                    continue
+                if needs_vector(self.dataset, base) and vector is None:
+                    vector = self.embed(q["question"])
+                result = self.search(q, name, vector)
+                if result is not None:
+                    entry["results"][name] = result
+        finally:
+            self.say(progress_line(entry, self.k, bool(q["answer_ids"])))     # 途中で止まっても、そこまでの分を出す
 
     def go(self):
         """全部の質問を測る。止まった理由（なければ None）を返す。"""

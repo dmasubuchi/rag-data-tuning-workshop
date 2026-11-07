@@ -292,6 +292,7 @@ class EvalSearchTest(EvalCase):
         self.assertEqual(sorted(data["questions"][1]["results"]), ["hybrid", "keyword", "vector"])    # 2 問目は途中まで
         self.assertEqual(data["units"], {"search": 7, "semantic": 1, "embedding_tokens": 10})        # 403 の検索は数えない
         self.assertIn("ここまでの結果は", out)
+        self.assertIn("[h2] nDCG@10  keyword 1.00  vector 1.00  hybrid 1.00\n", out)      # 途中の質問も、できた分を出す
         self.assertIn("nDCG", out)                                # 止まっても、平均は出す
 
     def test_403_on_a_plain_search_blames_the_key_not_the_free_tier(self):
