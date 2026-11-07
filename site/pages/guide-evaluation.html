@@ -37,7 +37,7 @@
 <li>1位：1位が正解だった質問の割合</li>
 </ul>
 </li>
-<li>人事の権限の質問（種類 <code>permission</code>）には、正解がありません。平均には入れず、見えてはいけない文書が上位 k 件に出た数（漏れ）を数えます。0 であるべき数です。</li>
+<li>人事の権限の質問（種類 <code>permission</code>、12問）は、9問に正解の文書がなく（その人に見える文書がない）、3問は求人票が正解です。正解のない質問は、平均に入れず、見えてはいけない文書が上位 k 件に出た数（漏れ）で数えます。正解のある3問は、平均にも入れ、漏れも数えます。漏れは 0 であるべき数です。</li>
 <li>方式は4つです：<code>keyword</code>・<code>vector</code>・<code>hybrid</code>・<code>semantic</code>（ハイブリッド＋セマンティック ランカー）。ホテルの <code>condition</code> の質問は、各方式に絞り込みを足した <code>+filter</code>（例 <code>hybrid+filter</code>）も測ります。</li>
 <li>数えるのは文書の単位です。人事は1つの文書が多くのチャンクになりますが、同じ文書は1回だけ、最初に出た順位で数えます。</li>
 </ul>
@@ -110,7 +110,10 @@ python tools/eval_report.py _work/eval/&lt;結果のファイル&gt;.json --md _
 <h2 id="3-結果の読み方">3. 結果の読み方</h2>
 <p>表は2つ出ます。</p>
 <ul>
-<li>「方式ごと」：行は方式。列は、問（平均に入れた質問の数）・nDCG@k・再現率@k・1位。人事は、漏れ問（漏れがあった質問の数）・漏れ文書。さらに、検索・セマンティック ランカーの回数、埋め込みのトークン、費用の見込み</li>
+<li>「方式ごと」：行は方式。列は、問（平均に入れた質問の数。測った数と違うときは「平均に入れた数/測った数」）・nDCG@k・再現率@k・1位。人事は、漏れ問（漏れがあった質問の数）・漏れ文書。さらに、検索・セマンティック ランカーの回数、埋め込みのトークン、費用の見込み<ul>
+<li>方式の行のあとに、「埋め込み（共通）」の行（質問の埋め込みを使ったとき。方式で共用するので、ここにまとめます）と、「合計」の行（全部の回数と費用）が付きます</li>
+</ul>
+</li>
 <li>「方式×質問の種類」：行は質問の種類、列は方式。値は nDCG@k の平均で、カッコの中は問の数</li>
 </ul>
 <p>見る順番：</p>
@@ -123,7 +126,7 @@ python tools/eval_report.py _work/eval/&lt;結果のファイル&gt;.json --md _
 </li>
 <li>人事は、漏れを見る。一般社員の質問で漏れが1以上なら、権限の絞り込みか、索引の文書が違っています（<a href="applied-topics-16-security-filter-README.html">応用編の 16</a>）。漏れが出た質問と方式は、測っている最中の画面に出ます</li>
 </ol>
-<p>「-」は、正解のある質問がない種類（人事の権限など）か、測っていない方式です。</p>
+<p>「-」は、正解のない質問だけの種類か、測っていない方式です。人事の <code>permission</code> は、正解のある3問だけの平均になります（カッコの中も3）。</p>
 <h2 id="4-費用の見込みと単価のファイル">4. 費用の見込みと、単価のファイル</h2>
 <p>費用の見込みは、使った回数 × 単価です。単価は、この Repo に書いていません（変わるため）。料金のページで確かめた値を、自分で書きます。</p>
 <ol>
@@ -200,7 +203,10 @@ python tools/eval_search.py --dataset hr --methods hybrid --k 10
 <p>評価の質問を作る手間が、測るときのいちばんの手間です。手順は、この Repo の人事とホテルの質問を作ったときと同じです。</p>
 <ol>
 <li class="task"><input type="checkbox"> 1問を、<a href="https://github.com/dmasubuchi/rag-data-tuning-workshop/blob/main/evaluation/README.md">evaluation/README.md</a> の形で書く<ul>
-<li><code>qid</code>（質問の番号）・<code>question</code>（検索に使う質問の文）・<code>type</code>（種類）・<code>answer_ids</code>（取ってくるべき文書の ID）・<code>why</code>・<code>evidence</code>（答えの根拠になる短い語句）</li>
+<li>必ず書く：<code>qid</code>（質問の番号）・<code>question</code>（検索に使う質問の文）・<code>type</code>（種類）・<code>answer_ids</code>（取ってくるべき文書の ID。空にしてよいのは <code>permission</code> だけ）</li>
+<li><code>why</code>（どの文書のどこに答えがあるか）は、書かなくてもかまいません</li>
+<li><code>evidence</code>（答えの根拠になる、本文にそのまま出る短い語句）は、人事と、ホテルの <code>condition</code> でない質問には要ります（武将は任意）</li>
+<li><code>permission</code> には、<code>as_role</code>（だれとして聞くか）と <code>hidden_ids</code>（その人に見えてはいけない文書の ID）が要ります</li>
 </ul>
 </li>
 <li class="task"><input type="checkbox"> 質問の種類を分ける。業務で起きる聞き方を、種類ごとに数問ずつ作る（この Repo は、1種類 6〜12 問）<ul>
@@ -222,7 +228,18 @@ python tools/eval_search.py --dataset hr --methods hybrid --k 10
 </ul>
 </li>
 </ol>
-<p>この Repo の <code>check_questions</code>・<code>eval_search</code>・<code>spot_check</code> は、武将・人事・ホテルの3つのデータの設定（インデックスの名前、項目、種類の数）を持っています。自分の組織のデータで動かすときは、構築する人が、そのデータの設定を <code>tools/evallib/datasets.py</code> と <code>tools/evallib/questions.py</code> に、3つと同じ形で足します。</p>
+<p>この Repo の道具は、武将・人事・ホテルの3つのデータの設定を持っています。自分の組織のデータで動かすときは、構築する人が、3つと同じ形で、次の場所に足します。</p>
+<ul>
+<li><code>tools/evallib/datasets.py</code>：<code>SPECS</code> に、インデックスと、方式ごとの検索先、文書の ID の項目などを足す</li>
+<li><code>tools/evallib/questions.py</code><ul>
+<li><code>DATASETS</code>（データの名前）、<code>TYPE_TARGETS</code>（質問の種類と、種類ごとの数。足さないと、武将の5つの種類だけが使えます）</li>
+<li><code>QUESTION_FILES</code>（質問のファイル）、<code>DATA_FILES</code>（文書のデータ）、<code>ids_of</code>（データから文書の ID を取り出す）</li>
+<li>必要なら、データ固有の確かめ（<code>@dataset_check("名前")</code>）</li>
+</ul>
+</li>
+<li><code>tools/spot_check.py</code>：<code>DATASET_LABEL</code>（一覧の見出し）、<code>DOC_BUILDERS</code> と <code>build_context</code>（正解の文書を、本文つきで出す）。種類の表示名 <code>TYPE_LABEL</code> は、足さなくても動きます</li>
+</ul>
+<p>質問のファイルは、<code>evaluation/&lt;データの名前&gt;_questions.json</code> に置き、<code>QUESTION_FILES</code> に書きます（<code>hr_questions.json</code> と同じ）。組織の文書や質問を公開の Repo に入れてはいけないときは、<code>_work/</code> の下か Repo の外に置き、<code>--file</code> で渡します（<code>_work/</code> は Git に入りません）。</p>
 <h2 id="つまずいたとき">つまずいたとき</h2>
 <ul>
 <li>「.env.local が読めません」などの設定の案内が出る：Repo の直下で実行しているか、<code>.env.local</code> があるかを確かめます。キーは <code>.env.local</code> だけから読みます（端末の環境変数は読みません）</li>

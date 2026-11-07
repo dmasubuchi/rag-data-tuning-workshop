@@ -423,6 +423,8 @@ def index_counts(az, n: Names, rows) -> Counts:
 
     キーは az で読む検索用（query）のキー（管理者キーは読まない）。読めないときは、1行の理由にする。
     インデックスごとの失敗（まだない・数えられない）では止まらない。サインイン切れだけは上へ投げる。
+    ただし、つながらない（接続の失敗・時間切れ）インデックスが1つあったら、残りのインデックスは問い合わせず、
+    「数えられません（つながりません）」にする（4つ分の待ち時間を避ける）。
     """
     if not any(row.label == search_label(n) and row.status == OK for row in rows):
         return Counts(note="AI Search がまだ OK ではありません")

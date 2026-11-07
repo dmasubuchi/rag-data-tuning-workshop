@@ -265,6 +265,33 @@ class GuideTest(unittest.TestCase):
         for expect in team.INDEX_EXPECTS:
             self.assertIn(f"`{expect.index}` {expect.wanted}", text, expect.index)
 
+    def test_evaluation_guide_permission_counts_match_the_questions(self):
+        """人事の権限の質問の数（正解のない質問・正解のある質問）が、質問のファイルと同じ。"""
+        text = guide_texts()["evaluation.md"]
+        questions = json.loads((REPO_DIR / "evaluation" / "hr_questions.json").read_text(encoding="utf-8"))
+        permission = [q for q in questions if q["type"] == "permission"]
+        empty = sum(1 for q in permission if not q["answer_ids"])
+        answered = len(permission) - empty
+        self.assertIn(f"（種類 `permission`、{len(permission)}問）は、{empty}問に正解の文書がなく", text)
+        self.assertIn(f"{answered}問は求人票が正解です", text)
+        self.assertIn(f"正解のある{answered}問は、平均にも入れ", text)
+        self.assertIn(f"正解のある{answered}問だけの平均になります（カッコの中も{answered}）", text)
+        self.assertGreater(answered, 0)
+
+    def test_evaluation_guide_edit_points_exist(self):
+        """自分の組織のデータで動かすために変える場所として書いた名前が、コードに本当にある。"""
+        text = guide_texts()["evaluation.md"]
+        sources = {path: (REPO_DIR / path).read_text(encoding="utf-8") for path in
+                   ("tools/evallib/datasets.py", "tools/evallib/questions.py", "tools/spot_check.py")}
+        places = {"tools/evallib/datasets.py": ["SPECS"],
+                  "tools/evallib/questions.py": ["DATASETS", "TYPE_TARGETS", "QUESTION_FILES", "DATA_FILES", "def ids_of", "def dataset_check"],
+                  "tools/spot_check.py": ["DATASET_LABEL", "DOC_BUILDERS", "def build_context", "TYPE_LABEL"]}
+        for path, names in places.items():
+            self.assertIn(f"`{path}`", text, path)
+            for name in names:
+                self.assertIn(name, sources[path], f"{path}: {name}")
+                self.assertIn(name.removeprefix("def "), text, f"{path}: {name}")
+
     def test_json_blocks_parse(self):
         """貼り付ける JSON が読める（ベクトルを貼る場所の見本は除く）。"""
         count = 0

@@ -396,11 +396,12 @@ class Report:
         no_answer = [run for run in self.runs if any(q["results"] and all(r["ndcg"] is None for r in q["results"].values())
                                                      for q in run.questions)]
         if no_answer:
-            lines.append("正解のない質問（権限）は平均に入れず、見えてはいけない文書が上位 k 件に出た数（漏れ問・漏れ文書）で数えます。")
+            lines.append("正解のない質問（人事の権限の質問のうち、見える文書がないもの）は平均に入れず、"
+                         "見えてはいけない文書が上位 k 件に出た数（漏れ問・漏れ文書）で数えます。")
         return lines
 
     def table_two_notes(self) -> list:
-        return ["「-」は、正解のある質問がない（人事の権限の質問など）か、その方式を測っていない種類です。"]
+        return ["「-」は、正解のない質問だけの種類か、その方式を測っていない種類です。"]
 
 
 def build_blocks(report) -> list:
