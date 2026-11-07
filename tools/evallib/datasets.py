@@ -113,11 +113,24 @@ class Visibility:
             return self.doc_kinds.get(doc_id) not in HR_PUBLIC_KINDS
         return False
 
-    def count(self, role, hidden_ids, docs) -> int:
+    def leaked_docs(self, role, hidden_ids, docs) -> list:
+        """漏れた文書の ID の並び（docs の順。同じ文書は1回だけ）。権限のないデータ（role が None）は空。"""
         if role is None:
-            return 0
+            return []
         hidden = set(hidden_ids or [])
-        return sum(1 for doc_id in dict.fromkeys(docs) if self.leaked(role, hidden, doc_id))
+        return [doc_id for doc_id in dict.fromkeys(docs) if self.leaked(role, hidden, doc_id)]
+
+    def count(self, role, hidden_ids, docs) -> int:
+        return len(self.leaked_docs(role, hidden_ids, docs))
+
+
+def leakable(dataset: Dataset, question: dict) -> bool:
+    """この質問は、漏れが起きうるか。聞く人が採用担当でない（採用担当は全部見える）か、見えてはいけない文書（hidden_ids）がある質問。
+
+    漏れの割合（漏れた質問の数 ÷ 漏れうる質問の数）の分母になる。権限のないデータ（武将・ホテル）は、どの質問も False。
+    """
+    role = role_of(dataset, question)
+    return bool(role) and (role != HR_RECRUITER or bool(question.get("hidden_ids")))
 
 
 def doc_kinds_of(manifest) -> dict:

@@ -15,6 +15,7 @@ import sys
 import tempfile
 import unittest
 import urllib.error
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest import mock
 
@@ -65,7 +66,7 @@ class Seen:
 
 
 class Fake:
-    """偽物の Azure。search(index, body, seen) が答え（辞書）か HTTP の番号（整数）か例外を返す。"""
+    """偽物の Azure。search(index, body, seen) が答え（辞書）か HTTP の番号（整数）か (番号, 答えの文) か例外を返す。"""
 
     def __init__(self, search, tokens=5):
         self.search, self.tokens, self.seen = search, tokens, []
@@ -78,8 +79,10 @@ class Fake:
             return respond({"data": [{"index": 0, "embedding": [0.25] * 8}],
                             "usage": {"prompt_tokens": self.tokens, "total_tokens": self.tokens}})
         answer = self.search(seen.index, seen.body, seen)
-        if isinstance(answer, int):
-            raise urllib.error.HTTPError(seen.url, answer, "error", {}, io.BytesIO(b'{"error":{"message":"fake failure"}}'))
+        if isinstance(answer, (int, tuple)):
+            status, message = answer if isinstance(answer, tuple) else (answer, "fake failure")
+            body = json.dumps({"error": {"message": message}}).encode("utf-8")
+            raise urllib.error.HTTPError(seen.url, status, "error", {}, io.BytesIO(body))
         if isinstance(answer, Exception):
             raise answer
         return respond(answer)
@@ -200,15 +203,30 @@ class EvalSearchTest(EvalCase):
         self.assertIn("\\u6cb3\\u8d8a", fake.searches()[0].raw.decode("ascii"))
         self.assertEqual(fake.searches()[0].body["search"], "河越夜戦の大名")       # 受け取る側が読むと、元の日本語に戻る
 
-    def test_k_sets_the_scoring_depth_and_the_fetch_size(self):
-        self.assertEqual([methods.fetch_count(k) for k in (1, 10, 11, 50)], [5, 50, 50, 50])
+    def test_k_sets_only_the_scoring_depth_and_the_fetch_size_is_always_50(self):
+        """1回に取る件数 top は k によらず 50（k を変えて比べるとき、取る範囲が同じ）。k が変えるのは、採点する上位の件数だけ。"""
+        self.assertEqual(methods.FETCH, 50)
         qf = self.questions_file([{"qid": "q1", "question": "質問", "answer_ids": ["b015"]}])
-        fake = Fake(lambda index, body, seen: hits("id", *[f"x{i}" for i in range(9)], "b015"))
-        code, out, _ = self.run_eval(fake, ["--dataset", "sengoku", "--file", str(qf), "--methods", "keyword", "--k", "5"])
-        self.assertEqual(code, 0)
-        self.assertEqual(fake.searches()[0].body["top"], 25)
-        r = self.result()["questions"][0]["results"]["keyword"]
-        self.assertEqual((r["ndcg"], r["recall"], r["hit1"], r["first_rank"]), (0.0, 0.0, 0.0, 10))   # 10 位は k=5 の外
+        ranked = [f"x{i}" for i in range(9)] + ["b015"]
+        scores = {}
+        for k in (1, 5, 10, 50):
+            fake = Fake(lambda index, body, seen: hits("id", *ranked))
+            code, out, err = self.run_eval(fake, ["--dataset", "sengoku", "--file", str(qf), "--k", str(k)])
+            self.assertEqual(code, 0, out + err)
+            self.assertEqual(len(fake.searches()), 4)
+            for seen in fake.searches():
+                self.assertEqual(seen.body["top"], 50, f"k={k}")
+                for vq in seen.body.get("vectorQueries", []):
+                    self.assertEqual(vq["k"], 50)
+            scores[k] = (fake.searches()[0].body, self.result()["questions"][0]["results"]["keyword"])
+            for old in self.out_dir.glob("*.json"):
+                old.unlink()
+        self.assertEqual(len({json.dumps(body, sort_keys=True) for body, _ in scores.values()}), 1)      # k が違っても、検索の本文は同じ
+        self.assertEqual(len({tuple(r["ranked"]) for _, r in scores.values()}), 1)                       # 取ってきた文書の並びも同じ
+        r5, r10 = scores[5][1], scores[10][1]
+        self.assertEqual((r5["ndcg"], r5["recall"], r5["hit1"], r5["first_rank"]), (0.0, 0.0, 0.0, 10))   # 10 位は k=5 の外
+        self.assertEqual((r10["recall"], r10["first_rank"]), (1.0, 10))                                    # k=10 なら入る
+        self.assertEqual(scores[1][1]["recall"], 0.0)
 
     # ---------------------------------------------------------------- 人事：文書単位
 
@@ -221,7 +239,7 @@ class EvalSearchTest(EvalCase):
         self.assertEqual(code, 0, out + err)
         search = fake.searches()[0]
         self.assertEqual(search.index, "hr-docs")
-        self.assertEqual(search.body["top"], 50)                      # k=10 の5倍までチャンクを取る
+        self.assertEqual(search.body["top"], 50)                      # チャンクは k によらず 50 件取る
         self.assertEqual(search.body["select"], "doc_id,chunk_id")
         r = self.result()["questions"][0]["results"]["keyword"]
         self.assertEqual(r["ranked"], ["CV-APP-0391", "MAIL-09", "JOB-REQ042-v3", "CV-APP-0386"])
@@ -264,7 +282,9 @@ class EvalSearchTest(EvalCase):
     def test_missing_semantic_config_skips_only_semantic(self):
         """ホテルにセマンティックの設定がない（400）：semantic だけ飛ばす。ほかの方式は測る。"""
         def search(index, body, seen):
-            return 400 if body.get("queryType") == "semantic" else hits("HotelId", "1")
+            if body.get("queryType") == "semantic":
+                return 400, "The semantic configuration 'hotels-semantic' does not exist for index 'hotels-blob'."
+            return hits("HotelId", "1")
         fake = Fake(search)
         code, out, err = self.run_eval(fake, ["--dataset", "hotel", "--file", str(self.hotel_questions()), "--hotel-data", str(HOTELS)])
         self.assertEqual(code, 0, out + err)
@@ -276,6 +296,34 @@ class EvalSearchTest(EvalCase):
         # ホテルの semantic は hotels-blob で、ベクトルのクエリを付けない
         semantic = [s for s in fake.searches() if s.body.get("queryType") == "semantic"][0]
         self.assertEqual((semantic.index, semantic.body["semanticConfiguration"], "vectorQueries" in semantic.body), ("hotels-blob", "hotels-semantic", False))
+
+    def test_400_on_semantic_blames_the_config_only_when_the_answer_says_semantic(self):
+        """セマンティックの検索の 400 は、答えの文に semantic・セマンティック が入るときだけ「設定がありません」。ほかは中立に。"""
+        cases = [
+            ("The semantic configuration 'x' does not exist", "セマンティックの設定（hotels-semantic）がありません（エラー 400：The semantic"),
+            ("セマンティック構成が見つかりません", "セマンティックの設定（hotels-semantic）がありません（エラー 400：セマンティック構成"),
+            ("Invalid expression: the filter is not valid", "この方式は飛ばしました（HTTP 400：Invalid expression: the filter is not valid）"),
+        ]
+        for message, expected in cases:
+            with self.subTest(message=message):
+                fake = Fake(lambda index, body, seen, message=message:
+                            (400, message) if body.get("queryType") == "semantic" else hits("HotelId", "1"))
+                code, out, err = self.run_eval(fake, ["--dataset", "hotel", "--file", str(self.hotel_questions()),
+                                                      "--hotel-data", str(HOTELS), "--methods", "keyword,semantic"])
+                self.assertEqual(code, 0, out + err)
+                reason = self.result()["skipped"]["semantic"]
+                self.assertTrue(reason.startswith(expected), reason)
+                if "設定" not in expected:
+                    self.assertNotIn("セマンティックの設定", reason)       # 設定のせいにしない
+                    self.assertNotIn("セマンティックの設定", out)
+                self.assertEqual(sorted(self.result()["skipped"]), ["semantic", "semantic+filter"])
+                for old in self.out_dir.glob("*.json"):
+                    old.unlink()
+        # semantic でない方式の 400 も、中立に（設定のせいにしない）
+        fake = Fake(lambda index, body, seen: (400, "semantic is mentioned here") if body.get("search") else hits("HotelId", "1"))
+        code, out, err = self.run_eval(fake, ["--dataset", "hotel", "--file", str(self.hotel_questions()), "--hotel-data", str(HOTELS),
+                                              "--methods", "keyword"])
+        self.assertIn("この方式は飛ばしました（HTTP 400：semantic is mentioned here）", self.result()["skipped"]["keyword"])
 
     def test_403_stops_with_hint_and_keeps_partial_results(self):
         """セマンティックが 403：無料枠かキーかを案内して止まり、そこまでの結果（途中の質問も）を保存する。"""
@@ -377,17 +425,71 @@ class EvalSearchTest(EvalCase):
                 self.assertIsNone(p1[method][key], key)
             self.assertEqual(n1[method]["leaks"], 0)                    # 採用担当（既定）は全部見える：経歴書が出ても漏れでない
             self.assertEqual((n1[method]["ndcg"], n1[method]["recall"], n1[method]["hit1"]), (1.0, 1.0, 1.0))
+        for method in ("keyword", "hybrid"):
+            self.assertEqual(p1[method]["leaked"], ["EVAL-INTERVIEWS-2026-10", "CV-APP-0391"])   # 漏れた文書の ID（上位 k 件の順。2回出ても1つ）
+            self.assertEqual(n1[method]["leaked"], [])
+        self.assertEqual([q["leakable"] for q in data["questions"]], [True, False])       # 一般社員の質問だけが、漏れうる質問
         summary = metrics.summarize(data["questions"], "keyword")
         self.assertEqual((summary["questions"], summary["scored"], summary["ndcg"], summary["recall"]), (2, 1, 1.0, 1.0))
-        self.assertEqual((summary["leak_questions"], summary["leaks"]), (1, 2))
+        self.assertEqual((summary["leak_questions"], summary["leaks"], summary["leakable"]), (1, 2, 1))
         # 権限の絞り込み：as_role がなければ採用担当
         by_role = {("employee" in s.body["filter"]): s.body["filter"] for s in fake.searches()}
         self.assertEqual(by_role[True], "allowed/any(a: search.in(a, 'role:employee'))")
         self.assertEqual(by_role[False], "allowed/any(a: search.in(a, 'role:recruiter'))")
         self.assertIn("[p1] 漏れ  keyword 2  hybrid 2", out)
         self.assertIn("[n1] nDCG@10  keyword 1.00  hybrid 1.00", out)
-        self.assertIn("漏れ 1/2問（50%）・文書 2件", out)
+        self.assertIn("漏れ 1/1問（100%、権限の問）・文書 2件", out)         # 割合の分母は、全部の質問（2）でなく、漏れうる質問（1）
         self.assertIn("正解の文書がない質問（1問）は、平均に入れていません", out)
+
+    def test_hr_every_method_carries_the_permission_filter(self):
+        """人事は、keyword だけでなく vector・hybrid・semantic の本文にも、見てよい人の絞り込みが載る。ベクトルの検索は preFilter（絞ってから探す）。"""
+        qs = [{"qid": "p1", "question": "石田さんの評価", "type": "permission", "answer_ids": [], "as_role": "role:employee",
+               "hidden_ids": ["EVAL-INTERVIEWS-2026-10"]},
+              {"qid": "n1", "question": "求人票の年収", "type": "numeric", "answer_ids": ["JOB-REQ042-v3"]}]
+        fake = Fake(lambda index, body, seen: chunks("JOB-REQ042-v3"))
+        code, out, err = self.run_eval(fake, ["--dataset", "hr", "--file", str(self.questions_file(qs))])
+        self.assertEqual(code, 0, out + err)
+        searches = fake.searches()
+        self.assertEqual(len(searches), 8)
+        employee = "allowed/any(a: search.in(a, 'role:employee'))"
+        recruiter = "allowed/any(a: search.in(a, 'role:recruiter'))"
+        for position, seen in enumerate(searches):               # 1 問目（一般社員）の4方式、2 問目（採用担当）の4方式の順
+            self.assertEqual(seen.body["filter"], employee if position < 4 else recruiter, seen.body)
+            if "vectorQueries" in seen.body:
+                self.assertEqual(seen.body["vectorFilterMode"], "preFilter", seen.body)      # vector・hybrid・semantic
+            else:
+                self.assertNotIn("vectorFilterMode", seen.body)                              # keyword には要らない
+        for first in (0, 4):
+            keyword, vector, hybrid, semantic = (s.body for s in searches[first:first + 4])
+            self.assertNotIn("vectorQueries", keyword)
+            self.assertNotIn("search", vector)
+            self.assertIn("search", hybrid)
+            self.assertEqual(semantic["queryType"], "semantic")
+            for body in (vector, hybrid, semantic):
+                self.assertEqual(body["vectorFilterMode"], "preFilter")
+                self.assertTrue(body["filter"].startswith("allowed/any("))
+        # 検索の URL・ヘッダーはメンバーの query キー（絞り込みは本文に載せるだけで、管理の API は使わない）
+        for seen in searches:
+            self.assertEqual(seen.headers["api-key"], "query-key-from-the-file")
+
+    def test_documents_below_the_top_k_are_not_leaks(self):
+        """上位 k 件より下（取ってきたが採点の外）に出た見えない文書は、漏れに数えない。k を広げれば数える。"""
+        qs = [{"qid": "p1", "question": "石田さんの評価", "type": "permission", "answer_ids": [], "as_role": "role:employee",
+               "hidden_ids": ["EVAL-INTERVIEWS-2026-10"]}]
+        order = ("JOB-REQ042-v3", "JOB-REQ043-v1", "JOB-REQ047-v2", "EVAL-INTERVIEWS-2026-10", "CV-APP-0391")    # 4 位・5 位が見えない文書
+        results = {}
+        for k in (3, 4, 5):
+            fake = Fake(lambda index, body, seen: chunks(*order))
+            code, out, err = self.run_eval(fake, ["--dataset", "hr", "--file", str(self.questions_file(qs)), "--methods", "keyword", "--k", str(k)])
+            self.assertEqual(code, 0, out + err)
+            results[k] = self.result()["questions"][0]["results"]["keyword"]
+            self.assertEqual(results[k]["ranked"], list(order))                  # 取ってきた並びは k によらず同じ
+            self.assertEqual(fake.searches()[0].body["top"], 50)
+            for old in self.out_dir.glob("*.json"):
+                old.unlink()
+        self.assertEqual((results[3]["leaks"], results[3]["leaked"]), (0, []))              # 4 位は k=3 の外
+        self.assertEqual((results[4]["leaks"], results[4]["leaked"]), (1, ["EVAL-INTERVIEWS-2026-10"]))
+        self.assertEqual((results[5]["leaks"], results[5]["leaked"]), (2, ["EVAL-INTERVIEWS-2026-10", "CV-APP-0391"]))
 
     def test_leak_rules(self):
         kinds = {"JOB-1": "job_posting", "CV-1": "resume", "MAIL-1": "mail"}
@@ -398,6 +500,18 @@ class EvalSearchTest(EvalCase):
         self.assertEqual(vis.count(None, ["CV-1"], ["CV-1"]), 0)                                              # 権限のないデータ
         with self.assertRaises(datasets.DataError):
             datasets.allowed_filter("employee")
+        self.assertEqual(vis.leaked_docs("role:employee", [], ["CV-1", "JOB-1", "MAIL-1", "CV-1"]), ["CV-1", "MAIL-1"])    # 出た順・1回だけ
+        self.assertEqual(vis.leaked_docs(None, ["CV-1"], ["CV-1"]), [])
+
+    def test_leakable_questions(self):
+        """漏れうる質問＝聞く人が採用担当でない、または hidden_ids がある。採用担当で hidden_ids のない質問と、権限のないデータは、漏れない。"""
+        hr, hotel = datasets.SPECS["hr"], datasets.SPECS["hotel"]
+        self.assertFalse(datasets.leakable(hr, {"answer_ids": ["MAIL-09"]}))
+        self.assertFalse(datasets.leakable(hr, {"as_role": "role:recruiter", "hidden_ids": []}))
+        self.assertTrue(datasets.leakable(hr, {"as_role": "role:employee", "hidden_ids": []}))
+        self.assertTrue(datasets.leakable(hr, {"as_role": "role:interviewer"}))
+        self.assertTrue(datasets.leakable(hr, {"hidden_ids": ["CV-APP-0391"]}))                    # 採用担当でも、hidden_ids があれば
+        self.assertFalse(datasets.leakable(hotel, {"hidden_ids": ["1"]}))
 
     # ---------------------------------------------------------------- 条件の絞り込み
 
@@ -479,11 +593,38 @@ class EvalSearchTest(EvalCase):
         self.assertRegex(next(self.out_dir.glob("*.json")).name, r"^hr-\d{8}T\d{6}Z\.json$")
         self.assertEqual([q["qid"] for q in data["questions"]], ["h1", "h2"])          # --limit
         self.assertEqual(data["questions"][0]["type"], "paraphrase")
-        self.assertEqual(list(data["questions"][0]["results"]["keyword"]), ["ranked", "ndcg", "recall", "hit1", "first_rank", "leaks"])
+        self.assertEqual(list(data["questions"][0]), ["qid", "type", "leakable", "results"])
+        self.assertEqual(list(data["questions"][0]["results"]["keyword"]), ["ranked", "ndcg", "recall", "hit1", "first_rank", "leaks", "leaked"])
         self.assertIn("評価：hr（質問 2 問、上位 10 件で採点）", out)
         self.assertIn("[h1] nDCG@10  keyword 0.63  vector 0.63  hybrid 0.63  semantic 0.63", out)
-        self.assertIn("keyword         nDCG 0.63  再現率 1.00  1位 0%  （2問）  漏れ 0/2問（0%）・文書 0件", out)
+        self.assertIn("keyword         nDCG 0.63  再現率 1.00  1位 0%  （2問）  漏れ：権限の質問がありません", out)      # 権限の質問（漏れうる質問）がなければ、割合は出さない
         self.assertIn("結果：", out)
+
+    def test_result_files_are_never_overwritten(self):
+        """同じ秒に2つ始めても、上書きしない（なければ作る形で開き、あれば -2・-3 を付ける）。"""
+        class Clock:
+            @staticmethod
+            def now(tz=None):
+                return datetime(2026, 11, 7, 1, 2, 3, 456789, tzinfo=timezone.utc)
+        qf = self.questions_file([{"qid": "q1", "question": "質問", "answer_ids": ["b015"]}])
+        paths = []
+        for _ in range(3):
+            fake = Fake(lambda index, body, seen: hits("id", "b015"))
+            with mock.patch.object(eval_search, "datetime", Clock):
+                code, out, err = self.run_eval(fake, ["--dataset", "sengoku", "--file", str(qf), "--methods", "keyword"])
+            self.assertEqual(code, 0, out + err)
+            paths.append(re.search(r"結果：(\S+)", out).group(1))
+        self.assertEqual([Path(p).name for p in paths],
+                         ["sengoku-20261107T010203Z.json", "sengoku-20261107T010203Z-2.json", "sengoku-20261107T010203Z-3.json"])
+        self.assertEqual(sorted(p.name for p in self.out_dir.glob("*.json")), sorted(Path(p).name for p in paths))
+        # 先にあったファイルの中身は、そのまま残る
+        first = self.out_dir / "sengoku-20261107T010203Z.json"
+        first.write_text("keep me\n", encoding="utf-8")
+        fake = Fake(lambda index, body, seen: hits("id", "b015"))
+        with mock.patch.object(eval_search, "datetime", Clock):
+            self.run_eval(fake, ["--dataset", "sengoku", "--file", str(qf), "--methods", "keyword"])
+        self.assertEqual(first.read_text(encoding="utf-8"), "keep me\n")
+        self.assertTrue((self.out_dir / "sengoku-20261107T010203Z-4.json").is_file())
 
     def test_quiet_prints_only_the_summary(self):
         qf = self.questions_file([{"qid": "q1", "question": "質問", "answer_ids": ["b015"]}])
@@ -643,16 +784,20 @@ class MetricsTest(unittest.TestCase):
 
     def test_summarize_excludes_questions_without_answers(self):
         questions = [
-            {"results": {"m": {"ndcg": 1.0, "recall": 1.0, "hit1": 1.0, "leaks": 0}}},
-            {"results": {"m": {"ndcg": 0.0, "recall": 0.5, "hit1": 0.0, "leaks": 1}}},
-            {"results": {"m": {"ndcg": None, "recall": None, "hit1": None, "leaks": 3}}},
-            {"results": {}},
+            {"leakable": False, "results": {"m": {"ndcg": 1.0, "recall": 1.0, "hit1": 1.0, "leaks": 0}}},
+            {"leakable": True, "results": {"m": {"ndcg": 0.0, "recall": 0.5, "hit1": 0.0, "leaks": 1}}},
+            {"leakable": True, "results": {"m": {"ndcg": None, "recall": None, "hit1": None, "leaks": 3}}},
+            {"leakable": True, "results": {}},          # この方式を測っていない質問は、分母に入れない
         ]
         s = metrics.summarize(questions, "m")
         self.assertEqual((s["questions"], s["scored"], s["ndcg"], s["recall"], s["hit1"]), (3, 2, 0.5, 0.75, 0.5))
-        self.assertEqual((s["leak_questions"], s["leaks"]), (2, 4))
+        self.assertEqual((s["leak_questions"], s["leaks"], s["leakable"]), (2, 4, 2))
+        self.assertEqual(metrics.leak_rate(s), 1.0)                       # 漏れた2問 ÷ 漏れうる2問（全部の3問では割らない）
         self.assertEqual(metrics.summarize(questions, "none"), {"questions": 0, "scored": 0, "ndcg": None, "recall": None, "hit1": None,
-                                                                 "leak_questions": 0, "leaks": 0})
+                                                                 "leak_questions": 0, "leaks": 0, "leakable": 0})
+        self.assertIsNone(metrics.leak_rate(metrics.summarize(questions, "none")))
+        old = [{"results": {"m": {"ndcg": 1.0, "recall": 1.0, "hit1": 1.0, "leaks": 1}}}, {"results": {"m": {"ndcg": 1.0, "recall": 1.0, "hit1": 1.0, "leaks": 0}}}]
+        self.assertEqual(metrics.summarize(old, "m")["leakable"], 2)       # leakable のない古い結果は、全部を漏れうる質問に数える
 
 
 if __name__ == "__main__":

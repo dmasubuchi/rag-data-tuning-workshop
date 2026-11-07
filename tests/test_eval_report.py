@@ -36,8 +36,10 @@ def unscored(leaks=0):
 
 
 def make_result(rows, dataset="hr", k=10, methods=BASE, skipped=None, units=None, stopped=None, started="2026-11-07T01:02:03Z"):
-    """rows は (qid, 質問の種類, {方式: 点}) の並び。units を省くと、答えの数から合わせる（検索・セマンティック）。埋め込みは1問100トークン。"""
-    questions = [{"qid": qid, "type": kind, "results": results} for qid, kind, results in rows]
+    """rows は (qid, 質問の種類, {方式: 点}) の並び。4つ目に leakable（漏れうる質問か）を書ける（省くと、種類が permission のとき真）。
+    units を省くと、答えの数から合わせる（検索・セマンティック）。埋め込みは1問100トークン。"""
+    questions = [{"qid": row[0], "type": row[1], "leakable": row[3] if len(row) > 3 else row[1] == "permission", "results": row[2]}
+                 for row in rows]
     searches = sum(len(q["results"]) for q in questions)
     semantic = sum(1 for q in questions for name in q["results"] if name.split("+")[0] == "semantic")
     return {"dataset": dataset, "started": started, "k": k, "methods": list(methods), "skipped": skipped or {},
@@ -130,6 +132,8 @@ class PricesFileTest(unittest.TestCase):
         self.assertEqual(data["sources"], ["https://azure.microsoft.com/ja-jp/pricing/details/search/",
                                            "https://azure.microsoft.com/ja-jp/pricing/details/cognitive-services/openai-service/"])
         self.assertIn("config/prices.json", data["note"])
+        for word in ("Basic の検索は時間課金なので search_per_1000 に 0 と書く", "null のままだと", "＊"):   # 時間課金の検索は 0 と書く（null だと合計に＊が付く）
+            self.assertIn(word, data["note"], word)
         loaded = cost.load_prices(REPO_DIR / "config" / "prices.example.json")
         self.assertTrue(loaded.found)
         self.assertEqual(loaded.unset_parts(), list(cost.PARTS))
@@ -326,8 +330,10 @@ class ReportTest(ReportCase):
         head, rows = method_table(md)
         self.assertIn("漏れ問", head)
         self.assertIn("漏れ文書", head)
-        self.assertEqual((rows["keyword"]["漏れ問"], rows["keyword"]["漏れ文書"]), ("1/5", "2"))
-        self.assertEqual((rows["hybrid"]["漏れ問"], rows["hybrid"]["漏れ文書"]), ("0/5", "0"))
+        # 割合の分母は、全部の質問（5）でなく、漏れうる質問（権限の2問）
+        self.assertEqual((rows["keyword"]["漏れ問"], rows["keyword"]["漏れ文書"]), ("1/2 (50%)", "2"))
+        self.assertEqual((rows["hybrid"]["漏れ問"], rows["hybrid"]["漏れ文書"]), ("0/2 (0%)", "0"))
+        self.assertIn("漏れうる質問", md)                                # 分母の説明が、表の下にある
         self.assertEqual(rows["keyword"]["問"], "3/5")                    # 平均に入れたのは、正解のある3問
         self.assertEqual(rows["keyword"]["nDCG@10"], "0.50")             # (0.5 + 0 + 1) / 3
         self.assertEqual(rows["keyword"]["再現率@10"], "0.67")
@@ -336,6 +342,31 @@ class ReportTest(ReportCase):
         by_type = {r[0]: r[1:] for r in md_tables(md)[title][1]}
         self.assertEqual(by_type["permission"], ["-", "-", "-", "-"])         # 行は残し、nDCG は決まらない
         self.assertIn("正解のない質問", md)
+
+    def test_leak_rate_is_over_leakable_questions_and_old_results_still_read(self):
+        """漏れの割合は、漏れうる質問で割る。leakable のない古い結果は、測った質問を全部漏れうる質問に数える。"""
+        full = {m: unscored(1) for m in BASE}
+        rows = [("p1", "permission", dict(full)), ("p2", "permission", dict(full))]
+        rows += [(f"n{i}", "numeric", {m: scored(1.0) for m in BASE}) for i in range(1, 11)]
+        result = make_result(rows)
+        _, out, _, md = self.report(self.result_file(result))
+        self.assertEqual(method_table(md)[1]["keyword"]["漏れ問"], "2/2 (100%)")      # 12 問のうち 2 問が漏れ。12 で割らない
+        self.assertEqual(method_table(md)[1]["keyword"]["漏れ文書"], "2")
+        self.assertIn("2/2 (100%)", out)
+        for q in result["questions"]:
+            del q["leakable"]
+        _, _, _, md = self.report(self.result_file(result))
+        self.assertEqual(method_table(md)[1]["keyword"]["漏れ問"], "2/12 (17%)")
+        # 漏れうる質問がなければ、割合は出さない
+        calm = make_result([("n1", "numeric", {m: scored(1.0) for m in BASE})], dataset="hr")
+        self.assertEqual(method_table(self.report(self.result_file(calm))[3])[1]["keyword"]["漏れ問"], "-")
+
+    def test_leakable_must_be_true_or_false(self):
+        result = make_result(hr_rows())
+        result["questions"][0]["leakable"] = "yes"
+        code, _, err, _ = self.report(self.result_file(result))
+        self.assertEqual(code, 2)
+        self.assertIn("leakable", err)
 
     def test_leak_columns_only_where_leaks_make_sense(self):
         rows = [("s1", "keyword-wins", {m: scored(1.0) for m in BASE})]
@@ -558,7 +589,7 @@ class WithEvalSearchTest(ReportTools, EvalCase):
         expected = 100 * 9 / 1000 + 500 * 3 / 1000 + 20 * 21 / 1_000_000
         self.assertEqual(rows["合計"]["費用の見込み"], cost.format_amount(expected, "JPY"))
         self.assertEqual(rows["埋め込み（共通）"]["費用の見込み"], "<0.01円")
-        self.assertEqual(rows["keyword"]["漏れ問"], "1/3")                  # 一般社員に MAIL-09 が出た
+        self.assertEqual(rows["keyword"]["漏れ問"], "1/1 (100%)")           # 一般社員に MAIL-09 が出た。漏れうる質問は一般社員の1問だけ（採用担当の2問は数えない）
         self.assertEqual(rows["keyword"]["問"], "2/3")
         # 画面と Markdown の両方に、種類の表がある
         self.assertIn("permission", md)

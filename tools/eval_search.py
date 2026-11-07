@@ -4,14 +4,16 @@
 セマンティック ランカー）で AI Search を検索し、正解の文書が上位 k 件に入ったかを、文書の単位で採点します。
 質問に condition（ホテルの条件）があれば、各方式に絞り込みを足した <方式>+filter も測ります。
 人事は、聞く人（質問の as_role。なければ role:recruiter）に見える分だけに絞って検索し、その人に見えてはいけない文書が
-上位 k 件に出た数（漏れ）を数えます。結果と、使った量（検索・セマンティック・埋め込みの回数）は JSON に書きます（費用は別の道具で）。
+上位 k 件に出た数（漏れ）を数えます。漏れた質問の割合は、漏れうる質問（聞く人が採用担当でない、または hidden_ids がある質問）の
+数で割ります。結果（問ごとの漏れた文書の ID も）と、使った量（検索・セマンティック・埋め込みの回数）は JSON に書きます（費用は別の道具で）。
 
 使い方（Repo 直下で）：
   python tools/eval_search.py --dataset hr
   python tools/eval_search.py --dataset sengoku --methods keyword,hybrid --k 10 --limit 12
   python tools/eval_search.py --dataset hotel --hotel-data <ホテルのデータの JSON>
   --methods     測る方式（既定は4つ全部）。<方式>+filter は、質問の condition から自動で足す
-  --k           上位何件で採点するか（既定 10。1〜50）。検索は k の5倍（上限 50）まで取ってから、文書にまとめる
+  --k           上位何件で採点するか（既定 10。1〜50）。検索で取る件数は k によらず 50 で、文書にまとめてから上位 k 件を採点する
+                （k を変えて比べても、取る範囲は同じ）
   --limit N     先頭の N 問だけ
   --file PATH   質問のファイルを変える
   --hotel-data  ホテルのデータの JSON。渡す（か _work/hotel-vectors/ に置く）と、質問の正解の ID がデータにあるかを先に確かめる
@@ -23,19 +25,20 @@
 設定ファイルは、環境変数 WORKSHOP_ENV_FILE で別のものを指せる（試験用）。端末の AZURE_* の環境変数は読まない。
 
 飛ばす・止まる：
-  ・インデックスがない（404）・セマンティックの設定がない（400）：その方式だけ飛ばして理由を出し、ほかの方式は最後まで測る
+  ・インデックスがない（404）・検索が通らない（400。セマンティックの設定がないときは、そう案内する）：その方式だけ飛ばして理由を出し、ほかの方式は最後まで測る
   ・キーが合わない（401・403）・セマンティック ランカーの無料枠の使い切り（403）・つながらない：止まって案内し、そこまでの結果は保存する
 
 終了コード：0 = 測れた／1 = 止まった（設定・キー・つながらない。そこまでの結果は保存）か、測れた方式がなかった／2 = 質問・データ・引数が使えない
 """
 import argparse
+import itertools
 import json
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
 from evallib import metrics
-from evallib.datasets import SPECS, Visibility, base_filter, combine, doc_kinds_of, role_of
+from evallib.datasets import SPECS, Visibility, base_filter, combine, doc_kinds_of, leakable, role_of
 from evallib.methods import FILTER_SUFFIX, METHODS, build_request, documents_in_order, needs_vector, split_name
 from evallib.questions import (DATA_FILES, DATASETS, QUESTION_FILES, REPO_DIR, DataError, condition_to_filter, ids_of,
                                load_data, load_questions)
@@ -43,7 +46,7 @@ from evallib.rest import RestError, embed, search
 from evallib.settings import ENV_HOWTO, SettingsError, load_settings
 
 OUT_DIR = REPO_DIR / "_work" / "eval"
-MAX_K = 50
+MAX_K = 50                # --k の上限（1回の検索で取る件数 FETCH と同じ）
 FREE_TIER_HINT = ("エラー 403：キーが合っているか、セマンティック ランカーの無料枠（月ごと。チームの AI Search 全体で使う）を"
                   "使い切っていないかを確かめます。")
 
@@ -100,6 +103,17 @@ def server_message(detail, limit=160):
     return " ".join(str(text).split())[:limit]
 
 
+SEMANTIC_WORDS = ("semantic", "セマンティック")
+
+
+def bad_request_reason(semantic, config, detail):
+    """検索が 400 になった方式を飛ばす理由。セマンティックの方式でも、サービスの答えの文に semantic・セマンティックが
+    入るときだけ「設定がありません」と言う（ほかの 400 を、設定のせいにしない）。"""
+    if semantic and any(word.lower() in detail.lower() for word in SEMANTIC_WORDS):
+        return f"セマンティックの設定（{config}）がありません（エラー 400：{detail}）"
+    return f"この方式は飛ばしました（HTTP 400：{detail}）"
+
+
 def stop_text(error, *, semantic=False, embedding=False):
     if error.status is None:
         return f"つながりません：{error.detail}"
@@ -150,7 +164,7 @@ class Run:
         filter_text = base_filter(self.dataset, q)
         if filtered:
             filter_text = combine(filter_text, q["_condition_filter"])
-        request = build_request(self.dataset, base, q["question"], vector, filter_text, self.k)
+        request = build_request(self.dataset, base, q["question"], vector, filter_text)
         try:
             response = search(self.settings, request.index, request.body)
         except RestError as error:
@@ -159,21 +173,19 @@ class Run:
                 self.skip_index(request.index, f"インデックス {request.index} がありません（まだ作っていません）")
             elif error.status == 400 and filtered:
                 self.skip([name], f"絞り込みが通りません（エラー 400：{detail}）")
-            elif error.status == 400 and request.semantic:
-                self.skip([name, name + FILTER_SUFFIX], f"セマンティックの設定（{setup.semantic_config}）がありません（エラー 400：{detail}）")
             elif error.status == 400:
-                self.skip([name, name + FILTER_SUFFIX], f"検索が通りません（エラー 400：{detail}）")
+                self.skip([name, name + FILTER_SUFFIX], bad_request_reason(request.semantic, setup.semantic_config, detail))
             else:
                 raise Stop(stop_text(error, semantic=request.semantic)) from None
             return None
         self.units["search"] += 1
         self.units["semantic"] += 1 if request.semantic else 0
         ranked = documents_in_order(self.dataset, response)
-        leaks = self.visibility.count(role_of(self.dataset, q), q.get("hidden_ids"), ranked[:self.k])
-        return {"ranked": ranked, **metrics.score(ranked, q["answer_ids"], self.k), "leaks": leaks}
+        leaked = self.visibility.leaked_docs(role_of(self.dataset, q), q.get("hidden_ids"), ranked[:self.k])
+        return {"ranked": ranked, **metrics.score(ranked, q["answer_ids"], self.k), "leaks": len(leaked), "leaked": leaked}
 
     def question(self, q):
-        entry = {"qid": q["qid"], "type": q.get("type"), "results": {}}
+        entry = {"qid": q["qid"], "type": q.get("type"), "leakable": leakable(self.dataset, q), "results": {}}
         self.results.append(entry)
         vector = None
         try:
@@ -217,6 +229,13 @@ def progress_line(entry, k, scored):
 
 # ------------------------------------------------------------------ まとめと保存
 
+def leak_text(s):
+    """方式の行の最後の、漏れの数え方。割合は、漏れうる質問（権限の質問）の数で割る。"""
+    if not s["leakable"]:
+        return "漏れ：権限の質問がありません"
+    return f"漏れ {s['leak_questions']}/{s['leakable']}問（{metrics.leak_rate(s) * 100:.0f}%、権限の問）・文書 {s['leaks']}件"
+
+
 def summary_lines(result, dataset, k):
     questions, lines = result["questions"], []
     no_answer = sum(1 for q in questions if q["results"] and all(r["ndcg"] is None for r in q["results"].values()))
@@ -235,7 +254,7 @@ def summary_lines(result, dataset, k):
         else:
             text += "正解のある質問がありません"
         if dataset.permission:
-            text += f"  漏れ {s['leak_questions']}/{s['questions']}問（{s['leak_questions'] / s['questions'] * 100:.0f}%）・文書 {s['leaks']}件"
+            text += "  " + leak_text(s)
         lines.append(text)
     if no_answer:
         lines.append(f"  正解の文書がない質問（{no_answer}問）は、平均に入れていません。見えてはいけない文書が出た数（漏れ）で数えます。")
@@ -256,10 +275,18 @@ def result_json(result) -> str:
 
 
 def write_result(result, out_dir, started):
-    path = Path(out_dir) / f"{result['dataset']}-{started:%Y%m%dT%H%M%SZ}.json"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(result_json(result), encoding="utf-8", newline="\n")
-    return path
+    """結果を <データ>-<開始の時刻>.json に書く。同じ名前がすでにあれば（同じ秒に2つ始めたとき）、上書きせず -2・-3 を付ける。"""
+    folder = Path(out_dir)
+    folder.mkdir(parents=True, exist_ok=True)
+    stem, text = f"{result['dataset']}-{started:%Y%m%dT%H%M%SZ}", result_json(result)
+    for number in itertools.count(1):
+        path = folder / (f"{stem}.json" if number == 1 else f"{stem}-{number}.json")
+        try:
+            with open(path, "x", encoding="utf-8", newline="\n") as file:      # なければ作る形で開く（あれば FileExistsError）
+                file.write(text)
+        except FileExistsError:
+            continue
+        return path
 
 
 def shown(path):

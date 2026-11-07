@@ -468,6 +468,7 @@ CONDITION_FIELDS = {
     "Rooms/SleepsCount": "number", "Rooms/SmokingAllowed": "bool",
 }
 CONDITION_OPS = ("eq", "ge", "le", "gt", "lt")
+MAX_INTEGER = 2 ** 63 - 1   # 整数の上限（検索の絞り込みの Edm.Int64 と同じ）。もっと大きいと小数にも直せず、isfinite が OverflowError になる
 _ISO_DATETIME = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$")
 
 
@@ -501,8 +502,10 @@ def _parse_ops(key, spec):
             ok = isinstance(value, str) and bool(value) and op == "eq"
             how = "文字列（演算は eq だけ）"
         elif kind == "number":
-            if _is_number(value) and not math.isfinite(value):
+            if isinstance(value, float) and not math.isfinite(value):
                 raise ValueError(f"「{key}」の {op} に NaN・無限大は使えません（有限の数で書きます。今は {value!r}）")
+            if isinstance(value, int) and not isinstance(value, bool) and abs(value) > MAX_INTEGER:
+                raise ValueError(f"「{key}」の {op} の数が大きすぎます（整数は絶対値が {MAX_INTEGER:,} までです）")
             ok = _is_number(value)
             how = "数"
         else:

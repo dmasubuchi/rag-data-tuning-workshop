@@ -1,7 +1,8 @@
 """評価の結果（tools/eval_search.py が書いた JSON）を、比べやすい表にまとめる（標準ライブラリだけ。通信しない）。
 
 出す表は2つ。
-  方式ごと        質問の数・nDCG@k・再現率@k・1位の割合・（人事は）漏れ・検索の回数・セマンティックの回数・埋め込みのトークン・費用の見込み
+  方式ごと        質問の数・nDCG@k・再現率@k・1位の割合・（人事は）漏れ（漏れた質問の数/漏れうる質問の数と％、漏れた文書の数）・
+                  検索の回数・セマンティックの回数・埋め込みのトークン・費用の見込み
   方式×質問の種類  質問の種類ごとの nDCG@k の平均（カッコは問の数）
 
 使い方（Repo 直下で）：
@@ -69,8 +70,8 @@ def result_problem(data):
     if not all(_is_count(data["units"].get(key)) for key in ("search", "semantic", "embedding_tokens")):
         return "units（検索・semantic・embedding_tokens の回数）の形が違います"
     for index, q in enumerate(data["questions"], start=1):
-        if not (isinstance(q, dict) and isinstance(q.get("results"), dict)):
-            return f"{index} 番目の質問の形が違います（results がありません）"
+        if not (isinstance(q, dict) and isinstance(q.get("results"), dict) and isinstance(q.get("leakable", True), bool)):
+            return f"{index} 番目の質問の形が違います（results がないか、leakable が true・false でありません）"
         for method, r in q["results"].items():
             if not (isinstance(r, dict) and all(_is_score(r.get(key)) for key in ("ndcg", "recall", "hit1")) and _is_count(r.get("leaks"))):
                 return f"{q.get('qid', index)} の {method} の点の形が違います（ndcg・recall・hit1・leaks）"
@@ -227,6 +228,13 @@ def percent(value) -> str:
     return f"{value * 100:.0f}%"
 
 
+def leak_cell(s) -> str:
+    """漏れ問の欄。漏れた質問の数/漏れうる質問の数（％）。漏れうる質問がなければ「-」。"""
+    if not s["leakable"]:
+        return f"{s['leak_questions']}/0" if s["leak_questions"] else "-"
+    return f"{s['leak_questions']}/{s['leakable']} ({percent(metrics.leak_rate(s))})"
+
+
 @dataclass
 class Notes:
     """表を作りながら集める、表の下に書くこと。"""
@@ -292,7 +300,7 @@ class Report:
         cells = [count] + (["-"] * 3 if not s["scored"] else
                            [f"{s['ndcg']:.2f}", f"{s['recall']:.2f}", percent(s["hit1"])])
         if self.show_leaks:
-            cells += [f"{s['leak_questions']}/{s['questions']}", str(s["leaks"])]
+            cells += [leak_cell(s), str(s["leaks"])]
         return cells
 
     def method_cells(self, run, name) -> list:
@@ -395,6 +403,10 @@ class Report:
         lines.append("nDCG・再現率・1位は、正解のある質問だけの平均。「問」は、平均に入れた数（測った数が違うときは 平均に入れた数/測った数）。")
         no_answer = [run for run in self.runs if any(q["results"] and all(r["ndcg"] is None for r in q["results"].values())
                                                      for q in run.questions)]
+        if self.show_leaks:
+            lines.append("漏れ問は、漏れた質問の数/漏れうる質問の数（％）。漏れうる質問は、聞く人が採用担当でない質問と、"
+                         "見えてはいけない文書（hidden_ids）が決めてある質問で、割合はその数で割ります（全部の質問では割りません）。"
+                         "漏れ文書は、漏れた文書の合計です。")
         if no_answer:
             lines.append("正解のない質問（人事の権限の質問のうち、見える文書がないもの）は平均に入れず、"
                          "見えてはいけない文書が上位 k 件に出た数（漏れ問・漏れ文書）で数えます。")

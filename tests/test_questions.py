@@ -797,6 +797,10 @@ class HotelConditionTest(unittest.TestCase):
             ({"Rooms/BaseRate": {"le": float("inf")}}, "NaN・無限大は使えません"),
             ({"Rating": {"gt": float("-inf")}}, "NaN・無限大は使えません"),
             ({"Rating": json.loads('{"x": NaN}')["x"]}, "NaN・無限大は使えません"),   # JSON の NaN も読めてしまう
+            ({"Rating": {"ge": 10 ** 400}}, "数が大きすぎます"),                      # 大きすぎる整数は、OverflowError でなく日本語の ValueError
+            ({"Rooms/BaseRate": {"le": -10 ** 400}}, "数が大きすぎます"),
+            ({"Rooms/SleepsCount": json.loads("1" + "0" * 400)}, "数が大きすぎます"),
+            ({"Rating": {"ge": 2 ** 63}}, "数が大きすぎます"),
         ]
         for condition, word in cases:
             with self.subTest(condition):
@@ -804,6 +808,11 @@ class HotelConditionTest(unittest.TestCase):
                     with self.assertRaises(ValueError) as caught:
                         function(condition)
                     self.assertIn(word, str(caught.exception))
+
+    def test_the_largest_integers_still_work(self):
+        self.assertEqual(ev.condition_to_filter({"Rating": {"le": 2 ** 63 - 1}}), f"Rating le {2 ** 63 - 1}")
+        self.assertEqual(ev.condition_to_filter({"Rating": {"ge": -(2 ** 63 - 1)}}), f"Rating ge {-(2 ** 63 - 1)}")
+        self.assertEqual(self.ids({"Rating": {"le": 2 ** 63 - 1}}), ["1", "2", "3"])
 
     def test_matches_top_level_and_address(self):
         self.assertEqual(self.ids({"Rating": {"ge": 4.5}, "ParkingIncluded": True}), ["1"])
@@ -922,7 +931,8 @@ class HotelCheckTest(unittest.TestCase):
 
     def test_bad_condition_shape_is_a_problem_not_a_crash(self):
         for bad in ({}, "Rating ge 4", {"Description": "x"}, {"Rating": {"ne": 4}}, {"Rating": "high"},
-                    json.loads('{"Rating": {"ge": NaN}}'), json.loads('{"Rooms/BaseRate": {"le": Infinity}}')):
+                    json.loads('{"Rating": {"ge": NaN}}'), json.loads('{"Rooms/BaseRate": {"le": Infinity}}'),
+                    {"Rating": {"ge": 10 ** 400}}):
             with self.subTest(bad):
                 problems = hotel_check([self.cond(["1"], bad)])
                 self.assertEqual(len(problems), 1, problems)

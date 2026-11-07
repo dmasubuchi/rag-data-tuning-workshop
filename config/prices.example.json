@@ -8,5 +8,5 @@
   "semantic_per_1000": null,
   "embedding_per_1m_tokens": null,
   "search_per_1000": null,
-  "note": "値は料金のページで確かめて、config/prices.json に写して書く。checked には確かめた日（例 2026-11-07）を書く。semantic_per_1000 はセマンティック ランカー 1,000 回の単価、embedding_per_1m_tokens は埋め込み 100 万トークンの単価、search_per_1000 は検索 1,000 回の単価。Basic など時間で課金される検索は回数では増えないので、search_per_1000 は 0 か null のままでよい（null のときは、検索の分を入れない金額として、その旨を表に書く）"
+  "note": "値は料金のページで確かめて、config/prices.json に写して書く。checked には確かめた日（例 2026-11-07）を書く。semantic_per_1000 はセマンティック ランカー 1,000 回の単価、embedding_per_1m_tokens は埋め込み 100 万トークンの単価、search_per_1000 は検索 1,000 回の単価。Basic の検索は時間課金なので search_per_1000 に 0 と書く（null のままだと、合計に＊が付く）"
 }

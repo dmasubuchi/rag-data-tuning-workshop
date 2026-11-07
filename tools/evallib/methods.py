@@ -14,8 +14,8 @@ from dataclasses import dataclass
 METHODS = ("keyword", "vector", "hybrid", "semantic")
 FILTER_SUFFIX = "+filter"
 NEAREST = 50            # ベクトルの近い候補の数 k（basic/lib/search.py の K_NEAREST と同じ）
-TOP_PER_K = 5           # 1問で取る件数は k の5倍まで（人事は、チャンクを文書にまとめると減るので）
-MAX_TOP = 50            # 1回の答えの件数の上限（これを超えると、答えが分かれて返る）
+FETCH = 50              # 1回の検索で取る件数 top。採点の上位 k 件によらず同じ（k を変えて比べても、取る範囲が同じ）。
+                        # 50 は、1回の答えの件数の上限（これを超えると答えが分かれて返る）。人事は、チャンクを文書にまとめると減る
 
 
 @dataclass(frozen=True)
@@ -32,25 +32,20 @@ def split_name(name: str):
     return name, False
 
 
-def fetch_count(k: int) -> int:
-    """1回の検索で取る件数。k の5倍まで（上限 50）。k より少なくはしない。"""
-    return max(k, min(k * TOP_PER_K, MAX_TOP))
-
-
 def needs_vector(dataset, method: str) -> bool:
     return dataset.setups[method].vector_field is not None
 
 
-def build_request(dataset, method: str, text: str, vector, filter_text, k: int) -> Request:
+def build_request(dataset, method: str, text: str, vector, filter_text) -> Request:
     """方式と質問から、検索の本文を作る。vector は質問の埋め込み（ベクトルを使う方式のとき）。filter_text は None か $filter の式。"""
     setup = dataset.setups[method]
-    body = {"top": fetch_count(k), "select": dataset.select}
+    body = {"top": FETCH, "select": dataset.select}
     if method != "vector":
         body["search"] = text
     if needs_vector(dataset, method):
         if vector is None:
             raise ValueError(f"{method} には質問のベクトルが要ります")
-        body["vectorQueries"] = [{"kind": "vector", "vector": vector, "fields": setup.vector_field, "k": max(NEAREST, body["top"])}]
+        body["vectorQueries"] = [{"kind": "vector", "vector": vector, "fields": setup.vector_field, "k": max(NEAREST, FETCH)}]
     if method == "semantic":
         body["queryType"] = "semantic"
         body["semanticConfiguration"] = setup.semantic_config

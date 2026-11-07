@@ -30,7 +30,7 @@ import hotel_vectors  # noqa: E402
 import search_demo  # noqa: E402
 import spot_check  # noqa: E402
 import team  # noqa: E402
-from evallib.methods import METHODS  # noqa: E402
+from evallib.methods import FETCH, METHODS  # noqa: E402
 from evallib.questions import DATASETS  # noqa: E402
 from githubmd import GithubSlugger, github_anchor  # noqa: E402
 from teamlib.names import make_names  # noqa: E402
@@ -251,9 +251,21 @@ class GuideTest(unittest.TestCase):
                 for methods in re.findall(r"--methods ([\w,+]+)", rest):
                     self.assertTrue(set(methods.split(",")) <= set(METHODS), f"{name}: --methods {methods}")
         self.assertEqual(seen, set(parsers), "4つの道具が、すべて手順書に出ている")
+        # 評価の道具でない道具（応用編の build_hr_index.py など）のオプションは、その道具のソースの argparse にある
+        for script, option in re.findall(r"python (applied/tools/\w+\.py) (--[a-z][\w-]*)", text):
+            self.assertIn(f'"{option}"', (REPO_DIR / script).read_text(encoding="utf-8"), f"{script}: {option}")
+        text = re.sub(r"python applied/tools/\w+\.py --[a-z][\w-]*", "", text)
         everywhere = set().union(*(set(m.build_parser()._option_string_actions) for m in parsers.values()))
         for option in set(re.findall(r"(?<![\w-])(--[a-z][\w-]*)", text)):   # 文の中のオプション（--limit など）も、どれかの道具にある
             self.assertIn(option, everywhere, option)
+
+    def test_evaluation_guide_fetch_count_and_hr_status_step(self):
+        """検索で取る件数（k によらず FETCH 件）と、人事の準備の「見てよい人」の確かめは、手順書に書いてある。"""
+        text = guide_texts()["evaluation.md"]
+        self.assertEqual(FETCH, eval_search.MAX_K)                       # k の上限と、1回に取る件数が同じ
+        self.assertIn(f"`--k` によらず {FETCH} 件", text)
+        self.assertIn("python applied/tools/build_hr_index.py --status", text)
+        self.assertIn("見てよい人", text.split("## 2. 測る順番")[0])        # 準備（1 章）の中にある
 
     def test_evaluation_guide_matches_prices_example_and_health_targets(self):
         """単価の項目名は config/prices.example.json と、件数の目安は team.py の INDEX_EXPECTS と同じ。"""

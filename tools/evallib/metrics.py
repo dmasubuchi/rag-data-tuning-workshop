@@ -74,11 +74,20 @@ def summarize(questions, method) -> dict:
     questions   結果の JSON の "questions"（各質問の results に、方式ごとの点と leaks が入っている）
     scored      点がついた質問の数（正解のある質問）。nDCG・再現率・1位の割合は、この質問だけの平均
     leak_questions  漏れが1件以上あった質問の数、leaks  漏れた文書の合計（正解のない質問も含めて、全部の質問で数える）
+    leakable    漏れうる質問の数（質問の "leakable" が真。聞く人が採用担当でない、または hidden_ids がある質問）。
+                漏れの割合は、leak_questions ÷ leakable（全部の質問で割らない）。"leakable" のない古い結果は、全部を漏れうる質問に数える
     """
-    results = [q["results"][method] for q in questions if method in q.get("results", {})]
+    measured = [q for q in questions if method in q.get("results", {})]
+    results = [q["results"][method] for q in measured]
     scored = [r for r in results if r.get("ndcg") is not None]
     return {"questions": len(results), "scored": len(scored),
             "ndcg": mean(r["ndcg"] for r in scored), "recall": mean(r["recall"] for r in scored),
             "hit1": mean(r["hit1"] for r in scored),
             "leak_questions": sum(1 for r in results if r.get("leaks", 0) > 0),
-            "leaks": sum(r.get("leaks", 0) for r in results)}
+            "leaks": sum(r.get("leaks", 0) for r in results),
+            "leakable": sum(1 for q in measured if q.get("leakable", True))}
+
+
+def leak_rate(summary):
+    """漏れた質問の割合（漏れうる質問に対して）。漏れうる質問がなければ None。"""
+    return summary["leak_questions"] / summary["leakable"] if summary["leakable"] else None
