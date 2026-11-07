@@ -109,7 +109,7 @@ python tools/eval_report.py _work/eval/&lt;結果のファイル&gt;.json --md _
 </ol>
 <p>止まったとき、飛ばしたとき：</p>
 <ul>
-<li>チームがまだ作っていないインデックスや、設定のない方式（ホテルの <code>semantic</code>。手順書のインデックスに、セマンティックの設定がありません）は、その方式だけ飛ばして、理由を出します。ほかの方式は最後まで測ります。表にも「飛ばした」と出ます</li>
+<li>チームがまだ作っていないインデックスや、設定のない方式（ホテルの <code>semantic</code> は、チームの <code>hotels-blob</code> に <code>hotels-semantic</code> がないとき。手順書の古い版でインデックスを作った場合など）は、その方式だけ飛ばして、理由を出します。ほかの方式は最後まで測ります。表にも「飛ばした」と出ます</li>
 <li>「エラー 403」で止まったとき：キーが合っているか、セマンティック ランカーの無料枠を使い切っていないかを確かめます。そこまでの結果は保存されます</li>
 <li>終了コード：0 は測れた、1 は止まった（そこまでの結果は保存）か、測れた方式がなかった、2 は質問・データ・引数が使えない</li>
 </ul>
@@ -250,7 +250,7 @@ python tools/eval_search.py --dataset hr --methods hybrid --k 10
 <ul>
 <li>「.env.local が読めません」などの設定の案内が出る：Repo の直下で実行しているか、<code>.env.local</code> があるかを確かめます。キーは <code>.env.local</code> だけから読みます（端末の環境変数は読みません）</li>
 <li>「インデックス … がありません」と出て、その方式が飛ばされる：構築する人が、そのインデックスを作ってあるか確かめます（<code>python tools/team.py health</code>）</li>
-<li>ホテルの <code>semantic</code> が飛ばされる：手順書のインデックスにセマンティックの設定がないためで、正常です</li>
+<li>ホテルの <code>semantic</code> が飛ばされる：チームの <code>hotels-blob</code> に <code>hotels-semantic</code> の設定がないためです（古い版の手順書で作った場合など）。ホテルの手順書 2-4 の JSON の <code>semantic</code> の部分を、インデックス <code>hotels-blob</code> に足して保存してから、測り直します</li>
 <li>人事の一般社員の漏れが 0 にならない：17 を試したあとなら、<code>cleanup.py</code> で元に戻してから測り直します</li>
 <li>「単価が未設定」と出る：<code>config/prices.json</code> を作って、単価を書きます（4）</li>
 </ul>

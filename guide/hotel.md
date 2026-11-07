@@ -22,7 +22,7 @@ Microsoft のホテルのサンプルデータ（日本語版）で、Azure AI S
 
 例は、組織が `acme`、チームが `red` のときです。
 
-- リソース グループ：`rg-<org>-<team>`（例 `rg-acme-red`）
+- リソース グループ：`rg-<org>-<team>`（例 `rg-acme-red`。既存のリソース グループに作ったときは、その名前）
 - ストレージ アカウント：`st<org><team>`（例 `stacmered`）
 - AI Search：`srch-<org>-<team>`（例 `srch-acme-red`）
 - Cosmos DB：`cosmos-<org>-<team>`（例 `cosmos-acme-red`）
@@ -75,7 +75,7 @@ Cosmos DB の中でも、ベクトル検索ができます（章4）。
 
 ### 2-1. AI Search のマネージド ID をオンにする
 
-1. リソース グループ `rg-<org>-<team>` を開き、`srch-<org>-<team>` を選びます。
+1. チームのリソース グループを開き、`srch-<org>-<team>` を選びます。
 2. 左メニューの「設定」の「ID（Identity）」を開きます。
 3. 「システム割り当て済み」で、状態を「オン」にします。
 4. 「保存」を選び、確認が出たら「はい」を選びます。
@@ -277,8 +277,7 @@ az storage blob upload --account-name "st$org$t" -c hotels -n HotelsData_toAzure
 }
 ```
 
-- `rg-<org>-<team>` は、リソース グループの名前です。既存のリソース グループに作ったとき（`workshop.config` の `AZURE_RESOURCE_GROUP`）は、その名前に置き換えます。
-
+- `rg-<org>-<team>` は、チームのリソース グループの名前です。既存のリソース グループに作ったとき（`workshop.config` の `AZURE_RESOURCE_GROUP`）は、その名前に置き換えます。
 
 確認：
 
@@ -1026,8 +1025,7 @@ az cosmosdb sql role assignment create --account-name "cosmos-$org-$t" -g $rg --
 }
 ```
 
-- `rg-<org>-<team>` は、リソース グループの名前です。既存のリソース グループに作ったとき（`workshop.config` の `AZURE_RESOURCE_GROUP`）は、その名前に置き換えます。
-
+- `rg-<org>-<team>` は、チームのリソース グループの名前です。既存のリソース グループに作ったとき（`workshop.config` の `AZURE_RESOURCE_GROUP`）は、その名前に置き換えます。
 
 確認：
 
@@ -1164,7 +1162,7 @@ az cosmosdb sql role assignment create --account-name "cosmos-$org-$t" -g $rg --
 
 章1〜3と、章4〜5の両方で使います。
 
-- ロールの付与で Search が候補に出ない：Search の ID が「オン」か（2-1）、`rg-<org>-<team>` の Search を選んでいるかを確認します。
+- ロールの付与で Search が候補に出ない：Search の ID が「オン」か（2-1）、チームのリソース グループの Search を選んでいるかを確認します。
 - 50件にならない：Blob の中身が JSON の配列か、インデクサーの解析モードが `jsonArray` か（2-6）を確認します。
 - 検索結果が変わらない、インデクサーが失敗する：実行履歴を見ます（2-7）。失敗が続くときは、エラーを読み、進行役に伝えます。
 - ポータルの画面の読み込みが遅い：待ち続けず、ページを読み込み直します。それでも進まないときは、進行役に伝えます。

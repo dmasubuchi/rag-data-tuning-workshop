@@ -50,6 +50,7 @@
 <li class="task"><input type="checkbox"> 組織の短い名前（小文字の英字と数字、3〜6文字、英字で始める）</li>
 <li class="task"><input type="checkbox"> Azure のテナント</li>
 </ul>
+<p>既存のリソース グループに作るときだけ、その名前も伝えます（<code>workshop.config</code> の <code>AZURE_RESOURCE_GROUP</code>。5つ目、任意）。</p>
 <h3 id="azure招待と所有者の割り当て">Azure：招待と所有者の割り当て</h3>
 <p>進行役、または組織の管理者が行います。構築する人の数だけくり返します。</p>
 <ol>
@@ -106,8 +107,8 @@
 <p>手順：<a href="guide-setup-azure-setup.html">Azure の準備</a></p>
 <ul>
 <li class="task"><input type="checkbox"> 各チームが、チームの名前を決める（例 <code>red</code>）。小文字の英字と数字だけ、3〜8文字、英字で始める、<code>shared</code> で始めない。チームどうしで同じにしない</li>
-<li class="task"><input type="checkbox"> 各チームが、<code>python tools/team.py check-names --team &lt;team&gt;</code> で確かめ、すべて「使える」になってから作り始める</li>
-<li class="task"><input type="checkbox"> チームごとに、<code>names</code> の表示どおりに作る：リソース グループ、Storage、AI Search（Basic）、Cosmos DB、Foundry とモデル2つ</li>
+<li class="task"><input type="checkbox"> 各チームが、<code>python tools/team.py check-names --team &lt;team&gt;</code> で確かめ、すべて「使える」になってから作り始める（既存のリソース グループを使うチームは、リソース グループだけ「既存のものを使う」になる）</li>
+<li class="task"><input type="checkbox"> チームごとに、<code>names</code> の表示どおりに作る：リソース グループ（既存のものを使うときは作らない）、Storage、AI Search（Basic）、Cosmos DB、Foundry とモデル2つ</li>
 <li class="task"><input type="checkbox"> 各チームの構築する人が、自分の <code>.env.local</code>（<code>python tools/team.py env --team &lt;team&gt; --role builder</code>）と、メンバー用の <code>member.local.env</code>（<code>--role member --out member.local.env</code>）を作り、<code>member.local.env</code> をチームの中だけでメンバーに渡す。メンバーは Repo 直下に <code>.env.local</code> という名前で置く</li>
 <li>確かめる（進行役の PC で、チームごとに）：<code>python tools/team.py health --team &lt;team&gt;</code>。8行がすべて「OK」で、<code>OK 8・まだ 0・NG 0</code><ul>
 <li>「NG」は理由を読んで直す。「まだ」は、まだ作っていないもの</li>
@@ -177,6 +178,7 @@
 <li>続きの手順を進めるなら残す。AI Search の Basic は、残しているあいだ料金がかかる（料金は <a href="https://azure.microsoft.com/ja-jp/pricing/details/search/">Azure の料金ページ</a>で確かめる）</li>
 <li>消すとき：ポータルでリソース グループを開き、「リソース グループの削除」を選ぶ。リソース グループの名前を入力して確認する</li>
 <li>az では：<code>az group delete -n rg-&lt;org&gt;-&lt;team&gt;</code>（リソース グループの中身が全部消える）</li>
+<li>既存のリソース グループを使ったチーム（<code>AZURE_RESOURCE_GROUP</code>）は、グループを削除しない（ほかのものも入っている）。中のチームのリソース（<code>st&lt;org&gt;&lt;team&gt;</code>・<code>srch-&lt;org&gt;-&lt;team&gt;</code>・<code>cosmos-&lt;org&gt;-&lt;team&gt;</code>・<code>ai-&lt;org&gt;-&lt;team&gt;</code>）だけを、1つずつ削除する</li>
 </ul>
 </li>
 <li class="task"><input type="checkbox"> 所有者の割り当てを、いつ外すか決める</li>
@@ -186,6 +188,7 @@
 <ul>
 <li>モデルのデプロイで枠が足りない：「グローバル標準（Global Standard）」を選んでいるか、容量が 50・20 以下か確かめる</li>
 <li>チームの名前が使えない：<code>check-names</code> の「ほかで使われている」。名前を変える</li>
+<li>「AZURE_RESOURCE_GROUP のリソース グループ … が見つかりません」：<code>workshop.config</code> の名前の綴りを直す（このツールは、グループを作らない）</li>
 <li>ロールの割り当てが効かない：付けた直後は、反映に時間がかかる。5分ほど待って、インデクサーの次の実行を見る</li>
 <li>画面の名前が違う：Azure の画面は変わる。メニューの名前を探し、見つからなければ、進行役が確かめて伝える</li>
 <li>セマンティック ランカーの無料枠：チームの AI Search 全体で、月ごとに使う。05 の <code>measure_methods.py</code> は、1回の実行で質問の数（60回）使う</li>

@@ -5,7 +5,7 @@
   hr       applied/lib/config.py の HR_INDEX・VECTOR_FIELD・SEMANTIC_CONFIG。1文書が多くのチャンクに分かれ、
            文書の ID は各チャンクの doc_id（チャンクのキーは chunk_id）
   hotel    guide/hotel.md の hotels-blob（ベクトルなし）と hotels-cosmos（DescriptionVector）。キーは HotelId。
-           手順書にセマンティックの設定はないので、その名前（HOTEL_SEMANTIC）は、足したときの約束
+           手順書のインデックスにセマンティックの設定（HOTEL_SEMANTIC）がある。古い版で作ったインデックスにはないので、その方式は飛ばす
 
 権限（人事だけ）：どの検索にも、聞く人（質問の as_role。なければ role:recruiter）に見える分だけに絞る式を掛ける。
 式は applied/lib/acl.py の allowed_filter と同じ（標準ライブラリだけで、ここに書く）。

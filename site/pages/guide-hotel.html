@@ -78,7 +78,7 @@
 <p>手順の中の <code>&lt;org&gt;</code>・<code>&lt;team&gt;</code> は、組織の名前とチームの名前に置き換えます。リソースの名前は、<code>python tools/team.py names</code> で表示できます。</p>
 <p>例は、組織が <code>acme</code>、チームが <code>red</code> のときです。</p>
 <ul>
-<li>リソース グループ：<code>rg-&lt;org&gt;-&lt;team&gt;</code>（例 <code>rg-acme-red</code>）</li>
+<li>リソース グループ：<code>rg-&lt;org&gt;-&lt;team&gt;</code>（例 <code>rg-acme-red</code>。既存のリソース グループに作ったときは、その名前）</li>
 <li>ストレージ アカウント：<code>st&lt;org&gt;&lt;team&gt;</code>（例 <code>stacmered</code>）</li>
 <li>AI Search：<code>srch-&lt;org&gt;-&lt;team&gt;</code>（例 <code>srch-acme-red</code>）</li>
 <li>Cosmos DB：<code>cosmos-&lt;org&gt;-&lt;team&gt;</code>（例 <code>cosmos-acme-red</code>）</li>
@@ -125,7 +125,7 @@
 <h2 id="2-blob-のホテルを-ai-search-に取り込む">2. Blob のホテルを AI Search に取り込む</h2>
 <h3 id="2-1-ai-search-のマネージド-id-をオンにする">2-1. AI Search のマネージド ID をオンにする</h3>
 <ol>
-<li>リソース グループ <code>rg-&lt;org&gt;-&lt;team&gt;</code> を開き、<code>srch-&lt;org&gt;-&lt;team&gt;</code> を選びます。</li>
+<li>チームのリソース グループを開き、<code>srch-&lt;org&gt;-&lt;team&gt;</code> を選びます。</li>
 <li>左メニューの「設定」の「ID（Identity）」を開きます。</li>
 <li>「システム割り当て済み」で、状態を「オン」にします。</li>
 <li>「保存」を選び、確認が出たら「はい」を選びます。</li>
@@ -322,7 +322,7 @@ az storage blob upload --account-name "st$org$t" -c hotels -n HotelsData_toAzure
 }
 </code></pre>
 <ul>
-<li><code>rg-&lt;org&gt;-&lt;team&gt;</code> は、リソース グループの名前です。既存のリソース グループに作ったとき（<code>workshop.config</code> の <code>AZURE_RESOURCE_GROUP</code>）は、その名前に置き換えます。</li>
+<li><code>rg-&lt;org&gt;-&lt;team&gt;</code> は、チームのリソース グループの名前です。既存のリソース グループに作ったとき（<code>workshop.config</code> の <code>AZURE_RESOURCE_GROUP</code>）は、その名前に置き換えます。</li>
 </ul>
 <p>確認：</p>
 <ul>
@@ -1045,7 +1045,7 @@ az cosmosdb sql role assignment create --account-name "cosmos-$org-$t" -g $rg --
 }
 </code></pre>
 <ul>
-<li><code>rg-&lt;org&gt;-&lt;team&gt;</code> は、リソース グループの名前です。既存のリソース グループに作ったとき（<code>workshop.config</code> の <code>AZURE_RESOURCE_GROUP</code>）は、その名前に置き換えます。</li>
+<li><code>rg-&lt;org&gt;-&lt;team&gt;</code> は、チームのリソース グループの名前です。既存のリソース グループに作ったとき（<code>workshop.config</code> の <code>AZURE_RESOURCE_GROUP</code>）は、その名前に置き換えます。</li>
 </ul>
 <p>確認：</p>
 <ul>
@@ -1175,7 +1175,7 @@ az cosmosdb sql role assignment create --account-name "cosmos-$org-$t" -g $rg --
 <h2 id="6-つまずいたとき">6. つまずいたとき</h2>
 <p>章1〜3と、章4〜5の両方で使います。</p>
 <ul>
-<li>ロールの付与で Search が候補に出ない：Search の ID が「オン」か（2-1）、<code>rg-&lt;org&gt;-&lt;team&gt;</code> の Search を選んでいるかを確認します。</li>
+<li>ロールの付与で Search が候補に出ない：Search の ID が「オン」か（2-1）、チームのリソース グループの Search を選んでいるかを確認します。</li>
 <li>50件にならない：Blob の中身が JSON の配列か、インデクサーの解析モードが <code>jsonArray</code> か（2-6）を確認します。</li>
 <li>検索結果が変わらない、インデクサーが失敗する：実行履歴を見ます（2-7）。失敗が続くときは、エラーを読み、進行役に伝えます。</li>
 <li>ポータルの画面の読み込みが遅い：待ち続けず、ページを読み込み直します。それでも進まないときは、進行役に伝えます。</li>

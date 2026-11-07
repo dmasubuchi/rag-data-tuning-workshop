@@ -21,6 +21,8 @@
 - [ ] 組織の短い名前（小文字の英字と数字、3〜6文字、英字で始める）
 - [ ] Azure のテナント
 
+既存のリソース グループに作るときだけ、その名前も伝えます（`workshop.config` の `AZURE_RESOURCE_GROUP`。5つ目、任意）。
+
 ### Azure：招待と所有者の割り当て
 
 進行役、または組織の管理者が行います。構築する人の数だけくり返します。
@@ -80,8 +82,8 @@ Repo が非公開のときだけです。
 手順：[Azure の準備](setup/azure-setup.md)
 
 - [ ] 各チームが、チームの名前を決める（例 `red`）。小文字の英字と数字だけ、3〜8文字、英字で始める、`shared` で始めない。チームどうしで同じにしない
-- [ ] 各チームが、`python tools/team.py check-names --team <team>` で確かめ、すべて「使える」になってから作り始める
-- [ ] チームごとに、`names` の表示どおりに作る：リソース グループ、Storage、AI Search（Basic）、Cosmos DB、Foundry とモデル2つ
+- [ ] 各チームが、`python tools/team.py check-names --team <team>` で確かめ、すべて「使える」になってから作り始める（既存のリソース グループを使うチームは、リソース グループだけ「既存のものを使う」になる）
+- [ ] チームごとに、`names` の表示どおりに作る：リソース グループ（既存のものを使うときは作らない）、Storage、AI Search（Basic）、Cosmos DB、Foundry とモデル2つ
 - [ ] 各チームの構築する人が、自分の `.env.local`（`python tools/team.py env --team <team> --role builder`）と、メンバー用の `member.local.env`（`--role member --out member.local.env`）を作り、`member.local.env` をチームの中だけでメンバーに渡す。メンバーは Repo 直下に `.env.local` という名前で置く
 - 確かめる（進行役の PC で、チームごとに）：`python tools/team.py health --team <team>`。8行がすべて「OK」で、`OK 8・まだ 0・NG 0`
   - 「NG」は理由を読んで直す。「まだ」は、まだ作っていないもの
@@ -143,6 +145,7 @@ Repo が非公開のときだけです。
   - 続きの手順を進めるなら残す。AI Search の Basic は、残しているあいだ料金がかかる（料金は [Azure の料金ページ](https://azure.microsoft.com/ja-jp/pricing/details/search/)で確かめる）
   - 消すとき：ポータルでリソース グループを開き、「リソース グループの削除」を選ぶ。リソース グループの名前を入力して確認する
   - az では：`az group delete -n rg-<org>-<team>`（リソース グループの中身が全部消える）
+  - 既存のリソース グループを使ったチーム（`AZURE_RESOURCE_GROUP`）は、グループを削除しない（ほかのものも入っている）。中のチームのリソース（`st<org><team>`・`srch-<org>-<team>`・`cosmos-<org>-<team>`・`ai-<org>-<team>`）だけを、1つずつ削除する
 - [ ] 所有者の割り当てを、いつ外すか決める
 - [ ] 試しに作ったリソースがあれば、消す
 
@@ -150,6 +153,7 @@ Repo が非公開のときだけです。
 
 - モデルのデプロイで枠が足りない：「グローバル標準（Global Standard）」を選んでいるか、容量が 50・20 以下か確かめる
 - チームの名前が使えない：`check-names` の「ほかで使われている」。名前を変える
+- 「AZURE_RESOURCE_GROUP のリソース グループ … が見つかりません」：`workshop.config` の名前の綴りを直す（このツールは、グループを作らない）
 - ロールの割り当てが効かない：付けた直後は、反映に時間がかかる。5分ほど待って、インデクサーの次の実行を見る
 - 画面の名前が違う：Azure の画面は変わる。メニューの名前を探し、見つからなければ、進行役が確かめて伝える
 - セマンティック ランカーの無料枠：チームの AI Search 全体で、月ごとに使う。05 の `measure_methods.py` は、1回の実行で質問の数（60回）使う
