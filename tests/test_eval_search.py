@@ -584,7 +584,8 @@ class EvalSearchTest(EvalCase):
 
     def test_eval_modules_use_only_the_standard_library(self):
         allowed = set(sys.stdlib_module_names) | {"evallib"}
-        files = [REPO_DIR / "tools" / "eval_search.py", *sorted((REPO_DIR / "tools" / "evallib").glob("*.py"))]
+        files = [REPO_DIR / "tools" / "eval_search.py", REPO_DIR / "tools" / "eval_report.py",
+                 *sorted((REPO_DIR / "tools" / "evallib").glob("*.py"))]
         for path in files:
             tree = ast.parse(path.read_text(encoding="utf-8"))
             imported = {a.name.split(".")[0] for n in ast.walk(tree) if isinstance(n, ast.Import) for a in n.names}

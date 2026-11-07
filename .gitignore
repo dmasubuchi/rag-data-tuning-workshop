@@ -4,6 +4,8 @@
 *.local.env
 workshop.config
 workshop.local.env
+# 費用の見込みの単価（料金のページで確かめた値を、config/prices.example.json から写して書く）
+config/prices.json
 # 設定ファイルを書いている途中の一時ファイル（team.py env）
 .*.tmp
 
