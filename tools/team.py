@@ -4,7 +4,7 @@
 使い方（Repo 直下で）：
   python tools/team.py names       --team suika   名前を検査して、リソース名と PowerShell の1行を表示する
   python tools/team.py check-names --team suika   作る前に、名前が使えるかを Azure に聞く（何も作らない）
-  python tools/team.py health      --team suika   作ったものの状態を見る（読み取りだけ）
+  python tools/team.py health      --team suika   作ったものの状態を見る（読み取りだけ。AI Search のインデックスの文書の数も、参考に出す）
   python tools/team.py env --team suika --role builder   構築する人の接続の設定 .env.local を作る（人に渡さない）
   python tools/team.py env --team suika --role member --out member.local.env   メンバー用の設定を別の名前で書き出す（チームの中だけで渡す。
       メンバーは Repo 直下に .env.local という名前で置く）
@@ -20,19 +20,26 @@ Git に入らない名前（.env.local、*.local.env）にする。Repo の中�
   builder（構築する人）は AI Search の管理者キーと Storage の接続文字列（人に渡さない）、
   member（メンバー）は検索用のキー（チームの外に渡さない。Storage の接続文字列は入らない）。
 
+health の文書の数は、sengoku・hr-docs・hotels-blob・hotels-cosmos の4つを、AI Search の REST（GET .../docs/$count）で数える。
+キーは az で読む検索用（query）のキーだけ（管理者キーは読まない）。画面にも出さない。数は参考で、OK・まだ・NG の数と終了コードは変えない。
+
 動かすのは Python の標準ライブラリと az だけ（--out の注意のために、git も呼ぶ）。
 Azure に何かを作る・変える・消すコマンドは、このファイルに入っていない
-（az に渡せるコマンドは teamlib/az.py の READ_ONLY の一覧に限る）。
+（az に渡せるコマンドは teamlib/az.py の READ_ONLY の一覧に限る。文書の数は GET だけ）。
 """
 import argparse
+import http.client
 import os
+import re
 import subprocess
 import sys
+import urllib.error
+import urllib.request
 from pathlib import Path
 from typing import NamedTuple
 
 from teamlib.az import ARM, Az, CheckError
-from teamlib.envfile import CHAT_DEPLOYMENT, EMBEDDING_DEPLOYMENT, ENV_FILE, ROLES, write_env
+from teamlib.envfile import CHAT_DEPLOYMENT, EMBEDDING_DEPLOYMENT, ENV_FILE, ROLES, query_key, write_env
 from teamlib.names import ConfigError, Names, NameRuleError, check_org, check_team, load_config, make_names
 
 ENV_NAME = "WORKSHOP_TEAM"
@@ -230,6 +237,10 @@ def _found(fn, kind):
         raise
 
 
+def search_label(n: Names) -> str:
+    return f"AI Search {n.search}"
+
+
 def health(az, n: Names):
     """読み取りだけの状態確認。Row のリストを返す。まだないものは「まだ」。エラーでは止まらない（サインイン切れは除く）。"""
     rows = []
@@ -247,7 +258,7 @@ def health(az, n: Names):
             rows.append(error_row(label, error))
 
     rg = n.resource_group
-    L_RG, L_ST, L_SR = f"リソース グループ {rg}", f"Storage {n.storage}", f"AI Search {n.search}"
+    L_RG, L_ST, L_SR = f"リソース グループ {rg}", f"Storage {n.storage}", search_label(n)
     L_PRICE, L_SEM = "AI Search 価格レベル", "AI Search セマンティック ランカー"
     L_FD = f"Foundry {n.foundry}"
     L_DEP = [f"デプロイ {d}" for d in DEPLOYMENTS]
@@ -330,10 +341,116 @@ def health(az, n: Names):
     return rows
 
 
-def health_text(team: str, rows) -> tuple:
+# ------------------------------------------------------------------ health：インデックスの文書の数（参考）
+
+SEARCH_API = "2024-07-01"   # tools/search_demo.py と同じ
+COUNT_TIMEOUT = 30
+COUNT_BODY = re.compile(r"[0-9]{1,9}")
+COUNTS_TITLE = "インデックスの文書の数（参考"
+
+
+class Expect(NamedTuple):
+    index: str
+    wanted: int
+    at_least: bool = False   # True なら、wanted 以上が目安（1つの文書を何個かのチャンクに分けるインデックス）
+    unit: str = ""           # at_least のとき、数えているものの説明
+
+
+# 計画どおりに作ったときの目安（人事は、文書 23 から作ったチャンクの数なので、23 より多い）
+INDEX_EXPECTS = (
+    Expect("sengoku", 150),
+    Expect("hr-docs", 23, at_least=True, unit="文書 23 から作ったチャンクの数"),
+    Expect("hotels-blob", 50),
+    Expect("hotels-cosmos", 50),
+)
+INDEX_WIDTH = max(len(e.index) for e in INDEX_EXPECTS)
+
+
+class IndexCount(NamedTuple):
+    expect: Expect
+    count: int | None = None   # 数えられた文書の数。インデックスがまだなければ None
+    reason: str = ""           # 数えられなかった理由（あるとき、count は None）
+
+    def text(self) -> str:
+        e = self.expect
+        head = f"  {e.index:<{INDEX_WIDTH}}  "
+        if self.reason:
+            return head + f"数えられません（{self.reason}）"
+        if self.count is None:
+            return head + "まだない"
+        if e.at_least:
+            note = e.unit if self.count >= e.wanted else f"{e.unit}。{e.wanted} 件以上のはずなので、目安と違う"
+        else:
+            note = f"目安 {e.wanted}" if self.count == e.wanted else f"目安 {e.wanted} と違う"
+        return head + f"{self.count}件（{note}）"
+
+
+class Counts(NamedTuple):
+    items: tuple = ()
+    note: str = ""   # 数えなかったときの理由（1行）。あるとき、items は空
+
+
+def fetch_count(endpoint: str, key: str, index: str) -> int | None:
+    """インデックスの文書の数（GET .../docs/$count）。まだないインデックス（404）は None。
+
+    ほかの失敗は CheckError（理由は見せてよい短い文だけ。通信の例外の文は、キーが入りうるので使わない）。
+    """
+    request = urllib.request.Request(f"{endpoint}/indexes/{index}/docs/$count?api-version={SEARCH_API}",
+                                     headers={"api-key": key})
+    try:
+        with urllib.request.urlopen(request, timeout=COUNT_TIMEOUT) as response:
+            body = response.read()
+    except urllib.error.HTTPError as error:
+        error.close()
+        if error.code == 404:
+            return None
+        raise CheckError("other", f"キーが合いません。HTTP {error.code}" if error.code in (401, 403)
+                         else f"HTTP {error.code}") from None
+    except (OSError, http.client.HTTPException) as error:   # URLError・接続の失敗・時間切れも OSError
+        timed_out = isinstance(getattr(error, "reason", error), TimeoutError)
+        raise CheckError("other", "時間内に終わりません" if timed_out else "つながりません") from None
+    text = body.decode("utf-8-sig", errors="replace").strip() if isinstance(body, bytes) else ""
+    if not COUNT_BODY.fullmatch(text):
+        raise CheckError("other", "答えの形が想定外です")
+    return int(text)
+
+
+def index_counts(az, n: Names, rows) -> Counts:
+    """AI Search のインデックスの文書の数（参考）。rows は health の結果で、AI Search が OK でなければ数えない。
+
+    キーは az で読む検索用（query）のキー（管理者キーは読まない）。読めないときは、1行の理由にする。
+    インデックスごとの失敗（まだない・数えられない）では止まらない。サインイン切れだけは上へ投げる。
+    """
+    if not any(row.label == search_label(n) and row.status == OK for row in rows):
+        return Counts(note="AI Search がまだ OK ではありません")
+    try:
+        key = query_key(az, n)
+    except CheckError as error:
+        _keep_going(error)
+        return Counts(note=f"検索用のキーを読めません。{_why(error)}")
+    endpoint = f"https://{n.search}.search.windows.net"
+    items = []
+    for expect in INDEX_EXPECTS:
+        try:
+            items.append(IndexCount(expect, count=fetch_count(endpoint, key, expect.index)))
+        except CheckError as error:
+            items.append(IndexCount(expect, reason=_why(error)))
+    return Counts(items=tuple(items))
+
+
+def counts_lines(counts: Counts) -> list:
+    if counts.note:
+        return [f"{COUNTS_TITLE}）：数えません。{counts.note}"]
+    return [f"{COUNTS_TITLE}。下の OK・まだ・NG には入りません）：", *(item.text() for item in counts.items)]
+
+
+def health_text(team: str, rows, counts: Counts | None = None) -> tuple:
+    """counts があれば、OK・まだ・NG の数の前に、文書の数を参考として並べる。数と終了コードは rows だけで決まる。"""
     count = {s: sum(1 for r in rows if r.status == s) for s in (OK, MADA, NG)}
     lines = [f"チーム {team} の状態（読み取りだけ）"]
     lines += [r.text() for r in rows]
+    if counts is not None:
+        lines += counts_lines(counts)
     lines.append(f"OK {count[OK]}・まだ {count[MADA]}・NG {count[NG]}")
     return "\n".join(lines), 1 if count[NG] else 0
 
@@ -428,7 +545,8 @@ def main(argv=None, az=None, env_path=None) -> int:
             warning = not_ignored_warning(args.out) if args.out else ""
             text, code = write_env(az, n, args.role, args.out or env_path or ENV_FILE, warning=warning), 0
         else:
-            text, code = health_text(n.team, health(az, n))
+            rows = health(az, n)
+            text, code = health_text(n.team, rows, index_counts(az, n, rows))
     except CheckError as error:
         print(failure_text(error, cfg.tenant))
         return 1

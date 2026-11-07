@@ -109,6 +109,11 @@ def _search_key(az, names: Names, role: str) -> str:
     return _key(keys[0], "key")
 
 
+def query_key(az, names: Names) -> str:
+    """AI Search の検索用（query）のキー。文書の数を数えるだけの道具（team.py health）が使う。管理者キーは読まない。"""
+    return _search_key(az, names, "member")
+
+
 def _ai_key(az, names: Names) -> str:
     answer = _reading(f"Foundry {names.foundry}",
                       lambda: az.run("cognitiveservices", "account", "keys", "list", "-n", names.foundry, "-g", names.resource_group))

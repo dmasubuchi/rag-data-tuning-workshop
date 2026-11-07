@@ -1,6 +1,7 @@
 """tools/team.py と tools/teamlib/az.py の試験。
 
 通信しない。az は、本物の Az を継いで _call だけ差し替えた偽物（FakeAz）を使う。
+AI Search の件数の取得（urllib.request.urlopen）は、偽物（FakeHttp）に差し替える（MainCase.run_main が、いつも差し替える）。
 そのため、names・check-names・health が許可リスト（READ_ONLY）の外のコマンドを呼べば、試験の中でも CheckError になる。
 """
 
@@ -8,10 +9,12 @@ import contextlib
 import io
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
 import unittest
+import urllib.error
 from pathlib import Path
 from unittest import mock
 
@@ -77,6 +80,51 @@ class FakeAz(Az):
         return answer
 
 
+FAKE_KEY = "fake-query-" + "key-" + "0123456789abcdef"      # 検索用のキーの形の偽物（つないで作る）
+FAKE_ADMIN = "fake-admin-" + "key-" + "fedcba9876543210"     # 管理者キーの形の偽物。health は、これを読まない
+
+
+def http_error(code, url="https://example.invalid/"):
+    return urllib.error.HTTPError(url, code, f"error {code}", {}, io.BytesIO(b""))
+
+
+class FakeResponse:
+    def __init__(self, body):
+        self.body = body
+
+    def read(self):
+        return self.body
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+
+class FakeHttp:
+    """urllib.request.urlopen の代わり。インデックスごとの答えを返す。書いていないインデックスは 404（まだない）。
+
+    答えは、数（int）・本文（bytes）・投げる例外のどれか。requests に、受け取った Request を残す。
+    """
+
+    URL = re.compile(r"https://([^/]+)/indexes/([^/]+)/docs/\$count\?api-version=(.+)")
+
+    def __init__(self, answers=None):
+        self.answers = answers or {}
+        self.requests = []
+
+    def __call__(self, request, timeout=None):
+        self.requests.append(request)
+        found = self.URL.fullmatch(request.full_url)
+        if not found:
+            raise AssertionError(f"予想外の URL：{request.full_url}")
+        answer = self.answers.get(found.group(2), http_error(404, request.full_url))
+        if isinstance(answer, BaseException):
+            raise answer
+        return FakeResponse(str(answer).encode() if isinstance(answer, int) else answer)
+
+
 def names_free():
     """5つの名前がどこにも使われていない。"""
     return [
@@ -95,6 +143,7 @@ def healthy():
         (("group", "show"), {"properties": {"provisioningState": "Succeeded"}}),
         (("storage", "account", "show"), {"provisioningState": "Succeeded", "sku": {"name": "Standard_LRS"}, "kind": "StorageV2"}),
         (("search", "service", "show"), {"provisioningState": "succeeded", "status": "running", "sku": {"name": "basic"}, "semanticSearch": "free"}),
+        (("search", "query-key", "list"), [{"name": "member", "key": FAKE_KEY}]),
         (("cognitiveservices", "account", "show"), {"kind": "AIServices", "properties": {"provisioningState": "Succeeded"}}),
         (("cognitiveservices", "account", "deployment", "list"), [deployment("text-embedding-3-small"), deployment("gpt-5-mini")]),
     ]
@@ -120,15 +169,18 @@ class MainCase(unittest.TestCase):
         path.write_text(text, encoding="utf-8")
         return path
 
-    def run_main(self, command, *extra, team_name="suika", az=None, environ=None):
+    def run_main(self, command, *extra, team_name="suika", az=None, environ=None, http=None):
+        """http は偽の urlopen（FakeHttp）。省略すると、どのインデックスも 404。本物の通信は、どの試験でもしない。"""
         argv = [command, "--config", str(self.config)]
         if team_name is not None:
             argv += ["--team", team_name]
         argv += list(extra)
+        self.http = http or FakeHttp()
         out, err = io.StringIO(), io.StringIO()
         with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
             with mock.patch.dict(os.environ, environ or {}, clear=environ is not None):
-                code = team.main(argv, az=az)
+                with mock.patch("urllib.request.urlopen", self.http):
+                    code = team.main(argv, az=az)
         return code, out.getvalue(), err.getvalue()
 
 
@@ -487,11 +539,242 @@ class HealthTest(MainCase):
         self.assertIn("OK    AI Search srch-acme-suika", out)
         self.assertIn("OK    デプロイ gpt-5-mini", out)
 
-    def test_health_reads_no_keys(self):
+    def test_health_reads_only_the_query_key(self):
+        """文書の数を数えるために、検索用（query）のキーを1回だけ読む。管理者キー・Foundry や Storage のキーは読まない。"""
         az = FakeAz(healthy())
         self.run_main("health", az=az)
-        self.assertEqual([c for c in az.calls if "admin-key" in c or "keys" in c or "query-key" in c], [])
+        self.assertEqual([c for c in az.calls if "admin-key" in c or "keys" in c or "show-connection-string" in c], [])
+        self.assertEqual(sum(1 for c in az.calls if c[:3] == ("search", "query-key", "list")), 1)
         self.assertTrue(az.calls)
+
+
+# ------------------------------------------------------------------ health：インデックスの文書の数
+
+URL_BASE = "https://srch-acme-suika.search.windows.net/indexes"
+TITLE = "インデックスの文書の数（参考。下の OK・まだ・NG には入りません）"
+SUMMARY_OK = "OK 8・まだ 0・NG 0"
+BODY_BAD = "答えの形が想定外です"   # AI Search の答えの本文が、数でないとき
+
+
+class HealthCountsTest(MainCase):
+    """health は、AI Search の4つのインデックスの文書の数を、参考として足す。OK・まだ・NG の数と、終了コードは変えない。"""
+
+    def count_lines(self, out):
+        return [line for line in out.splitlines() if line.startswith("  ") and "件" in line or line.startswith("  ") and "まだない" in line
+                or line.startswith("  ") and "数えられません" in line]
+
+    def run_healthy(self, answers=None, az=None):
+        return self.run_main("health", az=az or FakeAz(healthy()), http=FakeHttp(answers))
+
+    def test_health_shows_index_counts(self):
+        answers = {"sengoku": 150, "hr-docs": 87, "hotels-blob": 50, "hotels-cosmos": 50}
+        code, out, err = self.run_healthy(answers)
+        self.assertEqual((code, err), (0, ""), out)
+        self.assertIn(TITLE, out)
+        self.assertIn("  sengoku        150件（目安 150）", out)
+        self.assertIn("  hr-docs        87件（文書 23 から作ったチャンクの数）", out)
+        self.assertIn("  hotels-blob    50件（目安 50）", out)
+        self.assertIn("  hotels-cosmos  50件（目安 50）", out)
+        self.assertNotIn("目安と違う", out)
+        self.assertEqual(len(self.count_lines(out)), 4, out)
+        # 判定の行はいつもどおり最後。件数の行は、その前の参考
+        self.assertEqual(out.splitlines()[-1], SUMMARY_OK)
+        self.assertLess(out.index(TITLE), out.index(SUMMARY_OK))
+
+    def test_health_asks_the_count_of_each_index_with_the_query_key(self):
+        self.run_healthy({"sengoku": 150})
+        urls = [r.full_url for r in self.http.requests]
+        self.assertEqual(urls, [f"{URL_BASE}/{name}/docs/$count?api-version=2024-07-01"
+                                for name in ("sengoku", "hr-docs", "hotels-blob", "hotels-cosmos")])
+        for request in self.http.requests:
+            self.assertEqual(request.get_method(), "GET")
+            self.assertIsNone(request.data)
+            self.assertEqual(request.get_header("Api-key"), FAKE_KEY)
+
+    def test_health_counts_with_a_bom_and_spaces(self):
+        _, out, _ = self.run_healthy({"sengoku": b"\xef\xbb\xbf150\r\n"})
+        self.assertIn("  sengoku        150件（目安 150）", out)
+
+    def test_health_marks_different_count_without_error(self):
+        answers = {"sengoku": 148, "hr-docs": 87, "hotels-blob": 0, "hotels-cosmos": 51}
+        code, out, _ = self.run_healthy(answers)
+        self.assertEqual(code, 0, out)
+        self.assertIn("  sengoku        148件（目安 150 と違う）", out)
+        self.assertIn("  hotels-blob    0件（目安 50 と違う）", out)
+        self.assertIn("  hotels-cosmos  51件（目安 50 と違う）", out)
+        self.assertIn(SUMMARY_OK, out)
+        self.assertNotIn("NG    ", out)
+
+    def test_health_hr_docs_counts_chunks_so_more_than_documents_is_normal(self):
+        for count, same in ((23, True), (24, True), (400, True), (22, False), (0, False)):
+            with self.subTest(count=count):
+                _, out, _ = self.run_healthy({"hr-docs": count})
+                line = next(ln for ln in out.splitlines() if ln.startswith("  hr-docs"))
+                self.assertIn(f"{count}件（文書 23 から作ったチャンクの数", line)
+                self.assertEqual("目安と違う" not in line, same, line)
+
+    def test_health_marks_missing_index_as_not_yet(self):
+        code, out, err = self.run_healthy({"sengoku": 150, "hr-docs": 87, "hotels-blob": 50})   # hotels-cosmos は 404
+        self.assertEqual((code, err), (0, ""), out)
+        self.assertIn("  hotels-cosmos  まだない", out)
+        self.assertIn("  hotels-blob    50件（目安 50）", out)   # ほかの行は続く
+        self.assertNotIn("NG    ", out)
+        self.assertIn(SUMMARY_OK, out)
+
+    def test_health_all_indexes_missing_is_not_error(self):
+        code, out, _ = self.run_healthy()
+        self.assertEqual(code, 0, out)
+        for name in ("sengoku", "hr-docs", "hotels-blob", "hotels-cosmos"):
+            self.assertRegex(out, rf"  {name} +まだない")
+        self.assertIn(SUMMARY_OK, out)
+
+    def test_health_uncountable_index_says_why_and_keeps_going(self):
+        answers = {"sengoku": http_error(500), "hr-docs": urllib.error.URLError("no route"), "hotels-blob": b"<html>",
+                   "hotels-cosmos": TimeoutError()}
+        code, out, err = self.run_healthy(answers)
+        self.assertEqual((code, err), (0, ""), out)
+        self.assertIn("  sengoku        数えられません（HTTP 500）", out)
+        self.assertIn("  hr-docs        数えられません（つながりません）", out)
+        self.assertIn(f"  hotels-blob    数えられません（{BODY_BAD}）", out)
+        self.assertIn("  hotels-cosmos  数えられません（時間内に終わりません）", out)
+        self.assertNotIn("Traceback", out)
+        self.assertIn(SUMMARY_OK, out)
+
+    def test_health_wrong_key_is_shown_per_index_not_as_missing(self):
+        for code_wanted in (401, 403):
+            with self.subTest(code=code_wanted):
+                answers = {name: http_error(code_wanted) for name in ("sengoku", "hr-docs", "hotels-blob", "hotels-cosmos")}
+                code, out, _ = self.run_healthy(answers)
+                self.assertEqual(code, 0, out)
+                self.assertIn(f"  sengoku        数えられません（キーが合いません。HTTP {code_wanted}）", out)
+                self.assertNotIn("まだない", out)
+
+    def test_health_odd_bodies_are_not_counts(self):
+        for body in (b"", b"-1", b"12abc", b"1.5", b'{"value": 3}', b"\xff\xfe", b"9" * 40):
+            with self.subTest(body=body):
+                _, out, _ = self.run_healthy({"sengoku": body})
+                self.assertIn(f"  sengoku        数えられません（{BODY_BAD}）", out)
+
+    def test_health_four_states_sample(self):
+        """present/matching、present/different、missing、not countable が、1回の出力に並ぶ。"""
+        answers = {"sengoku": 150, "hr-docs": 12, "hotels-blob": http_error(500)}   # hotels-cosmos は 404
+        code, out, _ = self.run_healthy(answers)
+        self.assertEqual(code, 0, out)
+        block = out[out.index(TITLE):out.index(SUMMARY_OK)].rstrip("\n").splitlines()
+        self.assertEqual(block, [
+            TITLE + "：",
+            "  sengoku        150件（目安 150）",
+            "  hr-docs        12件（文書 23 から作ったチャンクの数。23 件以上のはずなので、目安と違う）",
+            "  hotels-blob    数えられません（HTTP 500）",
+            "  hotels-cosmos  まだない",
+        ])
+
+    def test_health_counts_never_change_the_verdict(self):
+        """件数がどうでも、OK・まだ・NG の数と終了コードは、件数なしのときと同じ。"""
+        scenarios = {
+            "healthy": (healthy(), 0),
+            "wrong search": (override(healthy(), (("search", "service", "show"),
+                             {"provisioningState": "succeeded", "status": "running", "sku": {"name": "standard"}, "semanticSearch": "free"})), 1),
+        }
+        for label, (responses, code_wanted) in scenarios.items():
+            outputs = []
+            for answers in ({}, {"sengoku": 150, "hr-docs": 87, "hotels-blob": 50, "hotels-cosmos": 50}, {"sengoku": 1, "hr-docs": http_error(500)}):
+                code, out, _ = self.run_healthy(answers, az=FakeAz(responses))
+                outputs.append(([ln for ln in out.splitlines() if ln.startswith(("OK    ", "まだ  ", "NG    ")) or ln.startswith("OK ")], code))
+            with self.subTest(case=label):
+                self.assertEqual(outputs[0], outputs[1])
+                self.assertEqual(outputs[0], outputs[2])
+                self.assertEqual(outputs[0][1], code_wanted)
+
+    def test_health_without_search_service_gives_one_line_and_asks_nothing(self):
+        az = FakeAz(default=NOTFOUND)
+        code, out, _ = self.run_main("health", az=az)
+        self.assertEqual(code, 0, out)
+        self.assertIn("インデックスの文書の数（参考）：数えません。AI Search がまだ OK ではありません", out)
+        self.assertNotIn("sengoku", out)
+        self.assertEqual(self.http.requests, [])
+        self.assertFalse([c for c in az.calls if "query-key" in c])
+        self.assertIn("OK 0・まだ 8・NG 0", out)
+
+    def test_health_search_not_ok_is_not_counted(self):
+        for state in ("provisioning", "Failed", "deleting"):
+            with self.subTest(state=state):
+                responses = override(healthy(), (("search", "service", "show"),
+                                                 {"provisioningState": state, "sku": {"name": "basic"}, "semanticSearch": "free"}))
+                code, out, _ = self.run_main("health", az=FakeAz(responses))
+                self.assertIn("数えません。AI Search がまだ OK ではありません", out)
+                self.assertEqual(self.http.requests, [])
+
+    def test_health_unreadable_query_key_gives_one_line(self):
+        cases = (
+            (CheckError("notfound", "ResourceNotFound"), "AI Search srch-acme-suika がまだありません"),
+            (CheckError("denied", "AuthorizationFailed"), "AI Search srch-acme-suika のキーを読む権限がありません"),
+            (CheckError("other", "az が時間内に終わりません"), "az が時間内に終わりません"),
+            ([], "検索用のキーがありません"),
+            (None, BAD),
+            ({"key": FAKE_KEY}, BAD),
+            ([{"name": "x"}], BAD),
+            ([{"key": "has space"}, ], BAD),
+        )
+        for answer, why in cases:
+            with self.subTest(answer=repr(answer)[:30]):
+                responses = override(healthy(), (("search", "query-key", "list"), answer))
+                code, out, err = self.run_main("health", az=FakeAz(responses))
+                self.assertEqual((code, err), (0, ""), out)
+                self.assertIn("インデックスの文書の数（参考）：数えません。検索用のキーを読めません。", out)
+                self.assertIn(why, out)
+                self.assertEqual(self.http.requests, [])
+                self.assertIn(SUMMARY_OK, out)
+                self.assertNotIn(FAKE_KEY, out)
+
+    def test_health_sign_in_lost_while_reading_the_key_gives_same_guide(self):
+        lost = override(healthy(), (("search", "query-key", "list"), CheckError("login", "")))
+        code, out, _ = self.run_main("health", az=FakeAz(lost))
+        self.assertEqual(code, 1)
+        self.assertIn(f"az login --tenant {TENANT}", out)
+
+    def test_health_uses_the_first_query_key_and_never_the_admin_key(self):
+        keys = [{"name": "member", "key": FAKE_KEY}, {"name": "other", "key": "second-" + FAKE_KEY}]
+        az = FakeAz(override(healthy(), (("search", "query-key", "list"), keys), (("search", "admin-key", "show"), {"primaryKey": FAKE_ADMIN})))
+        self.run_main("health", az=az, http=FakeHttp({"sengoku": 150}))
+        self.assertEqual({r.get_header("Api-key") for r in self.http.requests}, {FAKE_KEY})
+        self.assertEqual([c for c in az.calls if "admin-key" in c], [])
+
+    def test_health_never_prints_keys(self):
+        """画面（標準出力・標準エラー）に、キーがない。通信の失敗の文や、az の答えにキーが入っていても出さない。"""
+        leaky = lambda text: text + " " + FAKE_KEY  # noqa: E731
+        answers = {
+            "sengoku": urllib.error.HTTPError("https://x/", 500, leaky("boom"), {}, io.BytesIO(leaky("body").encode())),
+            "hr-docs": urllib.error.URLError(leaky("refused")),
+            "hotels-blob": leaky("not a count").encode(),
+            "hotels-cosmos": OSError(leaky("reset")),
+        }
+        az = FakeAz(healthy())
+        code, out, err = self.run_main("health", az=az, http=FakeHttp(answers))
+        for shown in (out, err):
+            self.assertNotIn(FAKE_KEY, shown)
+            self.assertNotIn(FAKE_KEY[:12], shown)
+            self.assertNotIn(FAKE_ADMIN, shown)
+        # az に渡す引数にも、キーはない（キーは、HTTP の api-key ヘッダーにだけ入る）
+        self.assertFalse([c for c in az.calls if any(FAKE_KEY in str(part) for part in c)])
+        # 全部の失敗でも、画面は崩れない
+        self.assertEqual(len(re.findall("数えられません", out)), 4, out)
+
+    def test_health_never_prints_keys_on_a_good_run(self):
+        code, out, err = self.run_healthy({"sengoku": 150, "hr-docs": 87, "hotels-blob": 50, "hotels-cosmos": 50})
+        self.assertNotIn(FAKE_KEY, out + err)
+        self.assertNotIn("api-key", (out + err).lower())
+
+    def test_health_text_without_counts_is_unchanged(self):
+        rows = [team.Row(team.OK, "a", "b"), team.Row(team.MADA, "c")]
+        text, code = team.health_text("suika", rows)
+        self.assertEqual(text, "チーム suika の状態（読み取りだけ）\nOK    a（b）\nまだ  c\nOK 1・まだ 1・NG 0")
+        self.assertEqual(code, 0)
+
+    def test_check_names_and_env_do_not_count(self):
+        az = FakeAz(names_free())
+        self.run_main("check-names", az=az)
+        self.assertEqual(self.http.requests, [])
 
 
 # ------------------------------------------------------------------ 想定外の答え

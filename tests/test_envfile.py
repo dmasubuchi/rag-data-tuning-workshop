@@ -22,7 +22,7 @@ sys.path.insert(0, str(REPO_DIR / "tools"))
 
 import team  # noqa: E402
 from teamlib.az import Az, CheckError  # noqa: E402
-from teamlib.envfile import ENV_FILE, env_text, write_env  # noqa: E402
+from teamlib.envfile import ENV_FILE, env_text, query_key, write_env  # noqa: E402
 from teamlib.names import make_names  # noqa: E402
 
 SUB = "0123abcd" + "-4567-" + "89ab-cdef-" + "0123456789ab"   # サブスクリプション ID の形（つないで作る）
@@ -202,6 +202,21 @@ class WriteEnvTest(TempCase):
         for admin in (ADMIN, ADMIN2):
             self.assertNotIn(admin, text)
         self.assertNotIn(ADMIN_CALL, [call[:3] for call in az.calls], "メンバーのために、管理者キーを読んではいけない")
+
+    def test_query_key_reads_the_first_query_key_and_nothing_else(self):
+        """team.py health が使う。検索用のキーの最初の1つだけを返し、管理者キー・Foundry・Storage には触れない。"""
+        az = answers()
+        self.assertEqual(query_key(az, NAMES), QUERY)
+        self.assertEqual([call[:3] for call in az.calls], [QUERY_CALL])
+
+    def test_query_key_problems_are_short_sentences(self):
+        cases = ((CheckError("notfound", "x"), "がまだありません"), (CheckError("denied", "x"), "キーを読む権限がありません"),
+                 ([], "検索用のキーがありません"), (None, BAD), ([{"key": "a b"}], BAD))
+        for answer, why in cases:
+            with self.subTest(answer=repr(answer)):
+                with self.assertRaises(CheckError) as caught:
+                    query_key(answers(query=answer), NAMES)
+                self.assertIn(why, str(caught.exception))
 
     def test_builder_has_admin_key(self):
         az = answers()
