@@ -629,16 +629,63 @@ class HealthCountsTest(MainCase):
         self.assertIn(SUMMARY_OK, out)
 
     def test_health_uncountable_index_says_why_and_keeps_going(self):
-        answers = {"sengoku": http_error(500), "hr-docs": urllib.error.URLError("no route"), "hotels-blob": b"<html>",
-                   "hotels-cosmos": TimeoutError()}
+        """AI Search が答えた失敗（HTTP の失敗・答えの形が想定外）は、1つずつ理由を出して、残りも数える。"""
+        answers = {"sengoku": http_error(500), "hr-docs": b"<html>", "hotels-blob": http_error(403), "hotels-cosmos": 50}
         code, out, err = self.run_healthy(answers)
         self.assertEqual((code, err), (0, ""), out)
         self.assertIn("  sengoku        数えられません（HTTP 500）", out)
-        self.assertIn("  hr-docs        数えられません（つながりません）", out)
-        self.assertIn(f"  hotels-blob    数えられません（{BODY_BAD}）", out)
-        self.assertIn("  hotels-cosmos  数えられません（時間内に終わりません）", out)
+        self.assertIn(f"  hr-docs        数えられません（{BODY_BAD}）", out)
+        self.assertIn("  hotels-blob    数えられません（キーが合いません。HTTP 403）", out)
+        self.assertIn("  hotels-cosmos  50件（目安 50）", out)
+        self.assertEqual(len(self.http.requests), 4)
         self.assertNotIn("Traceback", out)
         self.assertIn(SUMMARY_OK, out)
+
+    def test_health_connection_failure_stops_asking_the_rest(self):
+        """つながらない（接続の失敗・時間切れ）が1つあったら、残りは問い合わせず「つながりません」にまとめる（待ち時間を重ねない）。"""
+        names = ("sengoku", "hr-docs", "hotels-blob", "hotels-cosmos")
+        failures = ((urllib.error.URLError("no route"), "つながりません"), (OSError("reset"), "つながりません"),
+                    (TimeoutError(), "時間内に終わりません"), (urllib.error.URLError(TimeoutError()), "時間内に終わりません"))
+        for position in range(len(names)):
+            for failure, why in failures:
+                with self.subTest(position=position, failure=type(failure).__name__, why=why):
+                    answers = {name: 50 for name in names[:position]}
+                    answers[names[position]] = failure
+                    answers.update({name: 50 for name in names[position + 1:]})   # 残りは答えられるが、問い合わせない
+                    code, out, err = self.run_healthy(answers)
+                    self.assertEqual((code, err), (0, ""), out)
+                    self.assertEqual(len(self.http.requests), position + 1)
+                    for before in names[:position]:
+                        self.assertRegex(out, rf"  {before} +50件")
+                    self.assertRegex(out, rf"  {names[position]} +数えられません（{why}）")
+                    for after in names[position + 1:]:
+                        self.assertRegex(out, rf"  {after} +数えられません（つながりません）")
+                    self.assertIn(SUMMARY_OK, out)
+                    self.assertNotIn("Traceback", out)
+
+    def test_health_other_failures_before_a_connection_failure_do_not_stop_early(self):
+        """HTTP の失敗・答えの形の失敗は、つながっているので、止めない。つながらないものが出てから止める。"""
+        answers = {"sengoku": http_error(500), "hr-docs": b"x", "hotels-blob": OSError("reset"), "hotels-cosmos": 50}
+        _, out, _ = self.run_healthy(answers)
+        self.assertEqual(len(self.http.requests), 3)
+        self.assertIn("  sengoku        数えられません（HTTP 500）", out)
+        self.assertIn(f"  hr-docs        数えられません（{BODY_BAD}）", out)
+        self.assertIn("  hotels-blob    数えられません（つながりません）", out)
+        self.assertIn("  hotels-cosmos  数えられません（つながりません）", out)
+
+    def test_health_counts_with_an_unnamed_default_query_key(self):
+        """名前のない既定の検索用のキー（名前が null・空・欄なし）でも、名前に頼らず、並びの最初のキーで数える。"""
+        for label, entry in (("null", {"name": None, "key": FAKE_KEY}), ("empty", {"name": "", "key": FAKE_KEY}),
+                             ("absent", {"key": FAKE_KEY})):
+            with self.subTest(name=label):
+                az = FakeAz(override(healthy(), (("search", "query-key", "list"), [entry])))
+                code, out, err = self.run_main("health", az=az, http=FakeHttp({"sengoku": 150, "hr-docs": 87}))
+                self.assertEqual((code, err), (0, ""), out)
+                self.assertIn("  sengoku        150件（目安 150）", out)
+                self.assertIn("  hr-docs        87件（文書 23 から作ったチャンクの数）", out)
+                self.assertEqual({r.get_header("Api-key") for r in self.http.requests}, {FAKE_KEY})
+                self.assertNotIn("検索用のキーを読めません", out)
+                self.assertNotIn(FAKE_KEY, out + err)
 
     def test_health_wrong_key_is_shown_per_index_not_as_missing(self):
         for code_wanted in (401, 403):
@@ -745,12 +792,13 @@ class HealthCountsTest(MainCase):
         leaky = lambda text: text + " " + FAKE_KEY  # noqa: E731
         answers = {
             "sengoku": urllib.error.HTTPError("https://x/", 500, leaky("boom"), {}, io.BytesIO(leaky("body").encode())),
-            "hr-docs": urllib.error.URLError(leaky("refused")),
-            "hotels-blob": leaky("not a count").encode(),
+            "hr-docs": leaky("not a count").encode(),
+            "hotels-blob": urllib.error.URLError(leaky("refused")),     # つながらない失敗が出たら、残りは問い合わせない
             "hotels-cosmos": OSError(leaky("reset")),
         }
         az = FakeAz(healthy())
         code, out, err = self.run_main("health", az=az, http=FakeHttp(answers))
+        self.assertEqual(len(self.http.requests), 3)
         for shown in (out, err):
             self.assertNotIn(FAKE_KEY, shown)
             self.assertNotIn(FAKE_KEY[:12], shown)
@@ -759,6 +807,16 @@ class HealthCountsTest(MainCase):
         self.assertFalse([c for c in az.calls if any(FAKE_KEY in str(part) for part in c)])
         # 全部の失敗でも、画面は崩れない
         self.assertEqual(len(re.findall("数えられません", out)), 4, out)
+
+    def test_health_never_prints_keys_when_the_connection_fails_first(self):
+        """つながらない失敗（OSError・時間切れ）の文にキーが入っていても、出さない。"""
+        for failure in (OSError(FAKE_KEY + " reset"), TimeoutError(FAKE_KEY + " slow"), urllib.error.URLError(FAKE_KEY)):
+            with self.subTest(failure=type(failure).__name__):
+                code, out, err = self.run_healthy({"sengoku": failure})
+                self.assertEqual(len(self.http.requests), 1)
+                self.assertNotIn(FAKE_KEY, out + err)
+                self.assertNotIn(FAKE_KEY[:12], out + err)
+                self.assertEqual(len(re.findall("数えられません", out)), 4, out)
 
     def test_health_never_prints_keys_on_a_good_run(self):
         code, out, err = self.run_healthy({"sengoku": 150, "hr-docs": 87, "hotels-blob": 50, "hotels-cosmos": 50})

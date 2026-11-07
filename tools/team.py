@@ -22,6 +22,7 @@ Git に入らない名前（.env.local、*.local.env）にする。Repo の中�
 
 health の文書の数は、sengoku・hr-docs・hotels-blob・hotels-cosmos の4つを、AI Search の REST（GET .../docs/$count）で数える。
 キーは az で読む検索用（query）のキーだけ（管理者キーは読まない）。画面にも出さない。数は参考で、OK・まだ・NG の数と終了コードは変えない。
+つながらない（接続の失敗・時間切れ）インデックスが1つあったら、残りは問い合わせず「数えられません（つながりません）」にする（4つ分の待ち時間を避ける）。
 
 動かすのは Python の標準ライブラリと az だけ（--out の注意のために、git も呼ぶ）。
 Azure に何かを作る・変える・消すコマンドは、このファイルに入っていない
@@ -347,6 +348,8 @@ SEARCH_API = "2024-07-01"   # tools/search_demo.py と同じ
 COUNT_TIMEOUT = 30
 COUNT_BODY = re.compile(r"[0-9]{1,9}")
 COUNTS_TITLE = "インデックスの文書の数（参考"
+NO_CONNECTION = "つながりません"
+TIMED_OUT = "時間内に終わりません"
 
 
 class Expect(NamedTuple):
@@ -408,7 +411,7 @@ def fetch_count(endpoint: str, key: str, index: str) -> int | None:
                          else f"HTTP {error.code}") from None
     except (OSError, http.client.HTTPException) as error:   # URLError・接続の失敗・時間切れも OSError
         timed_out = isinstance(getattr(error, "reason", error), TimeoutError)
-        raise CheckError("other", "時間内に終わりません" if timed_out else "つながりません") from None
+        raise CheckError("other", TIMED_OUT if timed_out else NO_CONNECTION) from None
     text = body.decode("utf-8-sig", errors="replace").strip() if isinstance(body, bytes) else ""
     if not COUNT_BODY.fullmatch(text):
         raise CheckError("other", "答えの形が想定外です")
@@ -429,12 +432,16 @@ def index_counts(az, n: Names, rows) -> Counts:
         _keep_going(error)
         return Counts(note=f"検索用のキーを読めません。{_why(error)}")
     endpoint = f"https://{n.search}.search.windows.net"
-    items = []
+    items, unreachable = [], False
     for expect in INDEX_EXPECTS:
+        if unreachable:   # つながらないものは、残りも同じ。1件ごとに待たない（4件 × 30 秒にしない）
+            items.append(IndexCount(expect, reason=NO_CONNECTION))
+            continue
         try:
             items.append(IndexCount(expect, count=fetch_count(endpoint, key, expect.index)))
         except CheckError as error:
             items.append(IndexCount(expect, reason=_why(error)))
+            unreachable = error.detail in (NO_CONNECTION, TIMED_OUT)
     return Counts(items=tuple(items))
 
 
