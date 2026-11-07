@@ -103,7 +103,7 @@ pip で入れるものはありません（標準ライブラリだけです）�
 
 - 武将（質問 60 問）：keyword 0.58・vector 0.38・hybrid 0.55・semantic 0.76
   - 使った量：検索 240 回（うちセマンティック ランカー 60 回）、質問の埋め込み 2,785 トークン
-  - 基礎編 05 の `basic/topics/05-measure-search/measure_methods.py` の平均（小数 3 桁で 0.576・0.378・0.555・0.759）と同じ値です
+  - 基礎編 05 の `basic/topics/05-measure-search/measure_methods.py` を別に動かしても、方式の順（semantic・keyword・hybrid・vector）は同じでした
 - 人事（質問 60 問のうち、正解のある 51 問で採点）：keyword 0.69・vector 0.65・hybrid 0.77・semantic 0.89
   - 漏れ：4 つの方式のすべてで、漏れうる 12 問のうち 0 問（漏れた文書は 0）。どの検索にも、聞く人に見える文書だけに絞る式を付けています
   - 使った量：検索 240 回（うちセマンティック ランカー 60 回）、質問の埋め込み 2,269 トークン
