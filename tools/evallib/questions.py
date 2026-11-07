@@ -7,12 +7,14 @@
   validate(...)         質問の形と中身を確かめる。問題の文の一覧を返す（空なら合格）
 
 人事・ホテルに固有の確かめは、@dataset_check("hr") のように、このファイルの中に書いて、DATASET_CHECKS に足す
-（別のモジュールに置くと、tools/check_questions.py から呼ばれない）。人事の確かめは check_hr。
+（別のモジュールに置くと、tools/check_questions.py から呼ばれない）。人事の確かめは check_hr、ホテルは check_hotel。
+ホテルの condition（条件）は、condition_to_filter（検索の $filter の文字）と matches（データが条件に合うか）で扱う。
 """
 import importlib.util
 import json
 import re
 import sys
+from datetime import datetime
 from pathlib import Path
 
 REPO_DIR = Path(__file__).resolve().parents[2]
@@ -467,3 +469,311 @@ def check_hr(questions, *, known_ids, data):
         problems += _check_hr_evidence(who, q, list(dict.fromkeys(answers + hidden)), known_ids, files, content_dir, cache)
     return problems
 
+
+# ------------------------------------------------------------------ ホテルの condition（条件）
+
+# condition に書ける項目と、値の種類。検索のインデックスで「絞り込める」項目（guide/hotel.md の hotels-blob）だけ。
+# Rooms/… は客室の項目（どれかの客室が満たす）、Address/… は住所の項目。
+CONDITION_FIELDS = {
+    "HotelId": "text", "Category": "text", "Category_ja": "text",
+    "ParkingIncluded": "bool", "IsDeleted": "bool", "LastRenovationDate": "datetime", "Rating": "number",
+    "Address/City": "text", "Address/StateProvince": "text", "Address/PostalCode": "text", "Address/Country": "text",
+    "Rooms/Type": "text", "Rooms/Type_ja": "text", "Rooms/BaseRate": "number", "Rooms/BedOptions": "text",
+    "Rooms/SleepsCount": "number", "Rooms/SmokingAllowed": "bool",
+}
+CONDITION_OPS = ("eq", "ge", "le", "gt", "lt")
+_ISO_DATETIME = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$")
+
+
+def _is_number(value):
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def _datetime(text):
+    """ISO 8601 の日時の文字（例 2015-01-01T00:00:00Z）を日時にする。そうでなければ None。"""
+    if not isinstance(text, str) or not _ISO_DATETIME.match(text):
+        return None
+    try:
+        return datetime.fromisoformat(text[:-1] + "+00:00" if text.endswith("Z") else text)
+    except ValueError:
+        return None
+
+
+def _parse_ops(key, spec):
+    """項目 1 つの条件（値だけ、または {演算: 値}）を [(演算, 値)] にする。形が違えば ValueError。"""
+    kind = CONDITION_FIELDS[key]
+    ops = list(spec.items()) if isinstance(spec, dict) else [("eq", spec)]
+    if not ops:
+        raise ValueError(f"「{key}」の条件が空です（値、または {{\"ge\": 4.5}} のように書きます）")
+    for op, value in ops:
+        if op not in CONDITION_OPS:
+            raise ValueError(f"「{key}」の演算「{op}」は使えません（使える演算：{'・'.join(CONDITION_OPS)}）")
+        if kind == "bool":
+            ok = isinstance(value, bool) and op == "eq"
+            how = "true か false（演算は eq だけ）"
+        elif kind == "text":
+            ok = isinstance(value, str) and bool(value) and op == "eq"
+            how = "文字列（演算は eq だけ）"
+        elif kind == "number":
+            ok = _is_number(value)
+            how = "数"
+        else:
+            ok = _datetime(value) is not None
+            how = "日時の文字（例 \"2015-01-01T00:00:00Z\"）"
+        if not ok:
+            raise ValueError(f"「{key}」の {op} は {how} で書きます（今は {value!r}）")
+    return ops
+
+
+def _parse_condition(condition):
+    """condition を、書いた順の部品にする。部品は ("field", 項目, 演算の並び)、または ("rooms", [(項目, 演算の並び), ...])。
+
+    Rooms/… の条件は、いくつあっても 1 つの部品にまとめる（同じ客室が全部を満たす）。部品の位置は最初の Rooms/… の位置。
+    形が違えば ValueError（理由は日本語）。
+    """
+    if not isinstance(condition, dict) or not condition:
+        raise ValueError("condition は {項目: 値、または {演算: 値}} の形で、1 つ以上の条件を書きます")
+    parts, rooms = [], None
+    for key, spec in condition.items():
+        if key not in CONDITION_FIELDS:
+            raise ValueError(f"「{key}」は condition に使えません（使える項目：{'・'.join(CONDITION_FIELDS)}）")
+        ops = _parse_ops(key, spec)
+        if key.startswith("Rooms/"):
+            if rooms is None:
+                rooms = []
+                parts.append(("rooms", rooms))
+            rooms.append((key[len("Rooms/"):], ops))
+        else:
+            parts.append(("field", key, ops))
+    return parts
+
+
+def _odata_value(kind, value):
+    if kind == "bool":
+        return "true" if value else "false"
+    if kind == "text":
+        return "'" + value.replace("'", "''") + "'"
+    if kind == "datetime":
+        return value          # OData の日時は、引用符なし
+    return str(value) if isinstance(value, int) else repr(value)
+
+
+def condition_to_filter(condition):
+    """condition を、検索の $filter の文字にする。
+
+    {"Rating": {"ge": 4.5}, "ParkingIncluded": True} → "Rating ge 4.5 and ParkingIncluded eq true"
+    {"Rooms/BaseRate": {"le": 100}} → "Rooms/any(r: r/BaseRate le 100)"
+    項目の順は、書いた順のまま。Rooms/… は 1 つの any にまとめる（同じ客室が全部を満たす）。形が違えば ValueError。
+    """
+    clauses = []
+    for part in _parse_condition(condition):
+        if part[0] == "field":
+            _, key, ops = part
+            clauses += [f"{key} {op} {_odata_value(CONDITION_FIELDS[key], value)}" for op, value in ops]
+        else:
+            inner = [f"r/{field} {op} {_odata_value(CONDITION_FIELDS['Rooms/' + field], value)}"
+                     for field, ops in part[1] for op, value in ops]
+            clauses.append("Rooms/any(r: " + " and ".join(inner) + ")")
+    return " and ".join(clauses)
+
+
+def _holds(kind, found, op, wanted):
+    """データの値 found が、条件（op と wanted）を満たすか。値がない・種類が違うときは満たさない（OData の null と同じ）。"""
+    if found is None:
+        return False
+    if kind in ("bool", "text"):
+        return isinstance(found, type(wanted)) and found == wanted
+    if kind == "number":
+        found, wanted = (found, wanted) if _is_number(found) else (None, None)
+    else:
+        found, wanted = _datetime(found), _datetime(wanted)
+    if found is None:
+        return False
+    return {"eq": found == wanted, "ge": found >= wanted, "le": found <= wanted,
+            "gt": found > wanted, "lt": found < wanted}[op]
+
+
+def _value_at(item, path):
+    for name in path.split("/"):
+        item = item.get(name) if isinstance(item, dict) else None
+    return item
+
+
+def matches(hotel, condition):
+    """ホテル（データの 1 件）が condition に合うか。Rooms/… は、どれかの客室が（まとめて）満たすこと。形が違えば ValueError。"""
+    for part in _parse_condition(condition):
+        if part[0] == "field":
+            _, key, ops = part
+            found = _value_at(hotel, key)
+            if not all(_holds(CONDITION_FIELDS[key], found, op, value) for op, value in ops):
+                return False
+        else:
+            rooms = hotel.get("Rooms") if isinstance(hotel, dict) else None
+            rooms = rooms if isinstance(rooms, list) else []
+            if not any(isinstance(room, dict)
+                       and all(_holds(CONDITION_FIELDS["Rooms/" + field], room.get(field), op, value)
+                               for field, ops in part[1] for op, value in ops)
+                       for room in rooms):
+                return False
+    return True
+
+
+# ------------------------------------------------------------------ ホテルに固有の確かめ
+
+HOTEL_MAX_ANSWERS = 5             # condition でない質問の answer_ids の上限
+HOTEL_MAX_CONDITION_ANSWERS = 20  # condition の質問で、条件に合うホテルの上限（0 件・これより多い条件は使わない）
+_HOTEL_NON_TEXT = ("HotelId", "Location", "LastRenovationDate")   # 質問の根拠にしない項目
+_JAPANESE_CHARS = re.compile("[ぁ-んァ-ヶ一-鿿]")
+_OTHER_LANGUAGE = {"ja": "en", "en": "ja"}
+_LANGUAGE_NAME = {"ja": "日本語", "en": "英語"}
+
+
+def hotel_texts(hotel):
+    """ホテル 1 件の文字を、{"en": 英語の項目の文字, "ja": 日本語の項目の文字} にする（evidence の語句を探す先）。
+
+    日本語の項目は、名前が _ja で終わる項目（HotelName_ja・Description_ja・Category_ja・Tags_ja・客室の Description_ja・Type_ja）。
+    フランス語（_fr）と、HotelId・Location・LastRenovationDate は含めない。
+    それ以外はすべて英語の項目：HotelName・Description・Category・Tags、客室の Description・Type・BedOptions・Tags、住所（Address）。
+    """
+    found = {"en": [], "ja": []}
+
+    def walk(value, language):
+        if isinstance(value, str):
+            found[language].append(value)
+        elif isinstance(value, dict):
+            for key, item in value.items():
+                if key not in _HOTEL_NON_TEXT and not str(key).endswith("_fr"):
+                    walk(item, "ja" if str(key).endswith("_ja") else "en")
+        elif isinstance(value, list):
+            for item in value:
+                walk(item, language)
+
+    walk(hotel, "en")
+    return {language: "\n".join(parts) for language, parts in found.items()}
+
+
+def question_language(text):
+    """質問の言語。日本語の文字（ひらがな・カタカナ・漢字）があれば "ja"、なければ "en"。"""
+    return "ja" if isinstance(text, str) and _JAPANESE_CHARS.search(text) else "en"
+
+
+def _hotels(data):
+    """ホテルの並びから、{HotelId: ホテル} にする。渡されていない・形が違うときは None。"""
+    try:
+        return {str(h["HotelId"]): h for h in data}
+    except (KeyError, TypeError):
+        return None
+
+
+def _phrases(value):
+    """evidence の値（語句、または語句の並び）を、語句の並びにする。形が違えば None。"""
+    if isinstance(value, str):
+        value = [value]
+    if isinstance(value, list) and value and all(isinstance(x, str) and x.strip() for x in value):
+        return value
+    return None
+
+
+def _check_hotel_evidence(who, q, answers, hotels, texts):
+    """ホテルの evidence（{HotelId: 語句、または語句の並び}）の確かめ。
+
+    - condition でない質問は、answer_ids のホテルごとに要る（condition の質問は任意。あれば同じ確かめ）
+    - ホテルのデータがあるときは、語句がそのホテルの文字（hotel_texts）にあること
+    - ja-en は、質問の言語の項目になく、もう一方の言語の項目にだけある語句が、ホテルごとに 1 つ以上あること
+    """
+    evidence = q.get("evidence")
+    required = "condition" not in q and q.get("type") != "condition"
+    if evidence is None and not required:
+        return []
+    if not isinstance(evidence, dict):
+        how = "（answer_ids のホテルごとに、そのホテルのデータにそのまま出る短い語句を {\"6\": \"無料Wi-Fi\"} の形で書きます）"
+        return [f"{who}：evidence がありません{how}" if evidence is None
+                else f"{who}：evidence は {{HotelId: 語句}} の形で書きます"]
+    problems = []
+    for hotel_id in answers:
+        if hotel_id not in evidence and required:
+            problems.append(f"{who}：evidence に「{hotel_id}」の語句がありません（answer_ids のホテルごとに 1 つ）")
+    for hotel_id, value in evidence.items():
+        if hotel_id not in answers:
+            problems.append(f"{who}：evidence の「{hotel_id}」は answer_ids にありません")
+            continue
+        phrases = _phrases(value)
+        if phrases is None:
+            problems.append(f"{who}：evidence「{hotel_id}」は、語句か、語句の並び（空でない文字列）で書きます")
+            continue
+        if hotels is None or hotel_id not in hotels:
+            continue
+        if hotel_id not in texts:
+            texts[hotel_id] = {language: _squash(text) for language, text in hotel_texts(hotels[hotel_id]).items()}
+        both = texts[hotel_id]["en"] + "\n" + texts[hotel_id]["ja"]
+        for phrase in phrases:
+            if _squash(phrase) not in both:
+                problems.append(f"{who}：evidence「{hotel_id}」の語句「{phrase}」が、そのホテルのデータ"
+                                "（名前・説明・タグ・客室・住所）にありません")
+        if q.get("type") == "ja-en":
+            language = question_language(q.get("question"))
+            other = _OTHER_LANGUAGE[language]
+            if not any(_squash(p) in texts[hotel_id][other] and _squash(p) not in texts[hotel_id][language] for p in phrases):
+                example = "。例：英語の名前（HotelName）、都市名・通りの名前（Address）" if language == "ja" else ""
+                problems.append(
+                    f"{who}：ja-en の evidence「{hotel_id}」に、{_LANGUAGE_NAME[other]}の項目にだけあって、"
+                    f"{_LANGUAGE_NAME[language]}の項目にない語句がありません"
+                    f"（{_LANGUAGE_NAME[language]}の質問の手がかりは、{_LANGUAGE_NAME[other]}の項目にだけある語句にします{example}）")
+    return problems
+
+
+def _check_hotel_condition(who, q, answers, hotels):
+    """condition の確かめ。形が正しく、ホテルのデータがあるときは、answer_ids が「条件に合うホテル全部」と同じこと。"""
+    if "condition" not in q:
+        if q.get("type") == "condition":
+            return [f"{who}：condition の質問には condition（答えの条件）が要ります"
+                    "（例 {\"Rating\": {\"ge\": 4.5}, \"ParkingIncluded\": true}）"]
+        return []
+    try:
+        _parse_condition(q["condition"])
+    except ValueError as error:
+        return [f"{who}：condition の形が違います（{error}）"]
+    if hotels is None:
+        return []
+    matched = sorted((i for i, hotel in hotels.items() if matches(hotel, q["condition"])), key=lambda i: (len(i), i))
+    problems = []
+    if not matched or len(matched) > HOTEL_MAX_CONDITION_ANSWERS:
+        problems.append(f"{who}：condition に合うホテルが {len(matched)} 件です（1〜{HOTEL_MAX_CONDITION_ANSWERS} 件になる条件にします）")
+    if not matched:
+        return problems
+    missing = [i for i in matched if i not in answers]
+    extra = [i for i in answers if i not in matched]
+    if missing or extra:
+        detail = "・".join(part for part in (f"足りない：{'・'.join(missing)}" if missing else "",
+                                            f"条件に合わない：{'・'.join(extra)}" if extra else "") if part)
+        problems.append(f"{who}：answer_ids が、condition に合うホテル（{len(matched)} 件：{'・'.join(matched)}）と違います"
+                        f"（{detail}）。answer_ids は、条件に合うホテル全部にします")
+    return problems
+
+
+@dataset_check("hotel")
+def check_hotel(questions, *, known_ids, data):
+    """ホテルの質問に固有の確かめ（条件・答えの数・evidence）。
+
+    - condition：種類 condition の質問には condition が要る。形（項目・演算・値の種類）が正しいこと。
+      ホテルのデータがあるときは、answer_ids が「データのうち条件に合うホテル」と同じ集合で、1〜20 件であること
+      （種類が condition でなくても、condition があれば同じ）
+    - 答えの数：condition でない質問の answer_ids は 5 件まで
+    - evidence：condition でない質問は、answer_ids のホテルごとに、そのホテルのデータにそのまま出る語句（または語句の並び）。
+      ホテルのデータがあるときは、語句が hotel_texts にあること。ja-en は、質問の言語の項目にはなく、もう一方の言語の項目にだけある
+      語句が、ホテルごとに 1 つ以上あること
+    data はホテルの並び。None（validate を data なしで呼んだ）のときは、データを使う確かめ（condition の結果、語句の検索、ja-en の言語）は飛ばす。
+    """
+    hotels = _hotels(data)
+    texts = {}
+    problems = []
+    for index, q in enumerate(questions, 1):
+        who = label(q, index)
+        answers = _strs(q.get("answer_ids"))
+        has_condition = "condition" in q or q.get("type") == "condition"
+        if not has_condition and len(answers) > HOTEL_MAX_ANSWERS:
+            problems.append(f"{who}：{q.get('type')} の質問の answer_ids は {HOTEL_MAX_ANSWERS} 件までです（今は {len(answers)} 件。"
+                            "多くのホテルが当てはまる質問は、条件（condition）にするか、絞り込みます）")
+        problems += _check_hotel_condition(who, q, answers, hotels)
+        problems += _check_hotel_evidence(who, q, answers, hotels, texts)
+    return problems

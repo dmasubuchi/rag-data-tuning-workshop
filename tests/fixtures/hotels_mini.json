@@ -1,0 +1,74 @@
+[
+  {
+    "HotelId": "1",
+    "HotelName": "Harbor Light Inn",
+    "HotelName_ja": "ハーバーライト・イン",
+    "Description": "A quiet inn above the bay. Free parking and an evening wine hour.",
+    "Description_fr": "Une auberge calme au-dessus de la baie.",
+    "Description_ja": "湾を見下ろす静かな宿です。駐車場は無料で、夕方にはワインの時間があります。",
+    "Category": "Boutique",
+    "Category_ja": "ブティック",
+    "Tags": ["view", "concierge"],
+    "Tags_ja": ["眺め", "コンシェルジュ"],
+    "ParkingIncluded": true,
+    "IsDeleted": false,
+    "LastRenovationDate": "2019-05-01T00:00:00Z",
+    "Rating": 4.6,
+    "Address": {"StreetAddress": "10 Bay St", "City": "Lakeview", "StateProvince": "XX", "PostalCode": "00001", "Country": "USA"},
+    "Location": {"type": "Point", "coordinates": [-100.0, 40.0]},
+    "Rooms": [
+      {"Description": "Budget Room, 1 Queen Bed (Bay View)", "Description_fr": "Chambre Économique", "Description_ja": "バジェットルーム、クイーンベッド1台（湾の眺め）",
+       "Type": "Budget Room", "Type_ja": "バジェットルーム", "BaseRate": 95.5, "BedOptions": "1 Queen Bed", "SleepsCount": 2, "SmokingAllowed": true, "Tags": ["tv"]},
+      {"Description": "Suite, 1 King Bed (Bay View)", "Description_fr": "Suite", "Description_ja": "スイート、キングベッド1台（湾の眺め）",
+       "Type": "Suite", "Type_ja": "スイート", "BaseRate": 240.0, "BedOptions": "1 King Bed", "SleepsCount": 2, "SmokingAllowed": false, "Tags": ["jacuzzi tub"]}
+    ]
+  },
+  {
+    "HotelId": "2",
+    "HotelName": "Pine Motel",
+    "HotelName_ja": "パイン・モーテル",
+    "Description": "Simple rooms by the highway.",
+    "Description_fr": "Chambres simples près de l'autoroute.",
+    "Description_ja": "高速道路ぞいの、飾らない客室です。",
+    "Category": "Budget",
+    "Category_ja": "バジェット",
+    "Tags": ["free wifi"],
+    "Tags_ja": ["無料Wi-Fi"],
+    "ParkingIncluded": false,
+    "IsDeleted": false,
+    "LastRenovationDate": "2010-03-15T00:00:00Z",
+    "Rating": 3.2,
+    "Address": {"StreetAddress": "5 Route 9", "City": "Lakeview", "PostalCode": "00002", "Country": "USA"},
+    "Location": {"type": "Point", "coordinates": [-100.1, 40.1]},
+    "Rooms": [
+      {"Description": "Budget Room, 2 Double Beds (Cityside)", "Description_fr": "Chambre Économique", "Description_ja": "バジェットルーム、ダブルベッド2台（市街側）",
+       "Type": "Budget Room", "Type_ja": "バジェットルーム", "BaseRate": 59.0, "BedOptions": "2 Double Beds", "SleepsCount": 4, "SmokingAllowed": true, "Tags": ["tv"]},
+      {"Description": "Standard Room, 1 Queen Bed (Cityside)", "Description_fr": "Chambre Standard", "Description_ja": "スタンダードルーム、クイーンベッド1台（市街側）",
+       "Type": "Standard Room", "Type_ja": "スタンダードルーム", "BaseRate": 80.0, "BedOptions": "1 Queen Bed", "SleepsCount": 2, "SmokingAllowed": false, "Tags": ["coffee maker"]}
+    ]
+  },
+  {
+    "HotelId": "3",
+    "HotelName": "Summit Resort",
+    "HotelName_ja": "サミット・リゾート",
+    "Description": "A mountain resort with a spa and a heated pool.",
+    "Description_fr": "Un complexe de montagne avec spa.",
+    "Description_ja": "スパと温水プールのある、山のリゾートです。",
+    "Category": "Resort and Spa",
+    "Category_ja": "リゾート＆スパ",
+    "Tags": ["pool", "bar"],
+    "Tags_ja": ["プール", "バー"],
+    "ParkingIncluded": true,
+    "IsDeleted": false,
+    "LastRenovationDate": "2024-03-01T00:00:00Z",
+    "Rating": 4,
+    "Address": {"StreetAddress": "1 Summit Rd", "City": "Pinecrest", "StateProvince": "YY", "PostalCode": "00003", "Country": "USA"},
+    "Location": {"type": "Point", "coordinates": [-101.0, 41.0]},
+    "Rooms": [
+      {"Description": "Deluxe Room, 2 Queen Beds (Mountain View)", "Description_fr": "Chambre Deluxe", "Description_ja": "デラックスルーム、クイーンベッド2台（山の眺め）",
+       "Type": "Deluxe Room", "Type_ja": "デラックスルーム", "BaseRate": 150.0, "BedOptions": "2 Queen Beds", "SleepsCount": 4, "SmokingAllowed": true, "Tags": ["tv"]},
+      {"Description": "Suite, 1 King Bed (Mountain View)", "Description_fr": "Suite", "Description_ja": "スイート、キングベッド1台（山の眺め）",
+       "Type": "Suite", "Type_ja": "スイート", "BaseRate": 240.0, "BedOptions": "1 King Bed", "SleepsCount": 2, "SmokingAllowed": false, "Tags": ["jacuzzi tub"]}
+    ]
+  }
+]

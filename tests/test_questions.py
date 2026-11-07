@@ -8,6 +8,8 @@ import collections
 import contextlib
 import io
 import json
+import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -31,7 +33,7 @@ def with_evidence(q):
 
 
 def sample(dataset):
-    """TYPE_TARGETS どおりの、合格する質問の並び（人事は evidence つき）。"""
+    """TYPE_TARGETS どおりの、合格する質問の並び（人事は evidence つき。ホテルは condition の質問に condition、ほかに evidence）。"""
     out = []
     for kind, count in ev.TYPE_TARGETS[dataset].items():
         for _ in range(count):
@@ -39,7 +41,11 @@ def sample(dataset):
                  "answer_ids": ["D1", "D2"] if kind == "multi-doc" else ["D1"]}
             if kind == "permission":
                 q.update(answer_ids=[], as_role="role:employee", hidden_ids=["D2", "D3"])
-            out.append(with_evidence(q) if dataset == "hr" else q)
+            if dataset == "hr":
+                q = with_evidence(q)
+            elif dataset == "hotel":
+                q = {**q, "condition": {"Rating": {"ge": 4.0}}} if kind == "condition" else with_evidence(q)
+            out.append(q)
     return out
 
 
@@ -692,6 +698,436 @@ class HrQuestionsTest(unittest.TestCase):
         self.assertEqual(len({q["type"] for q in self.questions[:6]}), 6)
 
 
+MINI_HOTELS = REPO_DIR / "tests" / "fixtures" / "hotels_mini.json"   # 試験用の、架空のホテル 3 件（項目の形だけ本物に合わせた）
+
+
+def mini_hotels():
+    return json.loads(MINI_HOTELS.read_text(encoding="utf-8"))
+
+
+def hotel_check(questions, hotels=None):
+    hotels = mini_hotels() if hotels is None else hotels
+    return ev.check_hotel(questions, known_ids=ev.ids_of("hotel", hotels), data=hotels)
+
+
+def real_hotel_data_path():
+    """本物のホテルのデータ（Repo に写していない）の場所。環境変数 HOTEL_DATA か、_work/hotel-vectors/ の中。なければ None。"""
+    for candidate in (os.environ.get("HOTEL_DATA"), ev.DATA_FILES["hotel"]):
+        if candidate and Path(candidate).is_file():
+            return Path(candidate)
+    return None
+
+
+class HotelConditionTest(unittest.TestCase):
+    """condition（条件）を、検索の $filter の文字にする・データと照らす。"""
+
+    def setUp(self):
+        self.hotels = {h["HotelId"]: h for h in mini_hotels()}
+
+    def ids(self, condition):
+        return [i for i, hotel in self.hotels.items() if ev.matches(hotel, condition)]
+
+    def test_condition_to_filter(self):
+        cases = [
+            ({"Rating": {"ge": 4.5}, "ParkingIncluded": True}, "Rating ge 4.5 and ParkingIncluded eq true"),
+            ({"Category_ja": "ブティック"}, "Category_ja eq 'ブティック'"),
+            ({"Rooms/BaseRate": {"le": 100}}, "Rooms/any(r: r/BaseRate le 100)"),
+            ({"Address/City": "New York"}, "Address/City eq 'New York'"),
+            ({"ParkingIncluded": False}, "ParkingIncluded eq false"),
+            ({"Rating": 4}, "Rating eq 4"),
+            ({"Rating": {"gt": 4, "lt": 4.5}}, "Rating gt 4 and Rating lt 4.5"),
+            ({"Rooms/BaseRate": {"lt": 59.5}}, "Rooms/any(r: r/BaseRate lt 59.5)"),
+        ]
+        for condition, expected in cases:
+            with self.subTest(expected):
+                self.assertEqual(ev.condition_to_filter(condition), expected)
+
+    def test_condition_to_filter_quotes_text_and_leaves_dates_bare(self):
+        self.assertEqual(ev.condition_to_filter({"Address/City": "Lion's Den"}), "Address/City eq 'Lion''s Den'")
+        self.assertEqual(ev.condition_to_filter({"LastRenovationDate": {"ge": "2015-01-01T00:00:00Z"}}),
+                         "LastRenovationDate ge 2015-01-01T00:00:00Z")   # OData の日時は引用符なし
+        self.assertEqual(ev.condition_to_filter({"Category_ja": "リゾート＆スパ", "LastRenovationDate": {"lt": "2005-01-01T00:00:00Z"}}),
+                         "Category_ja eq 'リゾート＆スパ' and LastRenovationDate lt 2005-01-01T00:00:00Z")
+
+    def test_condition_to_filter_keeps_key_order_and_groups_rooms_into_one_any(self):
+        # 客室の条件は、いくつあっても 1 つの any に（同じ客室が全部を満たす）。位置は最初の Rooms/… の位置
+        self.assertEqual(ev.condition_to_filter({"Rooms/BaseRate": {"le": 100}, "Rating": {"ge": 4}, "Rooms/SmokingAllowed": False}),
+                         "Rooms/any(r: r/BaseRate le 100 and r/SmokingAllowed eq false) and Rating ge 4")
+        self.assertEqual(ev.condition_to_filter({"Rating": {"ge": 4}, "Rooms/SmokingAllowed": False, "Rooms/BaseRate": {"le": 100}}),
+                         "Rating ge 4 and Rooms/any(r: r/SmokingAllowed eq false and r/BaseRate le 100)")
+        self.assertEqual(ev.condition_to_filter({"Rooms/BaseRate": {"ge": 50, "le": 100}}),
+                         "Rooms/any(r: r/BaseRate ge 50 and r/BaseRate le 100)")
+
+    def test_bad_conditions_are_value_errors_in_japanese(self):
+        cases = [
+            ({}, "1 つ以上の条件"),
+            ("Rating ge 4", "1 つ以上の条件"),
+            ({"Description": "x"}, "「Description」は condition に使えません"),
+            ({"Rooms/Foo": 1}, "「Rooms/Foo」は condition に使えません"),
+            ({"Rating": {"ne": 4}}, "演算「ne」は使えません"),
+            ({"Rating": {}}, "条件が空です"),
+            ({"Rating": "high"}, "「Rating」の eq は 数 で書きます"),
+            ({"Rating": True}, "数 で書きます"),
+            ({"ParkingIncluded": {"ge": True}}, "true か false"),
+            ({"ParkingIncluded": "yes"}, "true か false"),
+            ({"Category_ja": {"ge": "ブ"}}, "文字列（演算は eq だけ）"),
+            ({"Category_ja": 5}, "文字列"),
+            ({"LastRenovationDate": {"ge": "2015"}}, "日時の文字"),
+            ({"LastRenovationDate": {"ge": 2015}}, "日時の文字"),
+        ]
+        for condition, word in cases:
+            with self.subTest(condition):
+                for function in (ev.condition_to_filter, lambda c: ev.matches(self.hotels["1"], c)):
+                    with self.assertRaises(ValueError) as caught:
+                        function(condition)
+                    self.assertIn(word, str(caught.exception))
+
+    def test_matches_top_level_and_address(self):
+        self.assertEqual(self.ids({"Rating": {"ge": 4.5}, "ParkingIncluded": True}), ["1"])
+        self.assertEqual(self.ids({"Rating": {"ge": 4}}), ["1", "3"])          # 評価が整数 4 のホテルも比べられる
+        self.assertEqual(self.ids({"Rating": {"gt": 4}}), ["1"])
+        self.assertEqual(self.ids({"Rating": 4}), ["3"])
+        self.assertEqual(self.ids({"Category_ja": "ブティック"}), ["1"])
+        self.assertEqual(self.ids({"Category_ja": "ブティック", "Rating": {"lt": 4}}), [])
+        self.assertEqual(self.ids({"Address/City": "Lakeview"}), ["1", "2"])
+        self.assertEqual(self.ids({"Address/City": "lakeview"}), [])           # 大文字・小文字は区別する（OData の eq と同じ）
+        self.assertEqual(self.ids({"ParkingIncluded": False}), ["2"])
+        self.assertEqual(self.ids({"LastRenovationDate": {"ge": "2015-01-01T00:00:00Z"}}), ["1", "3"])
+        self.assertEqual(self.ids({"LastRenovationDate": {"lt": "2015-01-01T00:00:00Z"}}), ["2"])
+        self.assertEqual(self.ids({"LastRenovationDate": {"ge": "2019-05-01T09:00:00+09:00"}}), ["1", "3"])   # 時差つきも日時として比べる
+
+    def test_matches_missing_values_never_match(self):
+        # ホテル 2 は StateProvince がない（本物のデータにもある）。null との比べは、どれも偽
+        self.assertEqual(self.ids({"Address/StateProvince": "XX"}), ["1"])
+        self.assertEqual(self.ids({"Address/StateProvince": "ZZ"}), [])
+        self.assertFalse(ev.matches({"HotelId": "9"}, {"Rating": {"ge": 0}}))
+        self.assertFalse(ev.matches({"HotelId": "9", "Rooms": None}, {"Rooms/BaseRate": {"le": 100}}))
+        self.assertFalse(ev.matches({"HotelId": "9", "Rating": "4.5"}, {"Rating": {"ge": 4}}))   # 数でない値は偽
+
+    def test_matches_rooms_any(self):
+        # どれかの客室が満たせばよい（ホテル 1 は 95.5 と 240、ホテル 2 は 59 と 80、ホテル 3 は 150 と 240）
+        self.assertEqual(self.ids({"Rooms/BaseRate": {"le": 100}}), ["1", "2"])
+        self.assertEqual(self.ids({"Rooms/BaseRate": {"le": 60}}), ["2"])
+        self.assertEqual(self.ids({"Rooms/BaseRate": {"lt": 59}}), [])
+        self.assertEqual(self.ids({"Rooms/BaseRate": {"ge": 240}}), ["1", "3"])
+        self.assertEqual(self.ids({"Rooms/Type_ja": "スイート"}), ["1", "3"])
+        self.assertEqual(self.ids({"Rooms/BaseRate": {"ge": 100, "le": 200}}), ["3"])   # 1 つの客室が両方を満たす
+        self.assertEqual(self.ids({"Category_ja": "バジェット", "Rooms/BaseRate": {"le": 60}}), ["2"])
+
+    def test_matches_rooms_conditions_are_met_by_the_same_room(self):
+        # 100 ドル以下の部屋と、禁煙の部屋が別々にあるだけでは合わない（ホテル 1：安い部屋は喫煙可、禁煙の部屋は 240 ドル）
+        condition = {"Rooms/BaseRate": {"le": 100}, "Rooms/SmokingAllowed": False}
+        self.assertEqual(self.ids(condition), ["2"])
+        self.assertEqual(self.ids({"Rooms/BaseRate": {"le": 100}}), ["1", "2"])
+        self.assertEqual(self.ids({"Rooms/SmokingAllowed": False}), ["1", "2", "3"])
+
+    def test_every_allowed_field_converts_and_matches(self):
+        for key in ev.CONDITION_FIELDS:
+            kind = ev.CONDITION_FIELDS[key]
+            value = {"bool": True, "text": "x", "number": 1, "datetime": "2020-01-01T00:00:00Z"}[kind]
+            self.assertIn(key.split("/")[-1], ev.condition_to_filter({key: value}))
+            ev.matches(self.hotels["1"], {key: value})   # 形が正しい条件は、例外なく真偽を返す
+
+
+class HotelCheckTest(unittest.TestCase):
+    """ホテルに固有の確かめ（@dataset_check("hotel")）：condition・答えの数・evidence。架空の 3 件で。"""
+
+    def cond(self, answers, condition, **extra):
+        return {"qid": "c1", "question": "条件で絞る", "type": "condition", "answer_ids": answers, "condition": condition, **extra}
+
+    def other(self, kind="paraphrase", answers=("1",), evidence=None, **extra):
+        q = {"qid": "q1", "question": "湾の見える宿は", "type": kind, "answer_ids": list(answers),
+             "evidence": {"1": "湾を見下ろす静かな宿"} if evidence is None else evidence}
+        q.update(extra)
+        return q
+
+    def test_check_is_registered_for_hotel_only(self):
+        self.assertIn(ev.check_hotel, ev.DATASET_CHECKS["hotel"])
+        self.assertNotIn(ev.check_hotel, ev.DATASET_CHECKS["hr"])
+        self.assertNotIn(ev.check_hotel, ev.DATASET_CHECKS["sengoku"])
+
+    def test_condition_answers_must_equal_data_matches(self):
+        self.assertEqual(hotel_check([self.cond(["1"], {"Rating": {"ge": 4.5}})]), [])
+        self.assertEqual(hotel_check([self.cond(["1", "3"], {"ParkingIncluded": True})]), [])
+        self.assertEqual(hotel_check([self.cond(["3", "1"], {"ParkingIncluded": True})]), [])   # 順番は関係ない
+        # 条件に合わないホテルが入っている
+        problems = hotel_check([self.cond(["1", "3"], {"Rating": {"ge": 4.5}})])
+        self.assertEqual(len(problems), 1, problems)
+        self.assertIn("c1", problems[0])
+        self.assertIn("条件に合わない：3", problems[0])
+        self.assertIn("条件に合うホテル全部", problems[0])
+        # 条件に合うホテルが足りない
+        problems = hotel_check([self.cond(["1"], {"ParkingIncluded": True})])
+        self.assertEqual(len(problems), 1, problems)
+        self.assertIn("足りない：3", problems[0])
+        self.assertIn("2 件：1・3", problems[0])
+        # 足りないのと余計なのが両方
+        problems = hotel_check([self.cond(["2"], {"ParkingIncluded": True})])
+        self.assertEqual(len(problems), 1, problems)
+        self.assertIn("足りない：1・3", problems[0])
+        self.assertIn("条件に合わない：2", problems[0])
+
+    def test_condition_must_match_between_one_and_the_limit(self):
+        problems = hotel_check([self.cond(["1"], {"Rating": {"ge": 5}})])
+        self.assertEqual(len(problems), 1, problems)   # 0 件の条件では、answer_ids の食い違いを重ねて言わない
+        self.assertIn("0 件です", problems[0])
+        with mock.patch.object(ev, "HOTEL_MAX_CONDITION_ANSWERS", 2):
+            self.assertEqual(hotel_check([self.cond(["1", "3"], {"ParkingIncluded": True})]), [])
+            problems = hotel_check([self.cond(["1", "2", "3"], {"Rating": {"ge": 3}})])
+            self.assertTrue(any("3 件です" in p and "1〜2 件" in p for p in problems), problems)
+
+    def test_condition_type_needs_a_condition(self):
+        q = self.cond(["1"], {"Rating": {"ge": 4.5}})
+        del q["condition"]
+        problems = hotel_check([q])
+        self.assertEqual(len(problems), 1, problems)
+        self.assertIn("c1", problems[0])
+        self.assertIn("condition（答えの条件）が要ります", problems[0])
+
+    def test_a_condition_on_another_type_is_checked_the_same_way(self):
+        q = self.other(answers=("1", "2"), condition={"Rating": {"ge": 4.5}})
+        problems = hotel_check([q])
+        self.assertEqual(len(problems), 1, problems)
+        self.assertIn("条件に合わない：2", problems[0])
+
+    def test_bad_condition_shape_is_a_problem_not_a_crash(self):
+        for bad in ({}, "Rating ge 4", {"Description": "x"}, {"Rating": {"ne": 4}}, {"Rating": "high"}):
+            with self.subTest(bad):
+                problems = hotel_check([self.cond(["1"], bad)])
+                self.assertEqual(len(problems), 1, problems)
+                self.assertIn("condition の形が違います", problems[0])
+
+    def test_data_checks_are_skipped_without_the_data(self):
+        known = {"1", "2", "3"}
+        wrong = [self.cond(["2"], {"Rating": {"ge": 4.5}}), self.other(evidence={"1": "どこにもない語句"})]
+        self.assertEqual(ev.check_hotel(wrong, known_ids=known, data=None), [])
+        self.assertEqual(ev.check_hotel(wrong, known_ids=known, data={"not": "a list"}), [])
+        # 形は、データがなくても確かめる
+        problems = ev.check_hotel([self.cond(["1"], {"Rating": "high"})], known_ids=known, data=None)
+        self.assertIn("condition の形が違います", problems[0])
+
+    def test_non_condition_answers_are_limited(self):
+        known = {str(n) for n in range(1, 30)}
+        ids = [str(n) for n in range(1, 7)]
+        q = self.other(answers=ids, evidence={i: "x" for i in ids})
+        problems = ev.check_hotel([q], known_ids=known, data=None)
+        self.assertEqual(len(problems), 1, problems)
+        self.assertIn("q1", problems[0])
+        self.assertIn("5 件までです（今は 6 件", problems[0])
+        ok = self.other(answers=ids[:5], evidence={i: "x" for i in ids[:5]})
+        self.assertEqual(ev.check_hotel([ok], known_ids=known, data=None), [])
+        # condition の質問は、20 件まで（数はデータがあるとき、条件の結果で確かめる）
+        many = [str(n) for n in range(1, 21)]
+        self.assertEqual(ev.check_hotel([self.cond(many, {"Rating": {"ge": 4}})], known_ids=known, data=None), [])
+
+    def test_evidence_is_required_for_questions_without_a_condition(self):
+        q = self.other()
+        del q["evidence"]
+        problems = hotel_check([q])
+        self.assertEqual(len(problems), 1, problems)
+        self.assertIn("evidence がありません", problems[0])
+        problems = hotel_check([self.other(evidence=["湾を見下ろす静かな宿"])])
+        self.assertEqual(len(problems), 1, problems)
+        self.assertIn("evidence は {HotelId: 語句} の形", problems[0])
+        # ホテルごとに 1 つ
+        problems = hotel_check([self.other(answers=("1", "3"))])
+        self.assertEqual(len(problems), 1, problems)
+        self.assertIn("evidence に「3」の語句がありません", problems[0])
+        # answer_ids にないホテル
+        problems = hotel_check([self.other(evidence={"1": "湾を見下ろす静かな宿", "3": "スパと温水プール"})])
+        self.assertEqual(len(problems), 1, problems)
+        self.assertIn("evidence の「3」は answer_ids にありません", problems[0])
+        # 語句が空・文字列でない
+        for bad in ("  ", [], [""], ["湾を見下ろす静かな宿", 5], 5):
+            with self.subTest(bad):
+                problems = hotel_check([self.other(evidence={"1": bad})])
+                self.assertEqual(len(problems), 1, problems)
+                self.assertIn("語句か、語句の並び", problems[0])
+        # condition の質問には要らない（あれば同じ確かめ）
+        self.assertEqual(hotel_check([self.cond(["1"], {"Rating": {"ge": 4.5}})]), [])
+        problems = hotel_check([self.cond(["1"], {"Rating": {"ge": 4.5}}, evidence={"1": "どこにもない語句"})])
+        self.assertEqual(len(problems), 1, problems)
+        self.assertIn("どこにもない語句", problems[0])
+
+    def test_evidence_phrases_must_be_in_that_hotels_data(self):
+        self.assertEqual(hotel_check([self.other()]), [])
+        self.assertEqual(hotel_check([self.other(evidence={"1": "Free parking and an evening wine hour"})]), [])   # 英語の説明
+        self.assertEqual(hotel_check([self.other(evidence={"1": "Free  parking"})]), [])                            # 空白は無視
+        self.assertEqual(hotel_check([self.other(evidence={"1": ["眺め", "コンシェルジュ"]})]), [])                # タグ
+        self.assertEqual(hotel_check([self.other(evidence={"1": "Suite, 1 King Bed (Bay View)"})]), [])           # 客室の説明
+        self.assertEqual(hotel_check([self.other(evidence={"1": "jacuzzi tub"})]), [])                              # 客室のタグ
+        self.assertEqual(hotel_check([self.other(evidence={"1": "10 Bay St"})]), [])                                # 住所
+        problems = hotel_check([self.other(evidence={"1": "海を見下ろす静かな宿"})])
+        self.assertEqual(len(problems), 1, problems)
+        self.assertIn("q1", problems[0])
+        self.assertIn("「1」の語句「海を見下ろす静かな宿」", problems[0])
+        # 並びのうち、見つからない語句だけを言う
+        problems = hotel_check([self.other(evidence={"1": ["眺め", "プール"]})])
+        self.assertEqual(len(problems), 1, problems)
+        self.assertIn("「プール」", problems[0])
+        self.assertNotIn("「眺め」", problems[0])
+        # 別のホテルの語句は、そのホテルになければ問題
+        problems = hotel_check([self.other(evidence={"1": "スパと温水プールのある"})])
+        self.assertEqual(len(problems), 1, problems)
+        # フランス語の説明・HotelId は、根拠にしない
+        for phrase in ("Une auberge calme au-dessus de la baie", "Chambre Économique"):
+            self.assertEqual(len(hotel_check([self.other(evidence={"1": phrase})])), 1, phrase)
+
+    def test_hotel_texts_split_english_and_japanese_items(self):
+        hotel = mini_hotels()[0]
+        texts = ev.hotel_texts(hotel)
+        self.assertEqual(set(texts), {"en", "ja"})
+        for word in ("Harbor Light Inn", "quiet inn above the bay", "Boutique", "concierge", "Budget Room", "1 Queen Bed",
+                     "jacuzzi tub", "10 Bay St", "Lakeview", "USA"):
+            self.assertIn(word, texts["en"])
+            self.assertNotIn(word, texts["ja"])
+        for word in ("ハーバーライト・イン", "湾を見下ろす静かな宿", "ブティック", "コンシェルジュ", "バジェットルーム", "スイート、キングベッド1台"):
+            self.assertIn(word, texts["ja"])
+            self.assertNotIn(word, texts["en"])
+        both = texts["en"] + texts["ja"]
+        for word in ("Une auberge", "Chambre", "2019-05-01", "coordinates"):
+            self.assertNotIn(word, both)   # フランス語・日付・位置は含めない
+
+    def test_question_language(self):
+        self.assertEqual(ev.question_language("ホノルルのホテルは"), "ja")
+        self.assertEqual(ev.question_language("Trails End Motel の朝食は無料ですか"), "ja")
+        self.assertEqual(ev.question_language("Which hotel is in Pinecrest?"), "en")
+        self.assertEqual(ev.question_language("条件"), "ja")
+        self.assertEqual(ev.question_language(None), "en")
+
+    def ja_en(self, question, evidence, answers=("3",)):
+        return {"qid": "j1", "question": question, "type": "ja-en", "answer_ids": list(answers), "evidence": evidence}
+
+    def test_ja_en_japanese_question_needs_a_clue_only_in_english_items(self):
+        ok = self.ja_en("Pinecrest にあるホテルはどこですか。", {"3": "Pinecrest"})        # 住所は英語の項目だけ
+        self.assertEqual(hotel_check([ok]), [])
+        self.assertEqual(hotel_check([self.ja_en("Summit Resort の設備は？", {"3": "Summit Resort"})]), [])   # 英語の名前
+        # 手がかりが 1 つあれば、ほかの語句は日本語の項目のものでもよい
+        self.assertEqual(hotel_check([self.ja_en("Pinecrest のスパのあるホテルは？", {"3": ["Pinecrest", "スパと温水プール"]})]), [])
+        # 日本語の項目にある語句だけ：日本語で聞いたら、ふつうに日本語で当たる
+        problems = hotel_check([self.ja_en("サミット・リゾートはどこですか。", {"3": "サミット・リゾート"})])
+        self.assertEqual(len(problems), 1, problems)
+        self.assertIn("j1", problems[0])
+        self.assertIn("英語の項目にだけあって、日本語の項目にない語句がありません", problems[0])
+        # 英語の項目にもあるが、日本語の項目にも同じ綴りがある語句：どちらでも当たる
+        hotels = mini_hotels()
+        hotels[2]["Description_ja"] += "Pinecrest 駅から徒歩5分です。"
+        problems = hotel_check([ok], hotels)
+        self.assertEqual(len(problems), 1, problems)
+        self.assertIn("英語の項目にだけあって、日本語の項目にない語句がありません", problems[0])
+
+    def test_ja_en_english_question_needs_a_clue_only_in_japanese_items(self):
+        english = "Which hotel has a heated pool?"
+        self.assertEqual(hotel_check([self.ja_en(english, {"3": "温水プール"})]), [])
+        problems = hotel_check([self.ja_en(english, {"3": "A mountain resort"})])
+        self.assertEqual(len(problems), 1, problems)
+        self.assertIn("日本語の項目にだけあって、英語の項目にない語句がありません", problems[0])
+
+    def test_language_of_the_clue_is_only_checked_for_ja_en_and_with_data(self):
+        q = {**self.ja_en("Pinecrest にあるホテルは？", {"3": "サミット・リゾート"}), "type": "proper-noun"}
+        self.assertEqual(hotel_check([q]), [])
+        ja_en = self.ja_en("Pinecrest にあるホテルは？", {"3": "サミット・リゾート"})
+        self.assertEqual(ev.check_hotel([ja_en], known_ids={"3"}, data=None), [])
+
+    def test_valid_sample_passes_with_the_mini_data(self):
+        questions = [self.cond(["1", "3"], {"ParkingIncluded": True}), self.other(),
+                     self.ja_en("Pinecrest にあるホテルはどこですか。", {"3": "Pinecrest"})]
+        self.assertEqual(hotel_check(questions), [])
+
+
+class HotelQuestionsTest(unittest.TestCase):
+    """本物の evaluation/hotel_questions.json（40 問）。ホテルのデータは Repo に写していないので、形は常に、中身はデータがあるときだけ確かめる。"""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.questions = ev.load_questions(ev.QUESTION_FILES["hotel"])
+        cls.ids = {str(n) for n in range(1, 51)}   # 日本語版のホテルは 50 件（HotelId は "1"〜"50"）
+
+    def test_shape_and_type_counts(self):
+        self.assertEqual(len(self.questions), 40)
+        self.assertEqual(ev.validate("hotel", self.questions, known_ids=self.ids), [])
+        counts = collections.Counter(q["type"] for q in self.questions)
+        self.assertEqual(dict(counts), {"paraphrase": 10, "proper-noun": 6, "condition": 10, "ja-en": 6, "amenity": 8})
+        self.assertEqual(dict(counts), ev.TYPE_TARGETS["hotel"])
+        self.assertEqual([q["qid"] for q in self.questions], [f"hotel-{n:02d}" for n in range(1, 41)])
+
+    def test_each_question_has_a_why_of_one_or_two_sentences(self):
+        for q in self.questions:
+            why = q.get("why", "")
+            self.assertTrue(why.strip(), f"{q['qid']} に why がありません")
+            self.assertLessEqual(len(re.findall("。", why)), 2, f"{q['qid']} の why は 2 文までです")
+
+    def test_condition_questions_carry_a_condition_and_the_others_carry_evidence(self):
+        for q in self.questions:
+            if q["type"] == "condition":
+                self.assertIn("condition", q, q["qid"])
+                self.assertTrue(ev.condition_to_filter(q["condition"]), q["qid"])
+                self.assertLessEqual(len(q["answer_ids"]), ev.HOTEL_MAX_CONDITION_ANSWERS, q["qid"])
+            else:
+                self.assertEqual(set(q["evidence"]), set(q["answer_ids"]), q["qid"])   # ホテルごとに 1 つ。余りもない
+                self.assertLessEqual(len(q["answer_ids"]), ev.HOTEL_MAX_ANSWERS, q["qid"])
+
+    def test_condition_questions_use_every_operator_and_several_fields(self):
+        conditions = [q["condition"] for q in self.questions if q["type"] == "condition"]
+        ops = {op for c in conditions for spec in c.values() if isinstance(spec, dict) for op in spec}
+        self.assertEqual(ops, {"ge", "le", "gt", "lt"})   # eq は値だけで書く
+        fields = {key for c in conditions for key in c}
+        self.assertGreaterEqual(len(fields), 6, fields)
+        self.assertTrue({"Rating", "ParkingIncluded", "Category_ja", "LastRenovationDate", "Rooms/BaseRate", "Address/City"} <= fields)
+        self.assertEqual(len({ev.condition_to_filter(c) for c in conditions}), 10)   # 同じ条件の質問がない
+
+    def test_ja_en_questions_are_asked_in_japanese(self):
+        # ホテルのデータの英語と日本語は、1 対 1 の翻訳で、日本語だけにある手がかりはない。逆向き（英語で聞く）の質問は作れない
+        for q in self.questions:
+            if q["type"] == "ja-en":
+                self.assertEqual(ev.question_language(q["question"]), "ja", q["qid"])
+
+    def test_hotel_order_mixes_the_types(self):
+        types = [q["type"] for q in self.questions]
+        order = ["paraphrase", "proper-noun", "condition", "ja-en", "amenity"]
+        # hotel-01〜hotel-30 は、5 問ごとに 5 つの種類が 1 回ずつ。hotel-31 以降は、数の多い paraphrase・condition・amenity だけ
+        for start in range(0, 30, 5):
+            self.assertEqual(types[start:start + 5], order, f"hotel-{start + 1:02d} から 5 問")
+        self.assertEqual(set(types[30:]), {"paraphrase", "condition", "amenity"})
+
+    def test_question_set_is_varied(self):
+        texts = [q["question"] for q in self.questions]
+        self.assertEqual(len(set(texts)), 40)   # 同じ文の質問がない
+        answers = collections.Counter(i for q in self.questions for i in q["answer_ids"])
+        self.assertGreaterEqual(len(answers), 40)   # 40 件以上のホテルが、どれかの質問の正解になっている
+        self.assertLessEqual(max(answers.values()), 4)   # 特定のホテルにかたよらない
+
+    @unittest.skipUnless(real_hotel_data_path(), "ホテルのデータがありません（HOTEL_DATA か _work/hotel-vectors/ に置くと確かめます）")
+    def test_questions_pass_against_the_real_hotel_data(self):
+        data = ev.load_data("hotel", real_hotel_data_path())
+        self.assertEqual(len(data), 50)
+        self.assertEqual(ev.validate("hotel", self.questions, known_ids=ev.ids_of("hotel", data), data=data), [])
+        # condition の質問の answer_ids は、データのうち条件に合うホテル全部
+        for q in self.questions:
+            if q["type"] == "condition":
+                matched = {h["HotelId"] for h in data if ev.matches(h, q["condition"])}
+                self.assertEqual(matched, set(q["answer_ids"]), q["qid"])
+        # ja-en の手がかりは、日本語の質問なら、英語の項目にだけある（日本語の項目に同じ語句がない）
+        for q in self.questions:
+            if q["type"] == "ja-en":
+                for hotel_id, value in q["evidence"].items():
+                    texts = ev.hotel_texts(next(h for h in data if h["HotelId"] == hotel_id))
+                    phrases = [value] if isinstance(value, str) else value
+                    self.assertTrue(any(p in texts["en"] and p not in texts["ja"] for p in phrases), f"{q['qid']} {hotel_id}")
+
+    @unittest.skipUnless(real_hotel_data_path(), "ホテルのデータがありません")
+    def test_ja_en_clues_for_all_matching_hotels_are_listed(self):
+        # 「ポートランド」「サンフランシスコ」のように都市名で聞く質問は、その都市のホテルを全部、正解にしている
+        data = ev.load_data("hotel", real_hotel_data_path())
+        for q in self.questions:
+            if q["type"] != "ja-en":
+                continue
+            clue = next(iter(q["evidence"].values()))
+            clue = clue if isinstance(clue, str) else clue[0]
+            wanted = {h["HotelId"] for h in data if clue in ev.hotel_texts(h)["en"]}
+            self.assertEqual(wanted, set(q["answer_ids"]), q["qid"])
+
+
 class LoadTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -830,6 +1266,26 @@ class CliTest(unittest.TestCase):
         code, out, err = run_cli("--dataset", "hotel", "--file", path, "--hotel-data", hotels)
         self.assertEqual(code, 1)   # 質問が 0 問。ファイルは読めた
         self.assertIn("種類 amenity は 0 問です（目標 8 問）", out)
+
+    def test_hotel_conditions_are_checked_against_the_data(self):
+        good = {"qid": "hotel-01", "question": "評価が4.5以上のホテルは", "type": "condition", "answer_ids": ["1"],
+                "condition": {"Rating": {"ge": 4.5}}}
+        path = self.write("hotel.json", [good, {**good, "qid": "hotel-02", "answer_ids": ["1", "2"]}])
+        code, out, err = run_cli("--dataset", "hotel", "--file", path, "--hotel-data", str(MINI_HOTELS))
+        self.assertEqual(code, 1)
+        self.assertIn("hotel-02：answer_ids が、condition に合うホテル（1 件：1）と違います（条件に合わない：2）", out)
+        self.assertNotIn("hotel-01：", out)
+        self.assertEqual(err, "")
+        # 条件どおりなら、condition の確かめは通る（種類の数の違いだけが残る）
+        code, out, err = run_cli("--dataset", "hotel", "--file", self.write("ok.json", [good]), "--hotel-data", str(MINI_HOTELS))
+        self.assertEqual(code, 1)
+        self.assertNotIn("hotel-01：", out)
+        self.assertIn("種類 condition は 1 問です（目標 10 問）", out)
+
+    @unittest.skipUnless(real_hotel_data_path(), "ホテルのデータがありません（HOTEL_DATA か _work/hotel-vectors/ に置くと確かめます）")
+    def test_hotel_questions_pass_from_the_cli(self):
+        code, out, err = run_cli("--dataset", "hotel", "--hotel-data", str(real_hotel_data_path()))
+        self.assertEqual((code, out.strip(), err), (0, "問題なし（40 問）", ""))
 
     def test_hotel_data_option_only_for_hotel(self):
         code, out, err = run_cli("--dataset", "sengoku", "--hotel-data", str(self.dir / "h.json"))

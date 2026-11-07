@@ -8,9 +8,11 @@
 - 人事：`evaluation/hr_questions.json`（60問）
 - ホテル：`evaluation/hotel_questions.json`（40問）
 
-どれも質問の並び（JSON の配列）です。人事のファイルはできています。ホテルのファイルは、評価の準備の中で足します。
+どれも質問の並び（JSON の配列）です。人事とホテルのファイルはできています。ホテルのデータは Repo に写していないので、ホテルの質問を確かめるときは、データの場所を渡します（下の「質問を確かめる」）。
 
 人事の60問は、種類をまぜて並べてあります。`hr-01`〜`hr-36` は、6問ごとに6つの種類が1回ずつ（`paraphrase`・`proper-noun`・`numeric`・`multi-doc`・`scan`・`permission` の順）です。`scan` は6問で尽きるので、`hr-37` 以降は5つの種類で回り、最後の4問は `paraphrase` と `permission` だけです。先頭から何問かだけ取るときは、6の倍数の問数（6・12・…・36）なら、6種類がそろいます。
+
+ホテルの40問も、種類をまぜて並べてあります。`hotel-01`〜`hotel-30` は、5問ごとに5つの種類が1回ずつ（`paraphrase`・`proper-noun`・`condition`・`ja-en`・`amenity` の順）です。`hotel-31` 以降は、数の多い `paraphrase`・`condition`・`amenity` だけです。先頭から5の倍数の問数（5・10・…・30）なら、5種類がそろいます。
 
 ## 1問の形
 
@@ -37,11 +39,11 @@
 必要なときだけ書くもの：
 
 - `why`：どの文書のどこに答えがあり、どの方式が得意・不得意になりそうか
-- `evidence`：`answer_ids` と `hidden_ids` の文書ごとに、答えの根拠になる短い語句。`{"MAIL-01": "一次面接の日程の候補を2つ"}` の形で、語句は、その文書の本文にそのまま出るものにします。**人事の質問には要ります**（ホテル・武将は任意）。確かめの道具が、本文のもと（下の「人事の決まり」）にその語句があるかを調べます。質問を目で確かめる抜き取りの一覧にも、この語句を出します
+- `evidence`：`answer_ids` と `hidden_ids` の文書ごとに、答えの根拠になる短い語句。`{"MAIL-01": "一次面接の日程の候補を2つ"}` の形で、語句は、その文書の本文にそのまま出るものにします。**人事の質問と、ホテルの `condition` でない質問には要ります**（武将は任意）。確かめの道具が、本文のもと（人事は下の「人事の決まり」、ホテルは「ホテルの決まり」）にその語句があるかを調べます。ホテルは、`{"6": ["無料Wi-Fi", "バー"]}` のように、語句の並びで書いてもかまいません（並びの語句は、全部あること）。質問を目で確かめる抜き取りの一覧にも、この語句を出します
 - `note`：作る人のメモ
 - `as_role`：だれとして聞くか（例 `"role:employee"`）。`permission` の質問に要ります
 - `hidden_ids`：その人には見えてはいけない文書の ID の並び。`permission` の質問に要ります（1件以上）
-- `condition`：ホテルの `condition` の質問で、答えの条件を表したもの。形はホテルの質問を作るときに決めます
+- `condition`：ホテルの質問で、答えの条件を表したもの（例 `{"Rating": {"ge": 4.5}, "ParkingIncluded": true}`）。種類 `condition` の質問に要ります。書き方は「ホテルの決まり」
 
 ほかの項目（武将の `query_terms`・`avoid_terms`・`clues` など）があっても構いません。評価は読み飛ばします。
 
@@ -104,6 +106,24 @@
 - `scan`：`answer_ids` に、OCR が要る文書（manifest の `ocr_required` が true。`SCAN-01`〜`SCAN-03`）を含むこと。スキャンにしか書いていないことを聞きます
 - `permission`：次の節
 
+### ホテルの決まり
+
+ホテルの質問も、確かめの道具が決まりを見ます。ホテルのデータは Repo に写していないので、`--hotel-data` で渡したときだけ、データと照らす確かめ（条件の結果・語句の検索・`ja-en` の手がかり）が動きます。データなしで確かめるのは、形・答えの数・`evidence` と `condition` がそろっていることです。
+
+- `answer_ids`：`condition` でない質問は 1〜5 件。`condition` の質問は 1〜20 件で、0 件や 21 件以上になる条件は使いません
+- `condition`：答えの条件を、次のように書きます。**質問の意味を条件で表しきれる質問だけ**を、種類 `condition` にします。確かめの道具は、データのうち条件に合うホテルを計算して、`answer_ids` がその全部と同じ集合かを見ます。`answer_ids` は手で数えず、条件から作ります
+  - 例：`{"Rating": {"ge": 4.5}, "ParkingIncluded": true, "Category_ja": "ブティック", "Rooms/BaseRate": {"le": 100}}`
+  - 値だけ書くと `eq`。`{"演算": 値}` の演算は `eq`・`ge`・`le`・`gt`・`lt`。1つの項目に演算を2つ書けます（`{"Rating": {"ge": 4, "lt": 4.5}}`）。真偽と文字列は `eq` だけです
+  - 使える項目：`HotelId`・`Category`・`Category_ja`・`ParkingIncluded`・`IsDeleted`・`LastRenovationDate`・`Rating`、住所の `Address/City`・`Address/StateProvince`・`Address/PostalCode`・`Address/Country`、客室の `Rooms/Type`・`Rooms/Type_ja`・`Rooms/BaseRate`・`Rooms/BedOptions`・`Rooms/SleepsCount`・`Rooms/SmokingAllowed`。検索のインデックスで絞り込める項目だけで、説明やタグでは絞れません
+  - `Rooms/…` は「どれかの客室が満たす」です。客室の条件を2つ以上書くと、**同じ客室が全部を満たす**ことになります（100ドル以下の部屋と、禁煙の部屋が別々にあるだけでは、合いません）
+  - 改装日（`LastRenovationDate`）は、`{"ge": "2015-01-01T00:00:00Z"}` のように、`T` と `Z`（または時差）つきの日時の文字で書きます。データの日時と同じ順に比べ、検索の `$filter` では引用符のない日時になります
+  - 検索の `$filter` の文字は、`tools/evallib/questions.py` の `condition_to_filter` が作ります（例 `Rating ge 4.5 and ParkingIncluded eq true`、`Rooms/any(r: r/BaseRate le 100)`、`Address/City eq 'New York'`）。項目の順は書いた順です。評価の道具が、各方式に絞り込みを足して測るときに使います。`matches(ホテル, condition)` は、データが条件に合うかを返します
+- `evidence`：`condition` でない質問は、`answer_ids` のホテルごとに要ります。語句は、そのホテルのデータの文字にそのまま出るものにします（空白は無視して探します）。探す先は、名前（`HotelName`・`HotelName_ja`）・説明（`Description`・`Description_ja`）・カテゴリ・タグ・客室の説明と種類とベッドとタグ・住所です。フランス語の説明、`HotelId`、改装日、位置は、根拠にしません
+- `paraphrase`・`proper-noun`・`amenity`：説明・タグを読んで、人が見て正しいと言えるホテルを、すべて入れます。`amenity` は、タグに出ない設備が説明にだけ書かれているホテルも、正解です（例：タグに「無料Wi-Fi」がなくても、説明に書いてあれば入れます）
+- `ja-en`：ホテルのデータの英語の項目と日本語の項目（`_ja`）は、説明・タグ・客室の説明が1対1の翻訳で、日本語の項目にしかない手がかりはありません。そこで、**日本語で聞いて、手がかりが英語の項目にしかない**質問を作ります。英語の項目にしかないものは、英語のホテル名（`HotelName`。日本語の項目はカタカナ）、住所（`Address`の都市・州・通り）、客室のタグ（`Rooms/Tags`）です
+  - `evidence` の語句に、その手がかりを1つ以上入れます。確かめの道具は、質問の言語（日本語の文字があれば日本語）の項目になく、もう一方の言語の項目にだけある語句が、ホテルごとに1つ以上あるかを見ます。ほかの語句は、どちらの言語の項目にあってもかまいません
+  - 英語で聞いて、日本語の項目にしか手がかりがない質問は、データにないので作っていません（その向きの質問を足せば、確かめの道具は通します）
+
 ## permission（見えてはいけない文書）
 
 「一般社員として聞いたとき、求人票以外は出てこない」ことを確かめる質問です。
@@ -137,6 +157,7 @@ python tools/check_questions.py --dataset hotel --hotel-data <ホテルのデー
   - `permission` の `as_role` と `hidden_ids` の抜け
   - 種類ごとの数の違い
   - 人事は、上の「人事の決まり」（`permission`・`scan`・`multi-doc`）
+  - ホテルは、上の「ホテルの決まり」：`condition` の形、`answer_ids` が条件に合うホテル全部であること（データを渡したとき）、答えの数、`evidence` がそろっていて語句がそのホテルにあること、`ja-en` の手がかり
 - 質問やデータのファイルが読めないときは、理由を出して終了コード 2 で終わります。質問のファイルがないときは、次の手（`--file` で渡すか、質問を作ります）も出します
 - `--file PATH` で質問のファイルを変えられます
 - ホテルのデータは、このリポジトリに写していません。ダウンロードした `HotelsData_toAzureBlobs_ja.json` を `_work/hotel-vectors/` に置くか、`--hotel-data` で場所を渡します
