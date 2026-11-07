@@ -281,6 +281,8 @@ az group create -n $rg -l $loc
 az storage account create -n "st$org$t" -g $rg -l $loc --sku Standard_LRS --kind StorageV2
 ```
 
+- az 2.74 では、この Storage の作成が `DATA_STORAGE_TABLE` のエラーで止まることがあります。そのときは az を新しくする（`az upgrade`）か、画面（3-2）で作ります。
+
 AI Search（Basic、マネージド ID あり、セマンティック ランカー Free）：
 
 ```powershell

@@ -275,7 +275,13 @@ az storage blob upload --account-name "st$org$t" -c hotels -n HotelsData_toAzure
   ]}
  ],
  "suggesters":[{"name":"sg","searchMode":"analyzingInfixMatching",
-  "sourceFields":["HotelName"]}]
+  "sourceFields":["HotelName"]}],
+ "semantic":{
+  "configurations":[{"name":"hotels-semantic",
+   "prioritizedFields":{
+    "titleField":{"fieldName":"HotelName_ja"},
+    "prioritizedContentFields":[{"fieldName":"Description_ja"},{"fieldName":"Description"}],
+    "prioritizedKeywordsFields":[{"fieldName":"Tags_ja"},{"fieldName":"Category_ja"}]}}]}
 }
 </code></pre>
 <ol start="4">
@@ -315,6 +321,9 @@ az storage blob upload --account-name "st$org$t" -c hotels -n HotelsData_toAzure
   }
 }
 </code></pre>
+<ul>
+<li><code>rg-&lt;org&gt;-&lt;team&gt;</code> は、リソース グループの名前です。既存のリソース グループに作ったとき（<code>workshop.config</code> の <code>AZURE_RESOURCE_GROUP</code>）は、その名前に置き換えます。</li>
+</ul>
 <p>確認：</p>
 <ul>
 <li class="task"><input type="checkbox"> データソースの一覧に <code>hotels-blob-ds</code> がある。</li>
@@ -1035,6 +1044,9 @@ az cosmosdb sql role assignment create --account-name "cosmos-$org-$t" -g $rg --
   }
 }
 </code></pre>
+<ul>
+<li><code>rg-&lt;org&gt;-&lt;team&gt;</code> は、リソース グループの名前です。既存のリソース グループに作ったとき（<code>workshop.config</code> の <code>AZURE_RESOURCE_GROUP</code>）は、その名前に置き換えます。</li>
+</ul>
 <p>確認：</p>
 <ul>
 <li class="task"><input type="checkbox"> データソースの一覧に <code>hotels-cosmos-ds</code> がある。</li>

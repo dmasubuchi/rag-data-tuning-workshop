@@ -317,6 +317,9 @@ $rg = "rg-$org-$t"   # 既存のリソース グループに作るときは、�
 <pre><code class="language-powershell">az group create -n $rg -l $loc
 az storage account create -n "st$org$t" -g $rg -l $loc --sku Standard_LRS --kind StorageV2
 </code></pre>
+<ul>
+<li>az 2.74 では、この Storage の作成が <code>DATA_STORAGE_TABLE</code> のエラーで止まることがあります。そのときは az を新しくする（<code>az upgrade</code>）か、画面（3-2）で作ります。</li>
+</ul>
 <p>AI Search（Basic、マネージド ID あり、セマンティック ランカー Free）：</p>
 <pre><code class="language-powershell">az search service create -n "srch-$org-$t" -g $rg -l $loc --sku basic --identity-type SystemAssigned --semantic-search free
 </code></pre>

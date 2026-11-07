@@ -231,7 +231,13 @@ az storage blob upload --account-name "st$org$t" -c hotels -n HotelsData_toAzure
   ]}
  ],
  "suggesters":[{"name":"sg","searchMode":"analyzingInfixMatching",
-  "sourceFields":["HotelName"]}]
+  "sourceFields":["HotelName"]}],
+ "semantic":{
+  "configurations":[{"name":"hotels-semantic",
+   "prioritizedFields":{
+    "titleField":{"fieldName":"HotelName_ja"},
+    "prioritizedContentFields":[{"fieldName":"Description_ja"},{"fieldName":"Description"}],
+    "prioritizedKeywordsFields":[{"fieldName":"Tags_ja"},{"fieldName":"Category_ja"}]}}]}
 }
 ```
 
@@ -270,6 +276,9 @@ az storage blob upload --account-name "st$org$t" -c hotels -n HotelsData_toAzure
   }
 }
 ```
+
+- `rg-<org>-<team>` は、リソース グループの名前です。既存のリソース グループに作ったとき（`workshop.config` の `AZURE_RESOURCE_GROUP`）は、その名前に置き換えます。
+
 
 確認：
 
@@ -1016,6 +1025,9 @@ az cosmosdb sql role assignment create --account-name "cosmos-$org-$t" -g $rg --
   }
 }
 ```
+
+- `rg-<org>-<team>` は、リソース グループの名前です。既存のリソース グループに作ったとき（`workshop.config` の `AZURE_RESOURCE_GROUP`）は、その名前に置き換えます。
+
 
 確認：
 
