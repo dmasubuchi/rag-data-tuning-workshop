@@ -1,6 +1,6 @@
-// slide-player（MIT License, Copyright (c) 2026 dmasubuchi）の player/player.js の写し。
+// slideplay（https://github.com/dmasubuchi/slideplay、MIT License, Copyright (c) 2026 dmasubuchi）の player/player.js の写し。
 // このファイルは MIT License で使えます（全文はこの Repo の LICENSE）。
-// このファイルのコメントにある「約束」「CONTRACT.md」は、slide-player の Repo にある約束書（CONTRACT.md）のこと。この Repo には置いていない。
+// このファイルのコメントにある「約束」「CONTRACT.md」は、slideplay の Repo にある約束書（CONTRACT.md）のこと。この Repo には置いていない。
 // プレイヤー本体（CONTRACT.md）。1ファイル・依存なし・CSS 込み・file:// で動く。
 // 動画用の描画モード（?render）のときは、下の2つの関数と body.render のほかは何もしない（約束 §3.1）。
 (() => {
@@ -67,14 +67,14 @@
   const MSG_JUMP = 'URLジャンプします';                           // ジャンプの動きの途中（前のスライドが消えている間）に、薄く出す
 
   // 動きの層。入場の型
-  const ENTRY_STYLES = ['ppt', 'meiji'];
+  const ENTRY_STYLES = ['subtle', 'bounce'];
   // 入場：1枚の入場は ENTRY_TARGET_MS を目安に、ENTRY_MAX_MS を超えない。要素の間のずれは ENTRY_GAP_MS まで
   const ENTRY_TARGET_MS = 1500, ENTRY_MAX_MS = 2000, ENTRY_GAP_MS = 120;
   const ENTRY_MS = { fade: 400, left: 450, up: 450, blur: 500, pop: 450, wipe: 600, grow: 600, count: 800 };
-  // 役目の印（data-sp-role。約束 §2.6）→ 動き。PowerPoint風（ppt）と、ぼかし・持ち上げ・弾む型（meiji）
+  // 役目の印（data-sp-role。約束 §2.6）→ 動き。控えめ型（subtle）と、ぼかし・持ち上げ・弾む型（bounce）
   const ENTRY_EFFECTS = {
-    ppt: { title: 'fade', sub: 'fade', item: 'left', card: 'left', bar: 'wipe', stat: 'fade', count: 'fade', node: 'left', arrow: 'fade' },
-    meiji: { title: 'blur', sub: 'blur', item: 'up', card: 'up', bar: 'grow', stat: 'pop', count: 'count', node: 'pop', arrow: 'fade' },
+    subtle: { title: 'fade', sub: 'fade', item: 'left', card: 'left', bar: 'wipe', stat: 'fade', count: 'fade', node: 'left', arrow: 'fade' },
+    bounce: { title: 'blur', sub: 'blur', item: 'up', card: 'up', bar: 'grow', stat: 'pop', count: 'count', node: 'pop', arrow: 'fade' },
   };
   // 動きの形。最後の形は、要素のふだんの見た目（動き終わると animation は外れる）
   const ENTRY_KEYFRAMES = {
@@ -524,7 +524,7 @@ html.sp-mv-jump::view-transition-new(sp-jump) { animation: sp-jump-msg ${MOTION_
   }
 
   // デッキが選ぶ動きの層（info.motion）を、プレイヤーが使う形にそろえる。
-  //   send：送り（切り替えの動き）。既定は true（今と同じ）。entry：入場の型 'ppt'・'meiji'、既定は null（なし）。point：指す層、既定は false。
+  //   send：送り（切り替えの動き）。既定は true（今と同じ）。entry：入場の型 'subtle'・'bounce'、既定は null（なし）。point：指す層、既定は false。
   //   ない項目は既定。形の違う項目は選んでいない扱い（既定）にし、console.warn で1回だけ知らせる（動きは止めない）
   function normalizeDeckMotion(raw) {
     const out = { send: true, entry: null, point: false };

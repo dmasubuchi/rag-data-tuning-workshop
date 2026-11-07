@@ -145,7 +145,7 @@ class BuildTest(unittest.TestCase):
         self.assertEqual(build.topic_ref({"05": {"name": "x", "path": "applied/topics/05-x"}}, "05")["ed"], "応用")
 
     def test_no_references_to_files_outside_this_repo(self):
-        # この Repo にない道具・約束書を指さない（slide-player の写し player.js は元のまま）
+        # この Repo にない道具・約束書を指さない（slideplay の写し player.js は元のまま）
         gone = ("CONTRACT.md", "CONTRACT §", "_common.py", "build_deck.py", "build_video.py", "lecture-short")
         files = [LECTURE / "deck.html", LECTURE / "README.md", LECTURE / "catalog.css", *sorted((LECTURE / "tools").glob("*.py")),
                  *sorted((LECTURE / "diagrams").glob("*.py"))]
