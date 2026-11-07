@@ -63,7 +63,10 @@
 <li>PowerShell：<code>Copy-Item config/workshop.example.config workshop.config</code></li>
 </ul>
 </li>
-<li class="task"><input type="checkbox"> <code>workshop.config</code> を VS Code で開き、4つの値を書いて保存する（引用符はつけない）</li>
+<li class="task"><input type="checkbox"> <code>workshop.config</code> を VS Code で開き、4つの値を書いて保存する（引用符はつけない）<ul>
+<li>既存のリソース グループに作るときだけ、5つ目の <code>AZURE_RESOURCE_GROUP</code> にその名前を書く（空なら <code>rg-&lt;組織&gt;-&lt;チーム&gt;</code> を作る）</li>
+</ul>
+</li>
 </ol>
 <ul>
 <li><code>workshop.config</code> は Git に入りません。ほかの人に渡す必要もありません（値は進行役が全員に伝えます）。</li>
@@ -308,7 +311,7 @@ az account show --query name -o tsv
 $org = "&lt;org&gt;"
 $loc = "&lt;場所&gt;"
 $t = $env:WORKSHOP_TEAM
-$rg = "rg-$org-$t"
+$rg = "rg-$org-$t"   # 既存のリソース グループに作るときは、その名前（workshop.config の AZURE_RESOURCE_GROUP）
 </code></pre>
 <p>リソース グループと Storage：</p>
 <pre><code class="language-powershell">az group create -n $rg -l $loc

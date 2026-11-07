@@ -141,6 +141,22 @@ class LoadConfigTest(ConfigFileCase):
             ),
         )
 
+    def test_existing_resource_group_is_optional_and_used_for_names(self):
+        cfg = load_config(self.write(FULL_CONFIG + "AZURE_RESOURCE_GROUP=day1-rg\n"))
+        self.assertEqual(cfg.resource_group, "day1-rg")
+        n = make_names(cfg.org, "suika", cfg.resource_group)
+        self.assertEqual(n.resource_group, "day1-rg")
+        self.assertEqual(n.search, "srch-acme-suika")     # ほかの名前は変わらない
+        self.assertEqual(make_names("acme", "suika").resource_group, "rg-acme-suika")
+        self.assertEqual(load_config(self.write(FULL_CONFIG + "AZURE_RESOURCE_GROUP=\n")).resource_group, "")
+
+    def test_existing_resource_group_shape_is_checked(self):
+        for bad in ('"day1-rg"', "day1 rg", "ends.with.dot.", "x" * 91):
+            with self.subTest(bad=bad):
+                with self.assertRaises(ConfigError) as cm:
+                    load_config(self.write(FULL_CONFIG + f"AZURE_RESOURCE_GROUP={bad}\n"))
+                self.assertIn("AZURE_RESOURCE_GROUP", str(cm.exception))
+
     def test_load_config_missing_key(self):
         text = FULL_CONFIG.replace("AZURE_TENANT=tenant-for-test\n", "")
         with self.assertRaises(ConfigError) as cm:
@@ -223,12 +239,12 @@ class LoadConfigTest(ConfigFileCase):
 
 
 class ExampleConfigTest(unittest.TestCase):
-    def test_example_has_four_keys_with_empty_values(self):
+    def test_example_has_four_keys_and_the_optional_group_with_empty_values(self):
         lines = EXAMPLE_CONFIG.read_text(encoding="utf-8").splitlines()
         pairs = [line.split("=", 1) for line in lines if line.strip() and not line.lstrip().startswith("#")]
         self.assertEqual(
             [k for k, _ in pairs],
-            ["AZURE_SUBSCRIPTION_ID", "AZURE_LOCATION", "WORKSHOP_ORG", "AZURE_TENANT"],
+            ["AZURE_SUBSCRIPTION_ID", "AZURE_LOCATION", "WORKSHOP_ORG", "AZURE_TENANT", "AZURE_RESOURCE_GROUP"],
         )
         self.assertTrue(all(v == "" for _, v in pairs), "example の値は空にする")
 

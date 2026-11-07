@@ -31,6 +31,7 @@
 1. [ ] `config/workshop.example.config` をコピーして、Repo 直下に `workshop.config` という名前で置く
    - PowerShell：`Copy-Item config/workshop.example.config workshop.config`
 2. [ ] `workshop.config` を VS Code で開き、4つの値を書いて保存する（引用符はつけない）
+   - 既存のリソース グループに作るときだけ、5つ目の `AZURE_RESOURCE_GROUP` にその名前を書く（空なら `rg-<組織>-<チーム>` を作る）
 
 - `workshop.config` は Git に入りません。ほかの人に渡す必要もありません（値は進行役が全員に伝えます）。
 - 以降、`<テナント>` は `AZURE_TENANT` の値、`<サブスクリプション ID>` は `AZURE_SUBSCRIPTION_ID` の値、`<場所>` は `AZURE_LOCATION` の値、`<org>` は `WORKSHOP_ORG` の値に置き換えます。
@@ -270,7 +271,7 @@ az account show --query name -o tsv
 $org = "<org>"
 $loc = "<場所>"
 $t = $env:WORKSHOP_TEAM
-$rg = "rg-$org-$t"
+$rg = "rg-$org-$t"   # 既存のリソース グループに作るときは、その名前（workshop.config の AZURE_RESOURCE_GROUP）
 ```
 
 リソース グループと Storage：

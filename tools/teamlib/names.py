@@ -40,6 +40,7 @@ class WorkshopConfig(NamedTuple):
     location: str
     org: str
     tenant: str
+    resource_group: str = ""    # 任意：AZURE_RESOURCE_GROUP。既存のリソース グループに作るとき（空なら rg-<org>-<team>）
 
 
 def load_config(path: Path) -> WorkshopConfig:
@@ -64,7 +65,21 @@ def load_config(path: Path) -> WorkshopConfig:
     if missing:
         raise ConfigError(f"設定ファイル {path.name} に、次のキーの値がありません：{'、'.join(missing)}")
     check_subscription_id(values["AZURE_SUBSCRIPTION_ID"], path.name)
-    return WorkshopConfig(**{field: values[key] for key, field in CONFIG_KEYS})
+    group = values.get("AZURE_RESOURCE_GROUP", "")
+    if group:
+        check_resource_group(group, path.name)
+    return WorkshopConfig(**{field: values[key] for key, field in CONFIG_KEYS}, resource_group=group)
+
+
+RG_RE = re.compile(r"[-\w.()]{0,89}[-\w()]")   # Azure のリソース グループの名前の形（1〜90 文字、最後はピリオド以外）
+
+
+def check_resource_group(value: str, file_name: str) -> None:
+    """AZURE_RESOURCE_GROUP の形を確かめる（任意のキー）。"""
+    if value[0] in QUOTES or value[-1] in QUOTES:
+        raise ConfigError(f"設定ファイル {file_name} の AZURE_RESOURCE_GROUP に引用符がついています。引用符は外して、名前だけを書いてください。")
+    if not RG_RE.fullmatch(value):
+        raise ConfigError(f"設定ファイル {file_name} の AZURE_RESOURCE_GROUP が、リソース グループの名前の形ではありません（英数字・-・_・.・( )、90 文字まで）。")
 
 
 def check_subscription_id(value: str, file_name: str) -> None:
@@ -117,14 +132,15 @@ class Names(NamedTuple):
     foundry: str
 
 
-def make_names(org: str, team: str) -> Names:
-    """組織とチームの名前（検査つき）から、各リソースの名前を決める。"""
+def make_names(org: str, team: str, resource_group: str = "") -> Names:
+    """組織とチームの名前（検査つき）から、各リソースの名前を決める。
+    resource_group を渡すと（workshop.config の AZURE_RESOURCE_GROUP）、既存のリソース グループに作る。ほかの名前は変わらない。"""
     org = check_org(org)
     team = check_team(team)
     return Names(
         org=org,
         team=team,
-        resource_group=f"rg-{org}-{team}",
+        resource_group=resource_group or f"rg-{org}-{team}",
         storage=f"st{org}{team}",
         search=f"srch-{org}-{team}",
         cosmos=f"cosmos-{org}-{team}",

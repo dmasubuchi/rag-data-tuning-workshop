@@ -538,7 +538,7 @@ def main(argv=None, az=None, env_path=None) -> int:
             check_org(cfg.org)
         except NameRuleError as error:
             raise ConfigError(f"{config_path.name} の WORKSHOP_ORG を直してください。\n  {error}") from None
-        n = make_names(cfg.org, resolve_team(args.team))
+        n = make_names(cfg.org, resolve_team(args.team), cfg.resource_group)
     except NameRuleError as error:   # 設定ファイルの誤り（ConfigError）も含む
         print(error, file=sys.stderr)
         return 2
