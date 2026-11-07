@@ -35,7 +35,7 @@ def _wait_seconds(error) -> int:
 
 def post_json(url, key, body):
     """JSON を POST して、答えの JSON を返す。キーは api-key のヘッダーで送る（画面にもファイルにも出さない）。"""
-    data = json.dumps(body, ensure_ascii=False).encode("utf-8")
+    data = json.dumps(body).encode("utf-8")        # 日本語は \uXXXX に直す（tools/search_demo.py と同じ。本文は ASCII だけ）
     headers = {"api-key": key, "Content-Type": "application/json"}
     busy, retried = 0, False
     while True:

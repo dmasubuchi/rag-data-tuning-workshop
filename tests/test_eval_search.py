@@ -72,6 +72,7 @@ class Fake:
 
     def __call__(self, req, timeout=None):
         seen = Seen(req, json.loads(req.data))
+        seen.raw = req.data
         self.seen.append(seen)
         if seen.is_embedding:
             return respond({"data": [{"index": 0, "embedding": [0.25] * 8}],
@@ -188,6 +189,16 @@ class EvalSearchTest(EvalCase):
             {**base, "search": "河越夜戦の大名", "vectorQueries": vq, "queryType": "semantic", "semanticConfiguration": "sengoku-semantic"},
         ])
         self.assertEqual(len([s for s in fake.seen if s.is_embedding]), 1)      # 質問の埋め込みは1回（方式で使い回す）
+
+    def test_request_bodies_are_ascii_json_like_search_demo(self):
+        qf = self.questions_file([{"qid": "q1", "question": "河越夜戦の大名", "answer_ids": ["b015"]}])
+        fake = Fake(lambda index, body, seen: hits("id", "b015"))
+        code, out, err = self.run_eval(fake, ["--dataset", "sengoku", "--file", str(qf)])
+        self.assertEqual(code, 0, out + err)
+        for seen in fake.seen:                  # 検索の本文も、埋め込みの本文も、日本語を \uXXXX に直した ASCII（tools/search_demo.py と同じ）
+            self.assertTrue(seen.raw.isascii(), seen.url)
+        self.assertIn("\\u6cb3\\u8d8a", fake.searches()[0].raw.decode("ascii"))
+        self.assertEqual(fake.searches()[0].body["search"], "河越夜戦の大名")       # 受け取る側が読むと、元の日本語に戻る
 
     def test_k_sets_the_scoring_depth_and_the_fetch_size(self):
         self.assertEqual([methods.fetch_count(k) for k in (1, 10, 11, 50)], [5, 50, 50, 50])
