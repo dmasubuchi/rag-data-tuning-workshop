@@ -306,6 +306,36 @@ def hr_content_available():
     return Path(HR_CONTENT_DIR).is_dir()
 
 
+def hr_scan_parts(doc_id, content_dir):
+    """スキャン 1 件の本文のもとを、3 つの部分に分けて返す（hr_source_text は、これをつなげたものを返す）。
+
+    {"scan": scans.json のそのスキャンの記述（辞書）, "json": その記述の文字（改行でつないだもの）,
+     "code": 画像を描く make_scans.py の、そのスキャンを作る関数の文字（なければ ""）,
+     "dates": 記述にある ISO の日付の、ほかの書き方（_date_notations）, "notes": 注意の文の並び}
+    読めない・見つからないときは DataError。scans.json の一番上の形が違えば DataShapeError。
+    """
+    content_dir = Path(content_dir)
+    scans = _read_items(content_dir / "scans.json", "scans")
+    scan = next((x for x in scans if isinstance(x, dict) and x.get("id") == doc_id), None)
+    if scan is None:
+        raise DataError(f"{doc_id} が scans.json にありません")
+    text = "\n".join(_all_strings(scan))
+    script = content_dir.parent / "make_scans.py"
+    try:
+        code = script.read_text(encoding="utf-8")
+    except (OSError, ValueError):
+        raise DataError(f"{doc_id} の画像を描くスクリプト {_show(script)} が読めません") from None
+    scan_kind = scan.get("kind")
+    match = re.search(rf"^def make_{re.escape(str(scan_kind))}\(.*?(?=^def |\Z)", code, re.S | re.M)
+    notes = []
+    if match:
+        text += "\n" + match.group(0)
+    else:
+        notes.append(f"スキャンの種類「{scan_kind}」の make_{scan_kind} が make_scans.py にありません")
+    return {"scan": scan, "json": "\n".join(_all_strings(scan)), "code": match.group(0) if match else "",
+            "dates": _date_notations(text), "notes": notes}
+
+
 def hr_source_text(doc_id, file, content_dir):
     """文書の本文のもとの文字（evidence の語句を探す先）と、その場所の名前を返す。
 
@@ -335,25 +365,10 @@ def hr_source_text(doc_id, file, content_dir):
         text += "\n" + "\n".join(_all_strings(read_json(content_dir / "source_ats.json")))
         return text, "evaluations.json・source_ats.json"
     if kind == "scan":
-        scans = _read_items(content_dir / "scans.json", "scans")
-        scan = next((x for x in scans if isinstance(x, dict) and x.get("id") == doc_id), None)
-        if scan is None:
-            raise DataError(f"{doc_id} が scans.json にありません")
-        text = "\n".join(_all_strings(scan))
-        script = content_dir.parent / "make_scans.py"
-        try:
-            code = script.read_text(encoding="utf-8")
-        except (OSError, ValueError):
-            raise DataError(f"{doc_id} の画像を描くスクリプト {_show(script)} が読めません") from None
-        scan_kind = scan.get("kind")
-        match = re.search(rf"^def make_{re.escape(str(scan_kind))}\(.*?(?=^def |\Z)", code, re.S | re.M)
-        notes = []
-        if match:
-            text += "\n" + match.group(0)
-        else:
-            notes.append(f"スキャンの種類「{scan_kind}」の make_{scan_kind} が make_scans.py にありません")
-        text += "\n" + _date_notations(text)
-        return text, "scans.json・make_scans.py" + "".join(f" ※{note}" for note in notes)
+        parts = hr_scan_parts(doc_id, content_dir)
+        text = parts["json"] + ("\n" + parts["code"] if parts["code"] else "")
+        text += "\n" + parts["dates"]
+        return text, "scans.json・make_scans.py" + "".join(f" ※{note}" for note in parts["notes"])
     raise DataError(f"{doc_id} の種類「{kind}」は本文のもとが決まっていません")
 
 
@@ -566,7 +581,8 @@ def _holds(kind, found, op, wanted):
             "gt": found > wanted, "lt": found < wanted}[op]
 
 
-def _value_at(item, path):
+def value_at(item, path):
+    """入れ子の項目を "Address/City" のような道で取る。途中になければ None。"""
     for name in path.split("/"):
         item = item.get(name) if isinstance(item, dict) else None
     return item
@@ -577,7 +593,7 @@ def matches(hotel, condition):
     for part in _parse_condition(condition):
         if part[0] == "field":
             _, key, ops = part
-            found = _value_at(hotel, key)
+            found = value_at(hotel, key)
             if not all(_holds(CONDITION_FIELDS[key], found, op, value) for op, value in ops):
                 return False
         else:

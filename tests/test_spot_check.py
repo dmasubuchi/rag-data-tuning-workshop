@@ -2,6 +2,10 @@
 
 通信しない。人事・武将は Repo にある本物の質問とデータを読む。ホテルのデータは Repo に写していないので、
 試験の中で作った小さな見本を使う。一時のファイルは一時フォルダーに書く。
+
+ページの中の JavaScript の動き（チェックの排他・数の更新・書き出し・保存・コピー・再読み込みで戻る・localStorage が使えない環境）は、
+この試験では確かめない（ブラウザがいる）。ブラウザ（Chromium、file:// で開く）で手で確かめた。ここで確かめるのは、
+JavaScript に質問のデータが入っていないこと・HTML のエスケープ・外部の読み込みがないことなど、Python 側で決まる部分。
 """
 import collections
 import contextlib
@@ -200,12 +204,89 @@ class HrSheetTest(unittest.TestCase):
         self.assertIn("<mark>AWS ソリューションアーキテクト アソシエイト</mark>", page)
         self.assertIn("正解の文書：なし", page)
 
-    def test_scan_marks_the_phrase_in_the_scan_description(self):
-        scan = [q for q in HR_QUESTIONS if q["qid"] == "hr-05"]
-        page, _, warnings = make("hr", scan, HR_MANIFEST, n=1)
-        self.assertEqual(warnings, [])
+    def card(self, qid):
+        picked = [q for q in HR_QUESTIONS if q["qid"] == qid]
+        return make("hr", picked, HR_MANIFEST, n=1)[0].split('<article class="q"')[1].split("</article>")[0]
+
+    def test_scan_shows_the_description_the_phrase_line_and_a_link_to_the_image(self):
+        page = self.card("hr-05")
+        self.assertIn("内定承諾書。氏名の手書きと認印、会社の受付印", page)          # scans.json の what
+        self.assertIn(spot_check.SCAN_CODE_LABEL, page)
         self.assertIn("<mark>2026年12月1日</mark>", page)
         self.assertIn("OCR", page)
+        # make_scans.py の Python のコードは出さない（印字する文字だけ）
+        for code in ("def make_", "d.text(", "Image.new", "fill=INK", "mincho"):
+            self.assertNotIn(code, page)
+        image = (ev.DATA_FILES["hr"].parent / "scans" / "SCAN-OFFER-APP-0386.pdf").resolve()
+        self.assertTrue(image.is_file())
+        self.assertIn(f'href="{image.as_uri()}"', page)
+        self.assertIn("scans/SCAN-OFFER-APP-0386.pdf", page)
+
+    def test_scan_phrase_labels_say_where_the_phrase_is(self):
+        # 日付：画像の印字に合わせて道具が補った別の書き方（scans.json は 2026-10-26）
+        page = self.card("hr-11")
+        self.assertIn(spot_check.SCAN_DATES_LABEL, page)
+        self.assertIn("<mark>2026.10.26</mark>", page)
+        self.assertNotIn(spot_check.SCAN_CODE_LABEL, page)
+        # scans.json の項目
+        page = self.card("hr-55")
+        self.assertIn(spot_check.SCAN_JSON_LABEL, page)
+        self.assertIn("<mark>10:52</mark>", page)
+        # 描く指示の文字（手書きのメモの中身）。1 行だけを、文字列のリテラルにして出す
+        page = self.card("hr-56")
+        self.assertIn(spot_check.SCAN_CODE_LABEL, page)
+        self.assertIn("<mark>月1回の夜間当番</mark>", page)
+        self.assertNotIn("def make_", page)
+        # 印字する文字でなく、コードのコメントにだけある語句は、コードの行として出す（見つけたことが分かる）
+        page = self.card("hr-35")
+        self.assertIn(spot_check.SCAN_CODE_RAW_LABEL, page)
+        self.assertIn("<mark>確認印</mark>", page)
+
+    def test_scan_literals_drop_dict_keys_and_code(self):
+        line = '("応募番号", f["application_id"]), ("入社予定日", "2026年12月1日")]'
+        self.assertEqual(spot_check._literals(line), ["応募番号", "入社予定日", "2026年12月1日"])
+        self.assertEqual(spot_check._literals("d.text((1, 2), f\"{x}年\", font=m)"), ["{x}年"])
+        self.assertEqual(spot_check._literals("y = 860 + i * 84"), [])
+
+    def test_mail_label_is_neutral_and_shows_the_subject(self):
+        page = self.card("hr-01")                                  # MAIL-09（内定の知らせ）
+        self.assertNotIn("面接の連絡メール", page)
+        subject = next(m["subject"] for m in ev.read_json(ev.HR_CONTENT_DIR / "mail.json")["mails"] if m["id"] == "MAIL-09")
+        self.assertIn('<span class="dt">メール</span>', page)
+        self.assertIn(spot_check.e(subject), page)
+        job = self.card("hr-03")
+        self.assertIn("求人票", job)                                 # メール以外の札はそのまま
+
+    def test_no_copy_of_value_at(self):
+        self.assertFalse(hasattr(spot_check, "_value_at"))
+        self.assertIs(spot_check.ev.value_at, ev.value_at)
+
+    def test_scan_text_is_escaped_and_missing_image_is_flagged(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            data = Path(tmp) / "data"
+            content = data / "_build" / "content"
+            content.mkdir(parents=True)
+            (data / "scans").mkdir()
+            (data / "scans" / "S1.pdf").write_bytes(b"%PDF")
+            scans = {"scans": [
+                {"id": "S1", "kind": "memo", "what": f"<b>what</b> {EVIL}", "form": "<u>form</u>"},
+                {"id": "S2", "kind": "memo", "what": "画像がないスキャン"}]}
+            (content / "scans.json").write_text(json.dumps(scans, ensure_ascii=False), encoding="utf-8")
+            (data / "_build" / "make_scans.py").write_text(
+                f'def make_memo():\n    d.text((1, 2), "{EVIL}", font=f)\n    d.text((3, 4), "二つ目", font=f)\n', encoding="utf-8")
+            manifest = {"files": [{"doc_id": "S1", "kind": "scan", "path": "scans/S1.pdf", "ocr_required": True},
+                                  {"doc_id": "S2", "kind": "scan", "path": "scans/none.pdf", "ocr_required": True}]}
+            questions = [{"qid": "hr-01", "question": "q", "type": "scan", "answer_ids": ["S1", "S2"],
+                          "evidence": {"S1": EVIL, "S2": "二つ目"}}]
+            page, _, warnings = make("hr", questions, manifest, n=1, content_dir=content)
+            link = (data / "scans" / "S1.pdf").resolve().as_uri()
+        for raw in ("<img", "<b>", "<u>"):
+            self.assertNotIn(raw, page, raw)
+        self.assertIn("&lt;b&gt;what&lt;/b&gt;", page)
+        self.assertIn("<mark>&lt;img src=x onerror=alert(1)&gt;</mark>", page)
+        self.assertIn(f'href="{link}"', page)
+        self.assertIn("スキャンのファイルが見つかりません（scans/none.pdf）", page)       # S2 は画像がない
+        self.assertEqual(warnings, [])
 
 
 class HotelSheetTest(unittest.TestCase):

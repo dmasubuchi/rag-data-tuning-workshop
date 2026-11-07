@@ -659,6 +659,18 @@ class HrQuestionsTest(unittest.TestCase):
                 text, _ = ev.hr_source_text(doc_id, self.files[doc_id], ev.HR_CONTENT_DIR)
                 self.assertIn(ev._squash(phrase), ev._squash(text), f"{q['qid']} の evidence {doc_id}")
 
+    def test_scan_parts_are_what_hr_source_text_joins(self):
+        """hr_scan_parts は、スキャンの本文のもとを 3 つに分けたもの（hr_source_text は、それをつなげて返す）。"""
+        for doc_id in ("SCAN-01", "SCAN-02", "SCAN-03"):
+            parts = ev.hr_scan_parts(doc_id, ev.HR_CONTENT_DIR)
+            text, _ = ev.hr_source_text(doc_id, self.files[doc_id], ev.HR_CONTENT_DIR)
+            self.assertEqual(text, parts["json"] + "\n" + parts["code"] + "\n" + parts["dates"])
+            self.assertEqual(parts["scan"]["id"], doc_id)
+            self.assertEqual(parts["notes"], [])
+        self.assertIn("2026.10.26", ev.hr_scan_parts("SCAN-02", ev.HR_CONTENT_DIR)["dates"])
+        with self.assertRaises(ev.DataError):
+            ev.hr_scan_parts("SCAN-99", ev.HR_CONTENT_DIR)
+
     def test_hr_order_mixes_the_types(self):
         types = [q["type"] for q in self.questions]
         order = list(ev.TYPE_TARGETS["hr"])
@@ -806,6 +818,13 @@ class HotelConditionTest(unittest.TestCase):
         self.assertEqual(self.ids({"LastRenovationDate": {"ge": "2015-01-01T00:00:00Z"}}), ["1", "3"])
         self.assertEqual(self.ids({"LastRenovationDate": {"lt": "2015-01-01T00:00:00Z"}}), ["2"])
         self.assertEqual(self.ids({"LastRenovationDate": {"ge": "2019-05-01T09:00:00+09:00"}}), ["1", "3"])   # 時差つきも日時として比べる
+
+    def test_value_at_follows_the_path_and_gives_none_when_missing(self):
+        item = {"Address": {"City": "Seattle"}, "Rating": 4.5}
+        self.assertEqual(ev.value_at(item, "Address/City"), "Seattle")
+        self.assertEqual(ev.value_at(item, "Rating"), 4.5)
+        self.assertIsNone(ev.value_at(item, "Address/Country"))
+        self.assertIsNone(ev.value_at(item, "Rating/Foo"))
 
     def test_matches_missing_values_never_match(self):
         # ホテル 2 は StateProvince がない（本物のデータにもある）。null との比べは、どれも偽

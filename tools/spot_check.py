@@ -157,11 +157,12 @@ def _snippet(text, phrase, label=None):
 # ------------------------------------------------------------------ 文書ごとの出し方（共通の形：辞書）
 #
 # doc = {"id", "title", "sub", "tags": [札], "source": 出どころ, "facts": [(項目, 値)], "snippets": [...],
-#        "head": 先頭の文字（語句がないとき）, "problem": 読めない理由}
+#        "head": 先頭の文字（語句がないとき）, "problem": 読めない理由,
+#        "what": スキャンの記述, "form": スキャンの形, "link": (file:// の URL, 名前) または None, "missing": 画像がない旨}
 
 def _doc(doc_id, title, **fields):
     return {"id": doc_id, "title": title, "sub": "", "tags": [], "source": None, "facts": [], "snippets": [],
-            "head": None, "problem": None, **fields}
+            "head": None, "problem": None, "what": None, "form": None, "link": None, "missing": None, **fields}
 
 
 def hr_doc(doc_id, q, ctx, warnings):
@@ -169,8 +170,12 @@ def hr_doc(doc_id, q, ctx, warnings):
     if file is None:
         warnings.append(f"{q.get('qid')}：{doc_id} が manifest にありません")
         return _doc(doc_id, "（データにない文書）", problem="データ（manifest）にない文書です")
+    if file.get("kind") == "scan":
+        return scan_doc(doc_id, file, q, ctx, warnings)
     tags = ["画像だけ（OCR が要る）"] if file.get("ocr_required") else []
-    doc = _doc(doc_id, file.get("kind_label") or file.get("kind") or "", tags=tags)
+    # メールの札は、manifest の kind_label（面接の連絡メール）を使わない（全部が面接の連絡ではない）。件名を添える
+    title = "メール" if file.get("kind") == "mail" else file.get("kind_label") or file.get("kind") or ""
+    doc = _doc(doc_id, title, tags=tags)
     if doc_id not in ctx["cache"]:
         try:
             ctx["cache"][doc_id] = ev.hr_source_text(doc_id, file, ctx["content_dir"])
@@ -184,6 +189,8 @@ def hr_doc(doc_id, q, ctx, warnings):
         doc["problem"] = f"本文のもとを読めません（{found}）"
         return doc
     text, doc["source"] = found
+    if file.get("kind") == "mail":
+        doc["sub"] = text.split("\n", 1)[0]          # hr_source_text は、メールを「件名\n本文」で返す
     evidence = q.get("evidence") if isinstance(q.get("evidence"), dict) else {}
     phrases = _phrases(evidence.get(doc_id))
     for phrase in phrases:
@@ -196,18 +203,92 @@ def hr_doc(doc_id, q, ctx, warnings):
     return doc
 
 
+# スキャン（画像だけの文書）：本文のもとの Python のコードは出さない。語句が出る場所を札で示し、その行だけを出す。
+SCAN_CODE_LABEL = "画像に印字する文字（make_scans.py の該当行から）"
+SCAN_CODE_RAW_LABEL = "make_scans.py の該当行（コード）"
+SCAN_DATES_LABEL = "日付の書き方（道具が補った別の書き方）"
+SCAN_JSON_LABEL = "scans.json の項目"
+_LITERAL = re.compile(r"""f?"((?:[^"\\]|\\.)*)"|f?'((?:[^'\\]|\\.)*)'""")
+
+
+def _covering_lines(text, span):
+    """text の中の span（始め, 終わり）をふくむ行の並び。"""
+    start, end = span
+    first = text.count("\n", 0, start)
+    last = text.count("\n", 0, max(start, end - 1))
+    return text.split("\n")[first:last + 1]
+
+
+def _literals(line):
+    """コードの 1 行にある文字列のリテラル（"…"・'…'）の中身。x["key"] の key は、印字する文字でないので除く。"""
+    found = []
+    for match in _LITERAL.finditer(line):
+        if match.start() > 0 and line[match.start() - 1] == "[":
+            continue
+        found.append(match.group(1) if match.group(1) is not None else match.group(2))
+    return [text for text in found if text.strip()]
+
+
+def scan_snippet(parts, phrase):
+    """スキャンの語句が出る場所を、画像に近い順（描く指示 → scans.json → 補った日付の書き方）に探して、その行だけを返す。"""
+    shown = None
+    span = locate(parts["code"], phrase) if parts["code"] else None
+    if span:
+        lines = _covering_lines(parts["code"], span)
+        text = "\n".join(x for x in (" ｜ ".join(_literals(line)) for line in lines) if x)
+        shown = (SCAN_CODE_LABEL, text) if locate(text, phrase) else (SCAN_CODE_RAW_LABEL, "\n".join(x.strip() for x in lines))
+    else:
+        for label, text in ((SCAN_JSON_LABEL, parts["json"]), (SCAN_DATES_LABEL, parts["dates"])):
+            span = locate(text, phrase)
+            if span:
+                shown = (label, "\n".join(_covering_lines(text, span)))
+                break
+    exc = excerpt(shown[1], phrase, len(shown[1])) if shown else None
+    return {"label": shown[0] if exc else None, "phrase": phrase, "narrow": exc, "wide": None}
+
+
+def scan_doc(doc_id, file, q, ctx, warnings):
+    """スキャンの文書：記述（what・form）・語句が出る行・実際のスキャンのファイルへのリンク（画像を目で確かめる）。"""
+    tags = ["画像だけ（OCR が要る）"] if file.get("ocr_required") else []
+    doc = _doc(doc_id, "スキャンした書類", tags=tags)
+    key = f"scan:{doc_id}"
+    if key not in ctx["cache"]:
+        try:
+            ctx["cache"][key] = ev.hr_scan_parts(doc_id, ctx["content_dir"])
+        except ev.DataShapeError:
+            raise
+        except DataError as error:
+            ctx["cache"][key] = error
+    parts = ctx["cache"][key]
+    if isinstance(parts, DataError):
+        warnings.append(f"{q.get('qid')}：{parts}")
+        doc["problem"] = f"本文のもとを読めません（{parts}）"
+        return doc
+    for note in parts["notes"]:
+        warnings.append(f"{q.get('qid')}：{doc_id}：{note}")
+    doc["what"], doc["form"] = parts["scan"].get("what"), parts["scan"].get("form")
+    path = file.get("path")
+    if isinstance(path, str) and path:
+        image = (Path(ctx["data_dir"]) / path).resolve()
+        if image.is_file():
+            doc["link"] = (image.as_uri(), f"スキャンの画像を開く（{path}）")
+        else:
+            doc["missing"] = f"スキャンのファイルが見つかりません（{path}）"
+    evidence = q.get("evidence") if isinstance(q.get("evidence"), dict) else {}
+    for phrase in _phrases(evidence.get(doc_id)):
+        snippet = scan_snippet(parts, phrase)
+        doc["snippets"].append(snippet)
+        if snippet["narrow"] is None:
+            warnings.append(f"{q.get('qid')}：{doc_id} の語句「{phrase}」が本文のもと（scans.json・make_scans.py）にありません")
+    return doc
+
+
 def _name(hotel):
     return hotel.get("HotelName_ja") or hotel.get("HotelName") or ""
 
 
 def _plain(value):
     return json.dumps(value, ensure_ascii=False) if isinstance(value, bool) else str(value)
-
-
-def _value_at(item, path):
-    for name in path.split("/"):
-        item = item.get(name) if isinstance(item, dict) else None
-    return item
 
 
 def condition_facts(hotel, condition):
@@ -218,10 +299,10 @@ def condition_facts(hotel, condition):
     facts = []
     for key in condition:
         if key.startswith("Rooms/"):
-            values = list(dict.fromkeys(_plain(_value_at(r, key[len("Rooms/"):])) for r in matching))
+            values = list(dict.fromkeys(_plain(ev.value_at(r, key[len("Rooms/"):])) for r in matching))
             facts.append((key, "、".join(values[:6]) + (f"（ほか {len(values) - 6} 件）" if len(values) > 6 else "") or "（合う客室がない）"))
         else:
-            facts.append((key, _plain(_value_at(hotel, key))))
+            facts.append((key, _plain(ev.value_at(hotel, key))))
     return facts
 
 
@@ -289,8 +370,9 @@ def _ids(value):
 
 def build_context(dataset, data, content_dir):
     if dataset == "hr":
-        return {"files": {str(f["doc_id"]): f for f in data["files"]}, "content_dir": content_dir or ev.HR_CONTENT_DIR,
-                "cache": {}}
+        content_dir = Path(content_dir or ev.HR_CONTENT_DIR)
+        return {"files": {str(f["doc_id"]): f for f in data["files"]}, "content_dir": content_dir,
+                "data_dir": content_dir.parent.parent, "cache": {}}     # manifest の path は、この data_dir（applied/data）からの道
     if dataset == "hotel":
         return {"hotels": {str(h["HotelId"]): h for h in data}}
     return {"people": {str(p["id"]): p for p in data}}
@@ -349,6 +431,8 @@ h3.hid{color:var(--hid)}
 .dt{font-weight:600}.ds{color:var(--mute);font-size:.88rem}
 .tag{font-size:.75rem;border:1px solid var(--warn);color:var(--warn);background:var(--warn-bg);border-radius:999px;padding:0 8px}
 .src{color:var(--mute);font-size:.78rem;overflow-wrap:anywhere}
+.what{margin:6px 0 0;overflow-wrap:anywhere}.what .ds{display:block}
+.open{margin:6px 0 0;font-size:.9rem;overflow-wrap:anywhere}.open a{color:var(--accent)}
 .facts{display:flex;flex-wrap:wrap;gap:2px 18px;margin:4px 0 0;font-size:.88rem}
 .facts div{display:flex;gap:6px}.facts dt{color:var(--mute)}.facts dd{margin:0}
 blockquote{margin:8px 0 0;padding:0;white-space:pre-wrap;overflow-wrap:anywhere}
@@ -520,6 +604,12 @@ def render_doc(doc, hidden, newline):
     parts = [f'<div class="dh">{head}</div>']
     if doc["source"]:
         parts.append(f'<div class="src">本文のもと：{e(doc["source"])}</div>')
+    if doc["what"]:
+        parts.append(f'<p class="what">{e(doc["what"])}' + (f'<span class="ds">{e(doc["form"])}</span>' if doc["form"] else "") + "</p>")
+    if doc["link"]:
+        parts.append(f'<p class="open"><a href="{e(doc["link"][0])}" target="_blank" rel="noopener">{e(doc["link"][1])}</a></p>')
+    if doc["missing"]:
+        parts.append(f'<p class="miss">{e(doc["missing"])}</p>')
     facts = [(k, v) for k, v in doc["facts"] if v != ""]
     if facts:
         parts.append('<dl class="facts">' + "".join(f"<div><dt>{e(k)}</dt><dd>{e(v)}</dd></div>" for k, v in facts) + "</dl>")
