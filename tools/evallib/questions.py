@@ -10,6 +10,7 @@
 （別のモジュールに置くと、tools/check_questions.py から呼ばれない）。人事の確かめは check_hr。
 """
 import json
+import re
 from pathlib import Path
 
 REPO_DIR = Path(__file__).resolve().parents[2]
@@ -235,6 +236,8 @@ def validate(dataset, questions, *, known_ids, data=None):
 
 HR_PERMISSION_ROLE = "role:employee"   # 一般社員。applied/lib/acl.py：一般社員に見えるのは求人票（job_posting）だけ
 HR_JOB_KIND = "job_posting"
+# 文書の本文のもと（人事の evidence の語句を探す場所）。見つからない（フォルダーがない）ときは、語句を探す確かめだけ飛ばす
+HR_CONTENT_DIR = REPO_DIR / "applied" / "data" / "_build" / "content"
 
 
 def _strs(value):
@@ -250,31 +253,131 @@ def _hr_files(data):
         return None
 
 
+def _squash(text):
+    """空白（全角を含む）を全部取る。PDF や Word の折り返しがあっても、語句が見つかるように。"""
+    return re.sub(r"\s+", "", text)
+
+
+def _all_strings(value):
+    """JSON の中の文字列を全部（入れ子も）。"""
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, dict):
+        for item in value.values():
+            yield from _all_strings(item)
+    elif isinstance(value, list):
+        for item in value:
+            yield from _all_strings(item)
+
+
+def hr_source_text(doc_id, file, content_dir):
+    """文書の本文のもとの文字（evidence の語句を探す先）と、その場所の名前を返す。
+
+    求人票・経歴書は content/jobs・resumes の Markdown、メールは mail.json の件名と本文、
+    面接の評価の一覧は evaluations.json と source_ats.json（選考状況・選考履歴のシートの元の台帳）、
+    スキャンは scans.json の記述と、画像を描く make_scans.py の、そのスキャンを作る関数（画像の中の文字はここにある）。
+    読めない・見つからないときは DataError。
+    """
+    content_dir = Path(content_dir)
+    kind = file.get("kind")
+    if kind in ("job_posting", "resume"):
+        path = content_dir / ("jobs" if kind == "job_posting" else "resumes") / f"{doc_id}.md"
+        try:
+            return path.read_text(encoding="utf-8-sig"), f"{path.parent.name}/{path.name}"
+        except (OSError, ValueError):
+            raise DataError(f"{doc_id} の本文のもと {_show(path)} が読めません") from None
+    if kind == "mail":
+        mails = read_json(content_dir / "mail.json").get("mails", [])
+        mail = next((m for m in mails if isinstance(m, dict) and m.get("id") == doc_id), None)
+        if mail is None:
+            raise DataError(f"{doc_id} が mail.json にありません")
+        return f"{mail.get('subject', '')}\n{mail.get('body', '')}", "mail.json"
+    if kind == "interview_evaluations":
+        text = "\n".join(_all_strings(read_json(content_dir / "evaluations.json")))
+        text += "\n" + "\n".join(_all_strings(read_json(content_dir / "source_ats.json")))
+        return text, "evaluations.json・source_ats.json"
+    if kind == "scan":
+        scans = read_json(content_dir / "scans.json").get("scans", [])
+        scan = next((x for x in scans if isinstance(x, dict) and x.get("id") == doc_id), None)
+        if scan is None:
+            raise DataError(f"{doc_id} が scans.json にありません")
+        text = "\n".join(_all_strings(scan))
+        script = content_dir.parent / "make_scans.py"
+        try:
+            code = script.read_text(encoding="utf-8")
+        except (OSError, ValueError):
+            raise DataError(f"{doc_id} の画像を描くスクリプト {_show(script)} が読めません") from None
+        match = re.search(rf"^def make_{re.escape(str(scan.get('kind')))}\(.*?(?=^def |\Z)", code, re.S | re.M)
+        if match:
+            text += "\n" + match.group(0)
+        return text, "scans.json・make_scans.py"
+    raise DataError(f"{doc_id} の種類「{kind}」は本文のもとが決まっていません")
+
+
+def _check_hr_evidence(who, q, ids, known_ids, files, content_dir, cache):
+    """evidence（{文書の ID: 本文にそのまま出る語句}）の確かめ。文書にない ID は、共通の確かめが言うので、語句を求めない。"""
+    problems = []
+    evidence = q.get("evidence")
+    if not isinstance(evidence, dict):
+        how = "（answer_ids と hidden_ids の文書ごとに、本文にそのまま出る短い語句を {\"MAIL-01\": \"…\"} の形で書きます）"
+        return [f"{who}：evidence がありません{how}" if evidence is None
+                else f"{who}：evidence は {{文書の ID: 語句}} の形で書きます"]
+    for doc_id in (i for i in ids if i in known_ids):
+        phrase = evidence.get(doc_id)
+        if not isinstance(phrase, str) or not phrase.strip():
+            problems.append(f"{who}：evidence に「{doc_id}」の語句がありません（answer_ids・hidden_ids の文書ごとに 1 つ）")
+    for doc_id in evidence:
+        if doc_id not in ids:
+            problems.append(f"{who}：evidence の「{doc_id}」は answer_ids にも hidden_ids にもありません")
+    if files is None or content_dir is None:
+        return problems
+    for doc_id, phrase in evidence.items():
+        if doc_id not in ids or doc_id not in files or not isinstance(phrase, str) or not phrase.strip():
+            continue
+        if doc_id not in cache:
+            try:
+                cache[doc_id] = hr_source_text(doc_id, files[doc_id], content_dir)
+            except DataError as error:
+                cache[doc_id] = error
+        found = cache[doc_id]
+        if isinstance(found, DataError):
+            problems.append(f"{who}：evidence「{doc_id}」の語句を探せません（{found}）")
+        elif _squash(phrase) not in _squash(found[0]):
+            problems.append(f"{who}：evidence「{doc_id}」の語句「{phrase}」が、文書の本文のもと（{found[1]}）にありません")
+    return problems
+
+
 @dataset_check("hr")
 def check_hr(questions, *, known_ids, data):
-    """人事の質問に固有の確かめ（種類ごとの決まり）。
+    """人事の質問に固有の確かめ（種類ごとの決まり、evidence）。
 
     - permission：as_role は role:employee だけ。hidden_ids は求人票でない文書（一般社員に見えない文書）。
       answer_ids は求人票だけ（なければ空）
     - scan：answer_ids に、OCR が要る文書（manifest の ocr_required が true）が 1 件以上ある
     - multi-doc：answer_ids が 2 件以上（どれか 1 件だけでは答えきれない）
+    - evidence：answer_ids と hidden_ids の文書ごとに、本文にそのまま出る短い語句（{文書の ID: 語句}）。ない文書があれば問題。
+      HR_CONTENT_DIR（文書の本文のもと）があるときは、語句が、その文書の本文のもと（hr_source_text）にあること
     answer_ids・hidden_ids が manifest にあることは、共通の確かめ（known_ids）が見る。
-    data は manifest。None（validate を data なしで呼んだ）のときは、文書の種類・OCR が分からないので、
-    それを使う確かめ（permission の求人票、scan の OCR）は飛ばす。役割と multi-doc の数は、data なしでも確かめる。
+    data は manifest。None（validate を data なしで呼んだ）のときは、文書の種類・OCR・本文が分からないので、
+    それを使う確かめ（permission の求人票、scan の OCR、evidence の語句の検索）は飛ばす。
+    役割・multi-doc の数・evidence がそろっていることは、data なしでも確かめる。
     """
     files = _hr_files(data)
+    content_dir = HR_CONTENT_DIR if Path(HR_CONTENT_DIR).is_dir() else None
+    cache = {}
     problems = []
     for index, q in enumerate(questions, 1):
         who = label(q, index)
         kind = q.get("type")
         answers = _strs(q.get("answer_ids"))
+        hidden = _strs(q.get("hidden_ids"))
         if kind == "permission":
             role = q.get("as_role")
             if isinstance(role, str) and role.strip() and role != HR_PERMISSION_ROLE:
                 problems.append(f"{who}：permission の as_role は {HR_PERMISSION_ROLE} だけを使います（今は「{role}」。"
                                 "一般社員には求人票だけが見える決まりです）")
             if files is not None:
-                for doc_id in _strs(q.get("hidden_ids")):
+                for doc_id in hidden:
                     if doc_id in files and files[doc_id].get("kind") == HR_JOB_KIND:
                         problems.append(f"{who}：hidden_ids の「{doc_id}」は求人票です（求人票は一般社員にも見えるので、"
                                         "hidden_ids には求人票でない文書を書きます）")
@@ -289,4 +392,5 @@ def check_hr(questions, *, known_ids, data):
             if len(answers) < 2:
                 problems.append(f"{who}：multi-doc の質問の answer_ids は 2 件以上です（今は {len(answers)} 件。"
                                 "どれか 1 件だけで答えられる質問は、ほかの種類にします）")
+        problems += _check_hr_evidence(who, q, list(dict.fromkeys(answers + hidden)), known_ids, files, content_dir, cache)
     return problems

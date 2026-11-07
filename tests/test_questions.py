@@ -24,8 +24,14 @@ from evallib import questions as ev  # noqa: E402
 DOCS = {"D1", "D2", "D3"}
 
 
+def with_evidence(q):
+    """answer_ids と hidden_ids の文書ごとに、見本の語句（evidence）を足した質問を返す（人事の質問に要る）。"""
+    ids = list(dict.fromkeys(list(q.get("answer_ids", [])) + list(q.get("hidden_ids", []))))
+    return {**q, "evidence": {doc_id: "見本の語句" for doc_id in ids}}
+
+
 def sample(dataset):
-    """TYPE_TARGETS どおりの、合格する質問の並び。"""
+    """TYPE_TARGETS どおりの、合格する質問の並び（人事は evidence つき）。"""
     out = []
     for kind, count in ev.TYPE_TARGETS[dataset].items():
         for _ in range(count):
@@ -33,7 +39,7 @@ def sample(dataset):
                  "answer_ids": ["D1", "D2"] if kind == "multi-doc" else ["D1"]}
             if kind == "permission":
                 q.update(answer_ids=[], as_role="role:employee", hidden_ids=["D2", "D3"])
-            out.append(q)
+            out.append(with_evidence(q) if dataset == "hr" else q)
     return out
 
 
@@ -111,7 +117,7 @@ class ValidateTest(unittest.TestCase):
 
     def test_unknown_hidden_id_is_reported(self):
         questions = sample("hr")
-        questions[-1]["hidden_ids"] = ["D2", "NOPE-2"]
+        questions[-1] = with_evidence({**questions[-1], "hidden_ids": ["D2", "NOPE-2"]})
         problems = valid("hr", questions)
         self.assertEqual(len(problems), 1)
         self.assertIn("hidden_ids", problems[0])
@@ -149,7 +155,7 @@ class ValidateTest(unittest.TestCase):
             with self.subTest(name):
                 problems = ev.validate("hr", [{**base, **extra}], known_ids=DOCS)
                 self.assertTrue(any("p1" in p and "permission" in p and word in p for p in problems), problems)
-        ok = {**base, "as_role": "role:employee", "hidden_ids": ["D2"]}
+        ok = with_evidence({**base, "as_role": "role:employee", "hidden_ids": ["D2"]})
         problems = ev.validate("hr", [ok], known_ids=DOCS)
         self.assertFalse([p for p in problems if "p1" in p], problems)   # 種類の数だけが残る
 
@@ -161,15 +167,15 @@ class ValidateTest(unittest.TestCase):
     def test_empty_answer_ids_only_for_permission(self):
         for dataset, kind in (("hr", "numeric"), ("hotel", "amenity"), ("sengoku", "climax")):
             with self.subTest(kind):
-                bad = {"qid": "e1", "question": "答えがない", "type": kind, "answer_ids": []}
+                bad = {"qid": "e1", "question": "答えがない", "type": kind, "answer_ids": [], "evidence": {}}
                 problems = ev.validate(dataset, [bad], known_ids=DOCS)
                 hits = [p for p in problems if p.startswith("e1：")]
                 self.assertEqual(len(hits), 1, problems)
                 self.assertIn("answer_ids", hits[0])
                 self.assertIn(kind, hits[0])
                 self.assertIn("permission だけ", hits[0])
-        ok = {"qid": "e2", "question": "見えない文書を聞く", "type": "permission", "answer_ids": [],
-              "as_role": "role:employee", "hidden_ids": ["D2"]}
+        ok = with_evidence({"qid": "e2", "question": "見えない文書を聞く", "type": "permission", "answer_ids": [],
+                            "as_role": "role:employee", "hidden_ids": ["D2"]})
         self.assertFalse([p for p in ev.validate("hr", [ok], known_ids=DOCS) if p.startswith("e2：")])
 
     def test_field_type_errors_say_how_to_write_them(self):
@@ -275,12 +281,22 @@ def hr_data():
 
 
 def hr_check(questions):
+    """evidence のない質問には、見本の語句を足してから、人事の確かめにかける（evidence 以外の確かめを 1 つずつ見るため）。"""
     data = hr_data()
+    questions = [q if "evidence" in q else with_evidence(q) for q in questions]
     return ev.check_hr(questions, known_ids=ev.ids_of("hr", data), data=data)
 
 
 class HrCheckTest(unittest.TestCase):
     """人事に固有の確かめ（@dataset_check("hr")）。小さな manifest で、1 つずつ。"""
+
+    def setUp(self):
+        # 本物の文書の本文のもとは見ない（ここの文書は試験用の名前）。語句を探す確かめは HrEvidenceTest が見る
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        patch = mock.patch.object(ev, "HR_CONTENT_DIR", Path(self.tmp.name) / "none")
+        patch.start()
+        self.addCleanup(patch.stop)
 
     def perm(self, **extra):
         q = {"qid": "p1", "question": "見えない文書を聞く", "type": "permission", "answer_ids": [],
@@ -346,9 +362,10 @@ class HrCheckTest(unittest.TestCase):
 
     def test_without_manifest_only_manifest_free_checks_run(self):
         # data が None：文書の種類・OCR は分からないので飛ばす。multi-doc の数は、データがなくても確かめる
-        questions = [self.perm(as_role="role:recruiter", hidden_ids=["JOB-2"]),
-                     {"qid": "s1", "question": "q", "type": "scan", "answer_ids": ["MAIL-1"]},
-                     {"qid": "m1", "question": "q", "type": "multi-doc", "answer_ids": ["JOB-1"]}]
+        questions = [with_evidence(q) for q in (
+            self.perm(as_role="role:recruiter", hidden_ids=["JOB-2"]),
+            {"qid": "s1", "question": "q", "type": "scan", "answer_ids": ["MAIL-1"]},
+            {"qid": "m1", "question": "q", "type": "multi-doc", "answer_ids": ["JOB-1"]})]
         problems = ev.check_hr(questions, known_ids={"JOB-1", "JOB-2", "MAIL-1"}, data=None)
         self.assertTrue(any("m1" in p for p in problems), problems)
         self.assertTrue(any("p1" in p and "role:employee" in p for p in problems), problems)   # 役割は manifest なしでも
@@ -367,11 +384,154 @@ class HrCheckTest(unittest.TestCase):
                 q["answer_ids"], q["hidden_ids"] = [], ["CV-1", "MAIL-1"]
             elif q["type"] not in ("multi-doc", "scan"):
                 q["answer_ids"] = ["MAIL-1"]
-        self.assertEqual(ev.validate("hr", questions, known_ids=known, data=data), [])
-        questions[-1]["hidden_ids"] = ["JOB-1"]   # permission の hidden_ids に求人票
-        problems = ev.validate("hr", questions, known_ids=known, data=data)
+        questions = [with_evidence(q) for q in questions]
+        with mock.patch.object(ev, "HR_CONTENT_DIR", Path(self.tmp.name) / "none"):
+            self.assertEqual(ev.validate("hr", questions, known_ids=known, data=data), [])
+            questions[-1] = with_evidence({**questions[-1], "hidden_ids": ["JOB-1"]})   # permission の hidden_ids に求人票
+            problems = ev.validate("hr", questions, known_ids=known, data=data)
         self.assertEqual(len(problems), 1, problems)
         self.assertIn("JOB-1", problems[0])
+
+
+class HrEvidenceTest(unittest.TestCase):
+    """人事の evidence（答えの文書ごとの、本文にそのまま出る語句）。小さな「本文のもと」のフォルダーで確かめる。"""
+
+    DATA = {"files": [
+        {"doc_id": "JOB-1", "kind": "job_posting", "ocr_required": False},
+        {"doc_id": "CV-1", "kind": "resume", "ocr_required": False},
+        {"doc_id": "MAIL-1", "kind": "mail", "ocr_required": False},
+        {"doc_id": "EVAL-1", "kind": "interview_evaluations", "ocr_required": False},
+        {"doc_id": "SCAN-1", "kind": "scan", "ocr_required": True},
+        {"doc_id": "SCAN-2", "kind": "scan", "ocr_required": True},
+    ]}
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        root = Path(self.tmp.name)
+        self.content = root / "content"
+        for name in ("jobs", "resumes"):
+            (self.content / name).mkdir(parents=True)
+        (self.content / "jobs" / "JOB-1.md").write_text("# 求人票\n\n## 年収\n\n600万円から\n800万円。経験により決定します。\n", encoding="utf-8")
+        (self.content / "resumes" / "CV-1.md").write_text("氏名: 山田 太郎\n自己PR: 現年収は700万円です。\n", encoding="utf-8")
+        self.write("mail.json", {"mails": [{"id": "MAIL-1", "subject": "【REQ-1】面接のご案内", "body": "二次面接は東京本社で行います。"}]})
+        self.write("evaluations.json", {"rows": [{"evaluation_id": "EV-1", "comment": "必須条件を満たす。推奨する。"}]})
+        self.write("source_ats.json", {"persons": [{"display_name": "鈴木 花子"}]})
+        self.write("scans.json", {"scans": [{"id": "SCAN-1", "kind": "memo", "what": "手書きの面接メモ（2026-10-22）"},
+                                            {"id": "SCAN-2", "kind": "offer", "what": "内定承諾書"}]})
+        (root / "make_scans.py").write_text(
+            'def make_memo():\n    items = ["・懸念：特になし。入社時期は要確認"]\n    label = "確認印"\n\n\n'
+            'def make_offer():\n    items = [("入社予定日", "2026年12月1日")]\n\n\ndef main():\n    pass\n', encoding="utf-8")
+        patch = mock.patch.object(ev, "HR_CONTENT_DIR", self.content)
+        patch.start()
+        self.addCleanup(patch.stop)
+
+    def write(self, name, content):
+        (self.content / name).write_text(json.dumps(content, ensure_ascii=False), encoding="utf-8")
+
+    def check(self, question):
+        known = ev.ids_of("hr", self.DATA)
+        return ev.check_hr([question], known_ids=known, data=self.DATA)
+
+    def question(self, **extra):
+        q = {"qid": "q1", "question": "年収は", "type": "numeric", "answer_ids": ["JOB-1"],
+             "evidence": {"JOB-1": "600万円から800万円"}}
+        q.update(extra)
+        return q
+
+    def test_phrases_found_in_each_kind_of_source_pass(self):
+        q = {"qid": "m1", "question": "いくつもの文書", "type": "multi-doc",
+             "answer_ids": ["JOB-1", "CV-1", "MAIL-1", "EVAL-1", "SCAN-1", "SCAN-2"],
+             "evidence": {"JOB-1": "600万円から800万円",        # 折り返しの空白があっても探せる
+                          "CV-1": "現年収は700万円です",
+                          "MAIL-1": "二次面接は東京本社で行います",
+                          "EVAL-1": "必須条件を満たす。推奨する",    # evaluations.json
+                          "SCAN-1": "確認印",                       # make_scans.py の make_memo の中
+                          "SCAN-2": "2026年12月1日"}}               # make_offer の中
+        self.assertEqual(self.check(q), [])
+        # 件名、台帳（source_ats.json）、scans.json の記述にある語句でもよい
+        q["evidence"].update({"MAIL-1": "面接のご案内", "EVAL-1": "鈴木 花子", "SCAN-1": "手書きの面接メモ（2026-10-22）"})
+        self.assertEqual(self.check(q), [])
+
+    def test_wrong_phrase_is_reported(self):
+        problems = self.check(self.question(evidence={"JOB-1": "650万円から950万円"}))
+        self.assertEqual(len(problems), 1, problems)
+        self.assertIn("q1", problems[0])
+        self.assertIn("JOB-1", problems[0])
+        self.assertIn("650万円から950万円", problems[0])
+        self.assertIn("jobs/JOB-1.md", problems[0])
+        # 別の文書の語句は、その文書にないので問題
+        problems = self.check(self.question(evidence={"JOB-1": "現年収は700万円です"}))
+        self.assertEqual(len(problems), 1, problems)
+
+    def test_scan_phrase_must_come_from_that_scans_own_function(self):
+        base = {"qid": "s1", "question": "スキャン", "type": "scan", "answer_ids": ["SCAN-1"]}
+        self.assertEqual(self.check({**base, "evidence": {"SCAN-1": "入社時期は要確認"}}), [])
+        problems = self.check({**base, "evidence": {"SCAN-1": "2026年12月1日"}})   # SCAN-2（make_offer）の文字
+        self.assertEqual(len(problems), 1, problems)
+        self.assertIn("SCAN-1", problems[0])
+        self.assertIn("2026年12月1日", problems[0])
+
+    def test_missing_evidence_is_reported(self):
+        # 項目がない
+        q = self.question()
+        del q["evidence"]
+        problems = self.check(q)
+        self.assertEqual(len(problems), 1, problems)
+        self.assertIn("evidence がありません", problems[0])
+        # 形が違う
+        problems = self.check(self.question(evidence=["600万円から800万円"]))
+        self.assertEqual(len(problems), 1, problems)
+        self.assertIn("evidence は", problems[0])
+        # 文書の分が足りない
+        q = self.question(type="multi-doc", answer_ids=["JOB-1", "CV-1"])
+        problems = self.check(q)
+        self.assertEqual(len(problems), 1, problems)
+        self.assertIn("CV-1", problems[0])
+        self.assertIn("語句がありません", problems[0])
+        # 語句が空
+        problems = self.check(self.question(evidence={"JOB-1": " "}))
+        self.assertTrue(any("JOB-1" in p and "語句がありません" in p for p in problems), problems)
+        # permission は hidden_ids の文書にも要る
+        perm = {"qid": "p1", "question": "見えない", "type": "permission", "answer_ids": [], "as_role": "role:employee",
+                "hidden_ids": ["CV-1", "MAIL-1"], "evidence": {"CV-1": "現年収は700万円です"}}
+        problems = self.check(perm)
+        self.assertEqual(len(problems), 1, problems)
+        self.assertIn("MAIL-1", problems[0])
+
+    def test_evidence_for_a_document_not_in_the_question_is_reported(self):
+        problems = self.check(self.question(evidence={"JOB-1": "600万円から800万円", "CV-1": "現年収は700万円です"}))
+        self.assertEqual(len(problems), 1, problems)
+        self.assertIn("CV-1", problems[0])
+        self.assertIn("answer_ids にも hidden_ids にもありません", problems[0])
+
+    def test_unreadable_source_is_reported_not_crashed(self):
+        (self.content / "jobs" / "JOB-1.md").unlink()
+        problems = self.check(self.question())
+        self.assertEqual(len(problems), 1, problems)
+        self.assertIn("語句を探せません", problems[0])
+        (self.content / "mail.json").write_text("{", encoding="utf-8")
+        q = {"qid": "q2", "question": "メール", "type": "numeric", "answer_ids": ["MAIL-1"], "evidence": {"MAIL-1": "x"}}
+        problems = self.check(q)
+        self.assertEqual(len(problems), 1, problems)
+        self.assertIn("mail.json", problems[0])
+
+    def test_phrase_search_is_skipped_when_the_content_folder_is_missing(self):
+        with mock.patch.object(ev, "HR_CONTENT_DIR", Path(self.tmp.name) / "no-such-folder"):
+            self.assertEqual(self.check(self.question(evidence={"JOB-1": "どこにもない語句"})), [])
+            # 語句がそろっているかは、フォルダーがなくても見る
+            q = self.question()
+            del q["evidence"]
+            self.assertEqual(len(self.check(q)), 1)
+
+    def test_phrase_search_is_skipped_without_manifest(self):
+        questions = [self.question(evidence={"JOB-1": "どこにもない語句"})]
+        self.assertEqual(ev.check_hr(questions, known_ids={"JOB-1"}, data=None), [])
+
+    def test_evidence_for_unknown_ids_is_not_demanded_twice(self):
+        # 文書にない ID は共通の確かめが言う。evidence には求めない
+        q = self.question(answer_ids=["JOB-1", "NOPE-1"])
+        self.assertEqual(self.check(q), [])
 
 
 class HrQuestionsTest(unittest.TestCase):
@@ -415,6 +575,24 @@ class HrQuestionsTest(unittest.TestCase):
         # 答えが空の質問（漏れだけを数える）と、求人票で答えられる部分がある質問の両方がある
         self.assertTrue(any(not q["answer_ids"] for q in permission))
         self.assertTrue(any(q["answer_ids"] for q in permission))
+
+    def test_hr_evidence_is_complete_and_found_in_the_source_texts(self):
+        self.assertTrue(ev.HR_CONTENT_DIR.is_dir(), "本文のもと（applied/data/_build/content）がないと、語句の確かめが飛ばされる")
+        for q in self.questions:
+            ids = set(q["answer_ids"]) | set(q.get("hidden_ids", []))
+            self.assertEqual(set(q["evidence"]), ids, q["qid"])   # 文書ごとに 1 つ。余りもない
+            for doc_id, phrase in q["evidence"].items():
+                text, _ = ev.hr_source_text(doc_id, self.files[doc_id], ev.HR_CONTENT_DIR)
+                self.assertIn(ev._squash(phrase), ev._squash(text), f"{q['qid']} の evidence {doc_id}")
+
+    def test_hr_order_mixes_the_types(self):
+        types = [q["type"] for q in self.questions]
+        order = list(ev.TYPE_TARGETS["hr"])
+        # hr-01〜hr-36 は、6 問ごとに 6 つの種類が 1 回ずつ。hr-37 以降は scan がなく、最後の 4 問は paraphrase と permission
+        for start in range(0, 36, 6):
+            self.assertEqual(sorted(types[start:start + 6]), sorted(order), f"hr-{start + 1:02d} から 6 問")
+        self.assertNotIn("scan", types[36:])
+        self.assertEqual(set(types[56:]), {"paraphrase", "permission"})
 
     def test_hr_scan_questions_include_an_ocr_document(self):
         scan = [q for q in self.questions if q["type"] == "scan"]
