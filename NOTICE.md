@@ -23,7 +23,7 @@
 
 ## スライドの操作（player.js）
 
-`docs/lecture/player.js` と `site/lecture/player.js` は、slideplay の `player/player.js` の写しです。
+`docs/lecture/player.js` と `site/lecture/player.js` は、slideplay 0.1.0 の `player/player.js` の写しです。
 
 - 元：slideplay（<https://github.com/dmasubuchi/slideplay>、MIT License、Copyright (c) 2026 dmasubuchi）
 

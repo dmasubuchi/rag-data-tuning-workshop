@@ -1,6 +1,7 @@
-// slideplay（https://github.com/dmasubuchi/slideplay、MIT License, Copyright (c) 2026 dmasubuchi）の player/player.js の写し。
+// slideplay 0.1.0（https://github.com/dmasubuchi/slideplay、MIT License, Copyright (c) 2026 dmasubuchi）の player/player.js の写し。
 // このファイルは MIT License で使えます（全文はこの Repo の LICENSE）。
 // このファイルのコメントにある「約束」「CONTRACT.md」は、slideplay の Repo にある約束書（CONTRACT.md）のこと。この Repo には置いていない。
+// slideplay 0.1.0
 // プレイヤー本体（CONTRACT.md）。1ファイル・依存なし・CSS 込み・file:// で動く。
 // 動画用の描画モード（?render）のときは、下の2つの関数と body.render のほかは何もしない（約束 §3.1）。
 (() => {

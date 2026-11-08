@@ -10,7 +10,7 @@ HTML のスライド（`site/lecture/`）と Markdown（`docs/lecture/md/`）の
 - `keywords.md`：キーワードのページ（全52ページ）。**本文を直すときはここを直す**
 - `decks.json`：デッキ（部）の構成。ページの並び、節、各ページの「確かめる」トピック、新しく足したページ（はじめに、順位の調整、うまくいかない場面など）、トピックの表
 - `deck.html`：描画のひな形。部品 `kw`（2段組みの3層の箇条書き。文字は枠に収まるよう 26px から 17px まで縮む）と `diagram`（図）、全ページ共通の「確かめる」の欄がある
-- `player.js`：スライドのプレイヤー（slideplay の `player/player.js` の写し。MIT License。<https://github.com/dmasubuchi/slideplay>）
+- `player.js`：スライドのプレイヤー（slideplay 0.1.0 の `player/player.js` の写し。MIT License。<https://github.com/dmasubuchi/slideplay>）
 - `catalog.css`：目次のページの見た目
 - `diagrams/`：図。`pNN.json`（題、キャプション、SVG、ノート）は `figures.py` が `figs_*.py` から書き出す。どのページにも図がある
 - `tools/build.py`：`site/lecture/`（HTML のスライド）と `docs/lecture/md/`（Markdown）を作る
