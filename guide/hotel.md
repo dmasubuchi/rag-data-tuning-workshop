@@ -38,9 +38,9 @@ Microsoft のホテルのサンプルデータ（日本語版）で、Azure AI S
 
 ### 使うファイル
 
-- ホテルのデータ（日本語版）：[HotelsData_toAzureBlobs_ja.json](https://github.com/dmasubuchi/azure-search-sample-data-ja/blob/82c5f4a/hotels/ja/HotelsData_toAzureBlobs_ja.json)（50ホテル。元のデータの英語とフランス語の欄に、日本語の欄を足したもの）
+- ホテルのデータ（日本語版）：[HotelsData_toAzureBlobs_ja.json](https://github.com/dmasubuchi/azure-search-sample-data-ja/blob/66f7014/hotels/ja/HotelsData_toAzureBlobs_ja.json)（50ホテル。元のデータの英語とフランス語の欄に、日本語の欄を足したもの）
   - GitHub の画面でファイルを開き、「Download raw file」で保存します。
-  - 日本語は AI で作った訳です。出どころとライセンスは、同じフォルダーの [README](https://github.com/dmasubuchi/azure-search-sample-data-ja/blob/82c5f4a/hotels/ja/README.md) に書いてあります。
+  - 日本語は AI で作った訳です。出どころとライセンスは、同じフォルダーの [README](https://github.com/dmasubuchi/azure-search-sample-data-ja/blob/66f7014/hotels/ja/README.md) に書いてあります。
 - ホテルのデータに含まれる項目：`HotelId`（キー）、`HotelName`・`HotelName_ja`、`Description`（英語）・`Description_fr`・`Description_ja`、`Category`・`Category_ja`、`Tags`・`Tags_ja`、`ParkingIncluded`、`IsDeleted`、`LastRenovationDate`、`Rating`、`Address`（住所の入れ子）、`Location`（緯度と経度）、`Rooms`（客室の配列）
 
 ### 確認の欄

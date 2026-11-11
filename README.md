@@ -59,7 +59,7 @@ Everything is in Japanese: slides, step-by-step guides, scripts and sample data.
 
 入口は [site/index.html](site/index.html) です。目的、始め方、スライド、基礎編・応用編のページへのリンクを1枚にまとめています。スライドは [site/lecture/index.html](site/lecture/index.html) から開きます。
 
-GitHub Pages での公開を予定しています。いまは、Repo を手元に取り込み、ブラウザで開いてください。
+Web では <https://dmasubuchi.github.io/rag-data-tuning-workshop/> で開けます（GitHub Pages）。手元では、Repo を取り込んで `site/index.html` をブラウザで開きます。
 
 ## 教材を直す人へ
 

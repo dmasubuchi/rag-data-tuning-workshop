@@ -171,7 +171,7 @@ class GuideTest(unittest.TestCase):
         """サブスクリプション ID・Repo の URL（ホテルのデータを除く）・日付が、手順書に出ていない。"""
         guid = re.compile(r"[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}")
         date = re.compile(r"\b20\d\d[-/.]\d{1,2}[-/.]\d{1,2}\b|\b\d{1,2}/\d{1,2}\b")
-        allowed_url = ("https://github.com/dmasubuchi/azure-search-sample-data-ja/blob/82c5f4a/",)
+        allowed_url = ("https://github.com/dmasubuchi/azure-search-sample-data-ja/blob/66f7014/",)
         for name, text in guide_texts().items():
             self.assertIsNone(guid.search(text), name)
             self.assertIsNone(date.search(re.sub(r"--model-version \S+", "", text)), f"{name} に日付がある")   # モデルの版は日付の形
@@ -187,7 +187,7 @@ class GuideTest(unittest.TestCase):
 
     def test_hotel_data_is_pinned_to_the_commit(self):
         text = guide_texts()["hotel.md"]
-        self.assertIn("https://github.com/dmasubuchi/azure-search-sample-data-ja/blob/82c5f4a/hotels/ja/HotelsData_toAzureBlobs_ja.json", text)
+        self.assertIn("https://github.com/dmasubuchi/azure-search-sample-data-ja/blob/66f7014/hotels/ja/HotelsData_toAzureBlobs_ja.json", text)
         self.assertNotIn("/blob/main/", text)
 
     def test_commands_in_the_guide_exist(self):
@@ -316,7 +316,7 @@ class GuideTest(unittest.TestCase):
         self.assertGreaterEqual(count, 20)
 
     def test_hotel_indexes_cover_every_field_of_the_data(self):
-        """インデックスの項目が、日本語版のホテルのデータ（コミット 82c5f4a）の全項目と、入れ子の中まで同じ。"""
+        """インデックスの項目が、日本語版のホテルのデータ（コミット 66f7014）の全項目と、入れ子の中まで同じ。"""
         hotel = {"Address", "Category", "Category_ja", "Description", "Description_fr", "Description_ja", "HotelId",
                  "HotelName", "HotelName_ja", "IsDeleted", "LastRenovationDate", "Location", "ParkingIncluded", "Rating",
                  "Rooms", "Tags", "Tags_ja"}
