@@ -90,6 +90,7 @@
 </ul>
 <p>人事に進むチームの前提：</p>
 <ul>
+<li>人事を動かす全員（構築する人とメンバー）が、Repo 直下で <code>pip install -r applied/requirements.txt</code> を済ませる（武将のライブラリだけでは足りない）</li>
 <li>構築する人が、<a href="guide-hr.html">人事</a>の「最初に1回」を済ませておく。<code>python applied/tools/build_hr_index.py</code> で <code>hr-docs</code> を取り込む（OCR を含むので、数分かかる）。武将の途中で始めておくと、待たない</li>
 <li>取り込みが終わったら、<code>python applied/tools/build_hr_index.py --status</code> で状態を見る。メンバーは、取り込みが終わってから始める</li>
 <li>14 は手元の Python だけで動く（Azure は使わない）。15・16 は、構築する人が作った <code>hr-docs</code> を検索する</li>
