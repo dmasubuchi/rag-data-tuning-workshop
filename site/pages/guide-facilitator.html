@@ -15,6 +15,8 @@
 <nav class="toc"><details><summary>このページの目次</summary>
 <ul>
 <li class="l2"><a href="#人">人</a></li>
+<li class="l2"><a href="#5時間で進めるとき例">5時間で進めるとき（例）</a></li>
+<li class="l3"><a href="#遅れたとき早く終わったとき">遅れたとき・早く終わったとき</a></li>
 <li class="l2"><a href="#開始前の準備">開始前の準備</a></li>
 <li class="l3"><a href="#渡す値を決める">渡す値を決める</a></li>
 <li class="l3"><a href="#azure招待と所有者の割り当て">Azure：招待と所有者の割り当て</a></li>
@@ -33,7 +35,7 @@
 </ul>
 </details></nav>
 
-<p>研修を進める人（進行役）向けです。開始前の準備、パートの順、各パートで見せるもの、つまずきやすい所をまとめます。時刻は決めていません。人数やパートの長さに合わせて組みます。</p>
+<p>研修を進める人（進行役）向けです。開始前の準備、パートの順、各パートで見せるもの、つまずきやすい所をまとめます。時刻は人数やパートの長さに合わせて組みます。5時間で進めるときの例は「<a href="#5時間で進めるとき例">5時間で進めるとき（例）</a>」にあります。</p>
 <h2 id="人">人</h2>
 <ul>
 <li>進行役：全体を進める。組織の設定の値を渡し、Azure の権限を付ける。複数いるときは、チームごとに担当を決める</li>
@@ -41,6 +43,74 @@
 <li>チームの名前を決めたあとは、その名前（<code>&lt;team&gt;</code>）でチームを呼ぶ</li>
 </ul>
 <p>流れ：パート1 PC、パート2 Azure、パート3 基礎編（ホテルと武将）、パート4 応用編（人事）、締め</p>
+<h2 id="5時間で進めるとき例">5時間で進めるとき（例）</h2>
+<p>5時間で進めるときの例です。時刻はすべて例で、日時と相手が決まったら組み直します。</p>
+<ul>
+<li>範囲：全チームが、ホテル（章1〜3）と武将 01〜06 までを終える。早いチームは、人事と評価に進む</li>
+<li>最初の約30分は進行役が話し、残りは各チームが手順書を見て手を動かす。進行役は見て回る</li>
+<li>
+<p>「目安」は、その時刻までに見えていればよい数字</p>
+</li>
+<li>
+<p>0:00–0:30　さわりとガイダンス（進行役が話す）</p>
+<ul>
+<li>やること：検索の基盤のほかに、データの側（加工・運営・評価）があることを話す。進め方と、チームの役割を伝える</li>
+<li>映す：<a href="../lecture/intro/slides.html">はじめに</a>のさわりの3枚と、進め方</li>
+</ul>
+</li>
+<li>0:30–1:15　パート1 PC とパート2 Azure（→ <a href="#パート1-pc-の設定">パート1</a>、<a href="#パート2-azure-の接続とリソース作成">パート2</a>）<ul>
+<li>やること：PC を整え、チームの名前を決めて、Azure のリソースを作り、<code>.env.local</code> を作る</li>
+<li>目安：<code>python tools/team.py health --team &lt;team&gt;</code> が <code>OK 8・まだ 0・NG 0</code></li>
+</ul>
+</li>
+<li>1:15–2:10　ホテル 章1〜3（→ <a href="#ホテル">ホテル</a>）<ul>
+<li>やること：Blob のホテルを AI Search に取り込み、6つの機能を試す</li>
+<li>映す：<a href="../lecture/part2-ingestion/slides.html#p16">p.16 取り込みの順番</a>、<a href="../lecture/part1-search/slides.html#p01">p.1 BM25</a>、<a href="../lecture/part1-search/slides.html#p11">p.11 フィルターとファセット</a></li>
+<li>目安：<code>hotels-blob</code> のドキュメント数が50。章3のキーワード検索で beach が4件</li>
+</ul>
+</li>
+<li>2:10–2:20　休憩</li>
+<li>2:20–3:50　武将 01〜06（→ <a href="#武将">武将</a>）<ul>
+<li>やること：構築する人が 01 から順に進め、メンバーは検索のスクリプトを動かす。05 の60問の測定は、進行役が1回見せる（チームでは動かさない）</li>
+<li>映す：<a href="../lecture/part1-search/slides.html#p13">p.13 同義語マップ</a>、<a href="../lecture/part1-search/slides.html#p02">p.2 ベクトル検索</a>、<a href="../lecture/part1-search/slides.html#p03">p.3 ハイブリッド検索</a>、<a href="../lecture/part4-evaluation/slides.html#p42">p.42 NDCG と再現率</a>、<a href="../lecture/part5-wrapup/slides.html#p50">p.50 ハルシネーション</a></li>
+<li>目安：01 で <code>sengoku</code> が150件。03 で、言い換えの質問のベクトル検索の1位が正解。06 で、検索ありの答えが正解</li>
+</ul>
+</li>
+<li>3:50–4:00　休憩</li>
+<li>4:00–4:40　チームごとに分かれる<ul>
+<li>早いチーム（武将 06 まで終わった）：<a href="guide-hr.html">人事</a> 14 → 15 → 16、その次に<a href="guide-evaluation.html">評価</a>（<code>--limit 6</code>）</li>
+<li>遅いチーム：武将の残り。進行役は遅いチームを回る</li>
+</ul>
+</li>
+<li>4:40–5:00　締め（→ <a href="#締め">締め</a>）<ul>
+<li>やること：作り方の比較と料金を振り返る。続きの進め方（ホテルの章4〜5、人事 17〜20、評価の全部）を伝える。片付けを伝える（→ <a href="#終わったあと">終わったあと</a>）</li>
+<li>映す：<a href="../lecture/part5-wrapup/slides.html#p46">p.46 作り方の比較</a>、<a href="../lecture/part5-wrapup/slides.html#p52">p.52 料金の構造</a></li>
+</ul>
+</li>
+</ul>
+<p>人事に進むチームの前提：</p>
+<ul>
+<li>構築する人が、<a href="guide-hr.html">人事</a>の「最初に1回」を済ませておく。<code>python applied/tools/build_hr_index.py</code> で <code>hr-docs</code> を取り込む（OCR を含むので、数分かかる）。武将の途中で始めておくと、待たない</li>
+<li>取り込みが終わったら、<code>python applied/tools/build_hr_index.py --status</code> で状態を見る。メンバーは、取り込みが終わってから始める</li>
+<li>14 は手元の Python だけで動く（Azure は使わない）。15・16 は、構築する人が作った <code>hr-docs</code> を検索する</li>
+</ul>
+<p>パート4 の進行役のデモ（14〜20 と<a href="applied-assistant-README.html">採用アシスタント</a>）は、この時間割に入れていません。</p>
+<h3 id="遅れたとき早く終わったとき">遅れたとき・早く終わったとき</h3>
+<p>遅れたら、飛ばしてよい所：</p>
+<ul>
+<li>ホテルの 3-4 地理検索と 3-6 ソート：あとで、各チームで進める</li>
+<li>武将 05 の60問の測定：チームでは動かさず、進行役が見せた数字を見る</li>
+</ul>
+<p>判断の時刻の目安：</p>
+<ul>
+<li>2:10 にホテルの章3が終わっていなければ、3-4 と 3-6 を飛ばして武将へ進む</li>
+<li>3:50 に武将 06 まで来ていなければ、4:00–4:40 で続きを進める</li>
+</ul>
+<p>早く終わったら、人事 14 → 15 → 16、そのあと評価へ進む：</p>
+<ul>
+<li>評価の確かめ：<code>python tools/eval_search.py --dataset hr --limit 6</code>（先頭の6問だけ。セマンティック ランカーを6回使う）</li>
+<li>全部の質問を測るのは、チームで1回にする（<a href="guide-evaluation.html">評価</a>）</li>
+</ul>
 <h2 id="開始前の準備">開始前の準備</h2>
 <h3 id="渡す値を決める">渡す値を決める</h3>
 <p>次の4つを決めて、参加者に伝えます（参加者は <code>workshop.config</code> に書きます）。</p>
